@@ -99,7 +99,9 @@ async def websocket_endpoint(websocket: WebSocket, document_id: str):
     server = await get_websocket_server()
     room = await server.get_room(document_id)
 
-    adapter = FastAPIWebsocketAdapter(websocket, path=document_id, read_only=read_only)
+    adapter = FastAPIWebsocketAdapter(
+        websocket, path=document_id, read_only=read_only, user=user,
+    )
 
     try:
         await room.serve(adapter)

@@ -4,9 +4,15 @@ Bridges FastAPI WebSocket connections to pycrdt-websocket YRooms.
 Each document gets its own room identified by document ID. The handler
 authenticates users via JWT cookie or API key query param before allowing
 connection.
+
+Permission enforcement is dynamic: the adapter periodically re-checks
+the user's permission from the database so that mid-session ACL changes
+(e.g. owner downgrades a collaborator from Editor to Viewer) take effect
+within ``_PERM_RECHECK_INTERVAL`` seconds.
 """
 
 import logging
+import time
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -15,6 +21,8 @@ from pycrdt.websocket import WebsocketServer, YRoom
 from app.services.crdt_store import MongoYStore
 
 logger = logging.getLogger(__name__)
+
+_PERM_RECHECK_INTERVAL = 10  # seconds between permission re-checks
 
 
 class CollabWebsocketServer(WebsocketServer):
@@ -59,19 +67,33 @@ class FastAPIWebsocketAdapter:
 
     When ``read_only=True``, incoming Yjs sync-update messages (document edits)
     are silently dropped so VIEW users cannot push changes through the CRDT layer.
+
+    Permission is dynamically re-checked every ``_PERM_RECHECK_INTERVAL`` seconds
+    so that mid-session ACL changes (e.g. downgrade from Editor to Viewer) are
+    enforced without requiring the client to reconnect.
     """
 
-    def __init__(self, websocket: WebSocket, path: str, *, read_only: bool = False) -> None:
+    def __init__(
+        self,
+        websocket: WebSocket,
+        path: str,
+        *,
+        read_only: bool = False,
+        user: Any = None,
+    ) -> None:
         """Initialize the adapter.
 
         Args:
             websocket: The FastAPI WebSocket connection.
             path: The room path (document ID).
             read_only: If True, block incoming document update messages.
+            user: The authenticated User object (needed for permission re-checks).
         """
         self.websocket = websocket
         self.path = path
         self.read_only = read_only
+        self._user = user
+        self._last_perm_check = time.monotonic()
 
     async def send(self, message: bytes) -> None:
         """Send a binary message to the client.
@@ -96,11 +118,39 @@ class FastAPIWebsocketAdapter:
         """Return the async iterator for incoming messages."""
         return self
 
+    async def _recheck_permission(self) -> None:
+        """Re-check the user's permission from the database.
+
+        Called periodically (throttled by ``_PERM_RECHECK_INTERVAL``) to detect
+        mid-session ACL changes such as a collaborator being downgraded from
+        Editor to Viewer, or having their access revoked entirely.
+        """
+        if self._user is None:
+            return
+
+        now = time.monotonic()
+        if now - self._last_perm_check < _PERM_RECHECK_INTERVAL:
+            return
+        self._last_perm_check = now
+
+        from app.models.share_link import Permission
+        from app.services.share_service import get_user_permission
+
+        perm = await get_user_permission(self.path, self._user)
+        if perm is None or perm == Permission.VIEW:
+            if not self.read_only:
+                logger.info(
+                    "Permission changed to %s for user on room %s; enabling read-only",
+                    perm, self.path,
+                )
+            self.read_only = True
+
     async def __anext__(self) -> bytes:
         """Receive the next binary message from the client.
 
         When ``read_only`` is set, Yjs sync-update messages are silently
-        dropped (the loop continues to the next message).
+        dropped (the loop continues to the next message). Permission is
+        re-checked periodically so mid-session ACL changes take effect.
 
         Returns:
             The binary message data.
@@ -116,9 +166,11 @@ class FastAPIWebsocketAdapter:
             except Exception:
                 raise StopAsyncIteration()
 
-            if self.read_only and self._is_write_message(data):
-                logger.debug("Dropped write message from read-only client on room %s", self.path)
-                continue
+            if self._is_write_message(data):
+                await self._recheck_permission()
+                if self.read_only:
+                    logger.debug("Dropped write message from read-only client on room %s", self.path)
+                    continue
             return data
 
 
