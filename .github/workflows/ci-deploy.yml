@@ -31,11 +31,11 @@ jobs:
         working-directory: frontend
 
       - name: TypeScript type check
-        run: npx tsc --noEmit
+        run: ./node_modules/.bin/tsc --noEmit
         working-directory: frontend
 
       - name: Run frontend tests
-        run: npx vitest run
+        run: ./node_modules/.bin/vitest run
         working-directory: frontend
 
   deploy:
