@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render } from "@testing-library/react";
 
 vi.mock("../../hooks/useDarkMode", () => ({
   useDarkMode: vi.fn(() => false),
@@ -28,14 +28,16 @@ describe("MarkdownPreview", () => {
   });
 
   it("renders plain text markdown", () => {
-    render(<MarkdownPreview content="Hello world" />);
-    expect(screen.getByText("Hello world")).toBeDefined();
+    const { getByText } = render(<MarkdownPreview content="Hello world" />);
+    expect(getByText("Hello world")).toBeDefined();
   });
 
   it("renders headings correctly", () => {
-    render(<MarkdownPreview content={"# Heading 1\n\n## Heading 2"} />);
-    expect(screen.getByRole("heading", { level: 1 })).toBeDefined();
-    expect(screen.getByRole("heading", { level: 2 })).toBeDefined();
+    const { getByRole } = render(
+      <MarkdownPreview content={"# Heading 1\n\n## Heading 2"} />,
+    );
+    expect(getByRole("heading", { level: 1 })).toBeDefined();
+    expect(getByRole("heading", { level: 2 })).toBeDefined();
   });
 
   it("renders code blocks", () => {
