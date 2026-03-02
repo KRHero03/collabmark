@@ -27,10 +27,8 @@ jobs:
           node-version: "22"
 
       - name: Install frontend dependencies
-        run: npm install --no-optional
+        run: corepack enable && yarn install
         working-directory: frontend
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
 
       - name: TypeScript type check
         run: ./node_modules/.bin/tsc --noEmit
