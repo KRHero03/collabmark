@@ -1,0 +1,527 @@
+/**
+ * Editor page with split-pane layout: collaborative CodeMirror editor
+ * on the left, live Markdown preview (or comments gutter) on the right.
+ *
+ * Uses Yjs for real-time CRDT-based collaboration. Document metadata
+ * (title) is managed via REST API; content is synced via WebSocket.
+ *
+ * Integrates comment anchoring: the MarkdownEditor exposes its EditorView
+ * and selection events; the useCommentAnchors and useCommentPositions hooks
+ * resolve inline comment positions against the live Y.Doc.
+ *
+ * Panel toggle behaviour: toolbar buttons toggle panels (History, Comments).
+ * Only one panel can be open at a time; opening one closes the other.
+ * Panels include a backdrop overlay that can be clicked to dismiss.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useParams } from "react-router";
+import * as Y from "yjs";
+import type { EditorView } from "codemirror";
+import { Navbar } from "../components/Layout/Navbar";
+import {
+  MarkdownEditor,
+  type EditorSelection,
+  type CommentRange,
+} from "../components/Editor/MarkdownEditor";
+import { MarkdownPreview } from "../components/Editor/MarkdownPreview";
+import { EditorToolbar } from "../components/Editor/EditorToolbar";
+import { ShareDialog } from "../components/Editor/ShareDialog";
+import { VersionHistory } from "../components/Editor/VersionHistory";
+import { CommentsPanel } from "../components/Editor/CommentsPanel";
+import { documentsApi, sharingApi, type GeneralAccess, type Permission } from "../lib/api";
+import { useYjsProvider } from "../hooks/useYjsProvider";
+import { useAuth } from "../hooks/useAuth";
+import { useComments } from "../hooks/useComments";
+import { useCommentAnchors } from "../hooks/useCommentAnchors";
+import { useCommentPositions } from "../hooks/useCommentPositions";
+
+/** Encode a Uint8Array to a Base64 string. */
+function uint8ToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+const DEBOUNCE_MS = 1500;
+const EDITOR_WIDTH_KEY = "collabmark_editor_width";
+const MIN_WIDTH = 20;
+const MAX_WIDTH = 80;
+
+export function EditorPage() {
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const [title, setTitle] = useState("Untitled");
+  const [content, setContent] = useState("");
+  const [debouncedContent, setDebouncedContent] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [presentationMode, setPresentationMode] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
+  const [generalAccess, setGeneralAccess] = useState<GeneralAccess>("restricted");
+  const [ownerEmail, setOwnerEmail] = useState("");
+  const [ownerName, setOwnerName] = useState("");
+  const [permission, setPermission] = useState<Permission>("edit");
+
+  const titleSetByUser = useRef(false);
+
+  const [editorWidthPct, setEditorWidthPct] = useState(() => {
+    const saved = localStorage.getItem(EDITOR_WIDTH_KEY);
+    return saved ? Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Number(saved))) : 50;
+  });
+  const isDragging = useRef(false);
+  const splitContainerRef = useRef<HTMLDivElement>(null);
+
+  const [editorView, setEditorView] = useState<EditorView | null>(null);
+  const [selection, setSelection] = useState<EditorSelection | null>(null);
+  const [selectionRelative, setSelectionRelative] = useState<{
+    from: string;
+    to: string;
+  } | null>(null);
+
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  const { ydoc, ytext, provider, synced } = useYjsProvider(id);
+  const { comments } = useComments();
+
+  const anchors = useCommentAnchors({
+    ytext,
+    ydoc,
+    comments,
+    synced,
+  });
+
+  const positions = useCommentPositions(
+    editorView,
+    anchors,
+    editorContainerRef.current,
+  );
+
+  const commentRanges: CommentRange[] = useMemo(() => {
+    const ranges: CommentRange[] = [];
+    for (const [commentId, anchor] of anchors) {
+      if (anchor.status !== "orphaned") {
+        ranges.push({ commentId, from: anchor.from, to: anchor.to, status: anchor.status });
+      }
+    }
+    return ranges;
+  }, [anchors]);
+
+  useEffect(() => {
+    if (!id) return;
+    Promise.all([
+      documentsApi.get(id),
+      sharingApi.getMyPermission(id),
+    ]).then(([docRes, permRes]) => {
+      const data = docRes.data;
+      setTitle(data.title);
+      if (data.title && data.title !== "Untitled") {
+        titleSetByUser.current = true;
+      }
+      setIsOwner(data.owner_id === user?.id);
+      setGeneralAccess(data.general_access ?? "restricted");
+      setOwnerName(data.owner_name || "Unknown");
+      setOwnerEmail(data.owner_email || "");
+      setPermission(permRes.data.permission);
+      setLoading(false);
+    });
+  }, [id, user?.id]);
+
+  useEffect(() => {
+    document.title = title ? `${title} - CollabMark` : "CollabMark";
+    return () => { document.title = "CollabMark"; };
+  }, [title]);
+
+  useEffect(() => {
+    if (!synced) return;
+
+    const updateContent = () => {
+      setContent(ytext.toString());
+    };
+
+    updateContent();
+    ytext.observe(updateContent);
+
+    return () => {
+      ytext.unobserve(updateContent);
+    };
+  }, [ytext, synced]);
+
+  const titleSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveTitle = useCallback(
+    (newTitle: string) => {
+      if (!id || permission === "view") return;
+      if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current);
+      titleSaveTimer.current = setTimeout(async () => {
+        await documentsApi.update(id, { title: newTitle });
+      }, 800);
+    },
+    [id, permission],
+  );
+  useEffect(() => {
+    return () => {
+      if (titleSaveTimer.current) clearTimeout(titleSaveTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (titleSetByUser.current || title !== "Untitled") return;
+    const match = content.match(/^#{1,6}\s+(.+)/m);
+    if (match) {
+      const heading = match[1].trim();
+      if (heading) {
+        setTitle(heading);
+        saveTitle(heading);
+      }
+    }
+  }, [content, title, saveTitle]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedContent(content), DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [content]);
+
+  const previewStale = content !== debouncedContent;
+  const flushPreview = useCallback(() => setDebouncedContent(content), [content]);
+
+  const save = useCallback(async () => {
+    if (!id || permission === "view") return;
+    setSaving(true);
+    await documentsApi.update(id, { title, content: ytext.toString() });
+    setSaving(false);
+  }, [id, title, ytext, permission]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        if (permission === "edit") save();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [save, permission]);
+
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const handleExportPdf = useCallback(() => {
+    const previewEl = previewRef.current;
+    if (!previewEl) return;
+
+    const stylesheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+      .map((el) => el.outerHTML)
+      .join("\n");
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${title || "document"}</title>
+${stylesheets}
+<style>
+  @media print {
+    body { margin: 0; padding: 40px; }
+    @page { margin: 20mm; }
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    max-width: 800px; margin: 40px auto; padding: 0 20px;
+    font-size: 14px; line-height: 1.6; color: #333;
+  }
+  pre { background: #f5f5f5; padding: 16px; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; }
+  code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  th { background: #f5f5f5; }
+  blockquote { border-left: 3px solid #ddd; margin: 0; padding-left: 16px; color: #666; }
+  svg { max-width: 100%; height: auto; }
+</style>
+</head>
+<body>
+<h1>${title || "Untitled"}</h1>
+${previewEl.innerHTML}
+</body>
+</html>`);
+    printWindow.document.close();
+
+    // Wait for images/SVGs to settle before triggering print
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 500);
+  }, [title]);
+
+  const handleExportMd = useCallback(() => {
+    const text = ytext.toString();
+    const blob = new Blob([text], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "document"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [ytext, title]);
+
+  const toggleHistory = useCallback(() => {
+    setHistoryOpen((prev) => {
+      if (!prev) setCommentsOpen(false);
+      return !prev;
+    });
+  }, []);
+
+  const toggleComments = useCallback(() => {
+    setCommentsOpen((prev) => {
+      if (!prev) setHistoryOpen(false);
+      return !prev;
+    });
+  }, []);
+
+  const closeAllPanels = useCallback(() => {
+    setHistoryOpen(false);
+    setCommentsOpen(false);
+  }, []);
+
+  const handleSelectionChange = useCallback(
+    (sel: EditorSelection | null) => {
+      setSelection(sel);
+      if (sel && synced) {
+        const relFrom = Y.createRelativePositionFromTypeIndex(ytext, sel.from);
+        const relTo = Y.createRelativePositionFromTypeIndex(ytext, sel.to, -1);
+        setSelectionRelative({
+          from: uint8ToBase64(Y.encodeRelativePosition(relFrom)),
+          to: uint8ToBase64(Y.encodeRelativePosition(relTo)),
+        });
+      } else {
+        setSelectionRelative(null);
+      }
+    },
+    [ytext, synced],
+  );
+
+  const handleAddComment = useCallback(
+    (sel: EditorSelection) => {
+      setSelection(sel);
+      if (synced) {
+        const relFrom = Y.createRelativePositionFromTypeIndex(ytext, sel.from);
+        const relTo = Y.createRelativePositionFromTypeIndex(ytext, sel.to, -1);
+        setSelectionRelative({
+          from: uint8ToBase64(Y.encodeRelativePosition(relFrom)),
+          to: uint8ToBase64(Y.encodeRelativePosition(relTo)),
+        });
+      }
+      setCommentsOpen(true);
+      setHistoryOpen(false);
+    },
+    [ytext, synced],
+  );
+
+  const togglePresentation = useCallback(() => {
+    setPresentationMode((prev) => {
+      if (!prev) {
+        setHistoryOpen(false);
+        setCommentsOpen(false);
+      }
+      return !prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && presentationMode) {
+        setPresentationMode(false);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [presentationMode]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!isDragging.current || !splitContainerRef.current) return;
+      const rect = splitContainerRef.current.getBoundingClientRect();
+      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
+      const clamped = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, pct));
+      setEditorWidthPct(clamped);
+    };
+
+    const onUp = () => {
+      isDragging.current = false;
+      setEditorWidthPct((cur) => {
+        localStorage.setItem(EDITOR_WIDTH_KEY, String(Math.round(cur)));
+        return cur;
+      });
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen flex-col">
+      <Navbar />
+      <EditorToolbar
+        title={title}
+        onTitleChange={(t) => { titleSetByUser.current = true; setTitle(t); saveTitle(t); }}
+        onSave={save}
+        onExportMd={handleExportMd}
+        onExportPdf={handleExportPdf}
+        onShare={() => setShareOpen(true)}
+        onHistory={presentationMode ? undefined : toggleHistory}
+        onComments={presentationMode ? undefined : toggleComments}
+        onPresentation={togglePresentation}
+        presentationMode={presentationMode}
+        saving={saving}
+        readOnly={permission === "view"}
+      />
+      {!synced && (
+        <div className="flex items-center justify-center bg-yellow-50 px-4 py-1 text-xs text-yellow-700">
+          Connecting to collaboration server...
+        </div>
+      )}
+
+      {presentationMode ? (
+        /* ---- Presentation mode: centered preview only ---- */
+        <div className="flex-1 overflow-auto">
+          <div className="mx-auto max-w-4xl px-8 py-10">
+            {previewStale && (
+              <button
+                onClick={flushPreview}
+                className="mb-3 rounded-md bg-amber-100 px-3 py-1 text-xs text-amber-800 transition hover:bg-amber-200 dark:bg-amber-900 dark:text-amber-200"
+              >
+                Preview outdated — click to refresh
+              </button>
+            )}
+            <div ref={previewRef}>
+              <MarkdownPreview
+                content={debouncedContent}
+                className="prose-base"
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ---- Normal mode: editor + preview + comments ---- */
+        <div ref={splitContainerRef} className="flex flex-1 overflow-hidden">
+          {/* Editor pane */}
+          <div
+            ref={editorContainerRef}
+            className="overflow-auto border-r border-[var(--color-border)]"
+            style={{
+              width: commentsOpen
+                ? `calc(${editorWidthPct}% - 180px)`
+                : `${editorWidthPct}%`,
+            }}
+          >
+            {provider && (
+              <MarkdownEditor
+                ytext={ytext}
+                awareness={provider.awareness}
+                userName={user?.name}
+                onViewReady={setEditorView}
+                onSelectionChange={handleSelectionChange}
+                onAddComment={permission === "edit" ? handleAddComment : undefined}
+                commentRanges={commentRanges}
+                readOnly={permission === "view"}
+              />
+            )}
+          </div>
+
+          {/* Resize handle */}
+          <div
+            onMouseDown={handleResizeStart}
+            className="w-1 flex-shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-primary)]"
+          />
+
+          {/* Preview pane */}
+          <div
+            className="relative overflow-auto"
+            style={{
+              width: commentsOpen
+                ? `calc(${100 - editorWidthPct}% - 180px)`
+                : `${100 - editorWidthPct}%`,
+            }}
+          >
+            {previewStale && (
+              <button
+                onClick={flushPreview}
+                className="absolute right-3 top-2 z-10 rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800 transition hover:bg-amber-200 dark:bg-amber-900 dark:text-amber-200"
+              >
+                Refresh preview
+              </button>
+            )}
+            <div ref={previewRef}>
+              <MarkdownPreview content={debouncedContent} />
+            </div>
+          </div>
+
+          {/* Comments gutter (inline, position-synced) */}
+          {commentsOpen && id && (
+            <CommentsPanel
+              docId={id}
+              open={commentsOpen}
+              onClose={() => setCommentsOpen(false)}
+              currentUserId={user?.id || ""}
+              selectedText={selection?.text}
+              selectionRange={
+                selection ? { from: selection.from, to: selection.to } : undefined
+              }
+              selectionRelative={selectionRelative ?? undefined}
+              anchors={anchors}
+              positions={positions}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Backdrop overlay for History panel */}
+      {historyOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/20"
+          onClick={closeAllPanels}
+        />
+      )}
+
+      {id && (
+        <>
+          <ShareDialog
+            docId={id}
+            open={shareOpen}
+            onClose={() => setShareOpen(false)}
+            isOwner={isOwner}
+            generalAccess={generalAccess}
+            ownerEmail={ownerEmail}
+            ownerName={ownerName}
+            onGeneralAccessChange={setGeneralAccess}
+          />
+          <VersionHistory
+            docId={id}
+            open={historyOpen}
+            onClose={() => setHistoryOpen(false)}
+          />
+        </>
+      )}
+    </div>
+  );
+}
