@@ -698,7 +698,8 @@ export function ApiDocsPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const curlExample = `curl -H "X-API-Key: YOUR_KEY" http://localhost:8000/api/documents`;
+  const baseUrl = window.location.origin;
+  const curlExample = `curl -H "X-API-Key: YOUR_KEY" ${baseUrl}/api/documents`;
 
   return (
     <div className="flex min-h-screen flex-col bg-[var(--color-bg)]">
@@ -803,16 +804,11 @@ export function ApiDocsPage() {
 
         {/* Base URL note */}
         <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-xs text-[var(--color-text-muted)]">
-          <strong>Base URL:</strong> All paths are relative to the server origin.
-          In development, the Vite proxy forwards{" "}
+          <strong>Base URL:</strong>{" "}
           <code className="rounded bg-[var(--color-hover)] px-1 py-0.5">
-            /api/*
-          </code>{" "}
-          to the backend at{" "}
-          <code className="rounded bg-[var(--color-hover)] px-1 py-0.5">
-            http://localhost:8000
+            {baseUrl}
           </code>
-          . In production, all routes are served from the same origin.
+          . All API paths shown above are relative to this origin.
         </div>
       </div>
     </div>
