@@ -16,6 +16,7 @@ import time
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
+from pycrdt import Doc
 from pycrdt.websocket import WebsocketServer, YRoom
 
 from app.services.crdt_store import MongoYStore
@@ -35,6 +36,11 @@ class CollabWebsocketServer(WebsocketServer):
     async def get_room(self, name: str) -> YRoom:
         """Get or create a room with MongoDB-backed persistence.
 
+        Pre-loads the CRDT state from MongoDB into the Y.Doc before the
+        room starts serving clients.  Without this, a server restart would
+        create an empty Y.Doc and any client whose page also reloaded
+        (losing its in-memory state) would see a blank document.
+
         Args:
             name: The room name (typically a document ID).
 
@@ -43,10 +49,21 @@ class CollabWebsocketServer(WebsocketServer):
         """
         if name not in self.rooms:
             store = MongoYStore(path=name, log=self.log)
+            ydoc = Doc()
+            update_count = 0
+            async for update, _meta, _ts in store.read():
+                ydoc.apply_update(update)
+                update_count += 1
+            if update_count:
+                logger.info(
+                    "Loaded %d CRDT updates from store for room %s",
+                    update_count, name,
+                )
             self.rooms[name] = YRoom(
                 ready=self.rooms_ready,
                 ystore=store,
                 log=self.log,
+                ydoc=ydoc,
             )
         room = self.rooms[name]
         await self.start_room(room)
