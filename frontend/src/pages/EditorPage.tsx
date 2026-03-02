@@ -133,6 +133,22 @@ export function EditorPage() {
   }, [id, user?.id]);
 
   useEffect(() => {
+    if (!id) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await sharingApi.getMyPermission(id);
+        setPermission((prev) => {
+          if (prev !== res.data.permission) return res.data.permission;
+          return prev;
+        });
+      } catch {
+        /* network blip — keep current state */
+      }
+    }, 10_000);
+    return () => clearInterval(interval);
+  }, [id]);
+
+  useEffect(() => {
     document.title = title ? `${title} - CollabMark` : "CollabMark";
     return () => { document.title = "CollabMark"; };
   }, [title]);
