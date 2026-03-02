@@ -22,13 +22,14 @@ from app.models.api_key import ApiKey
 from app.models.comment import Comment
 from app.models.document import Document_
 from app.models.document_version import DocumentVersion
+from app.models.document_view import DocumentView
 from app.models.share_link import DocumentAccess
 from app.models.user import User
 from app.routes import auth, comments, documents, keys, sharing, users, versions, ws
 from app.services.crdt_store import MongoYStore
 from app.ws.handler import start_websocket_server, stop_websocket_server
 
-DOCUMENT_MODELS = [User, Document_, ApiKey, DocumentAccess, DocumentVersion, Comment]
+DOCUMENT_MODELS = [User, Document_, ApiKey, DocumentAccess, DocumentVersion, Comment, DocumentView]
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 

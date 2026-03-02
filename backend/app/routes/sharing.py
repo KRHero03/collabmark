@@ -1,9 +1,10 @@
-"""Sharing routes: collaborator management, general access, shared docs list."""
+"""Sharing routes: collaborator management, general access, shared/recent docs list."""
 
 from fastapi import APIRouter, Depends
 
 from app.auth.dependencies import get_current_user
 from app.models.document import DocumentRead
+from app.models.document_view import RecentlyViewedRead
 from app.models.share_link import (
     CollaboratorAdd,
     CollaboratorRead,
@@ -163,6 +164,55 @@ async def list_shared_documents(
             owner_id=item["document"].owner_id,
             permission=item["permission"],
             last_accessed_at=item["last_accessed_at"],
+            created_at=item["document"].created_at,
+            updated_at=item["document"].updated_at,
+        )
+        for item in items
+    ]
+
+
+@router.post("/api/documents/{doc_id}/view", status_code=204)
+async def record_view(
+    doc_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Record that the current user viewed a document.
+
+    No-op if the user is the document owner. Creates or updates
+    the view timestamp for the 'Recently Viewed' tab.
+
+    Args:
+        doc_id: Document ID.
+        user: Injected by get_current_user dependency.
+    """
+    await share_service.record_document_view(doc_id, user)
+
+
+@router.get(
+    "/api/documents/recent",
+    response_model=list[RecentlyViewedRead],
+)
+async def list_recently_viewed(
+    user: User = Depends(get_current_user),
+):
+    """List documents recently viewed by the current user (not owned).
+
+    Args:
+        user: Injected by get_current_user dependency.
+
+    Returns:
+        List of RecentlyViewedRead sorted by most recently viewed.
+    """
+    items = await share_service.list_recently_viewed(user)
+    return [
+        RecentlyViewedRead(
+            id=str(item["document"].id),
+            title=item["document"].title,
+            owner_id=item["document"].owner_id,
+            owner_name=item["owner_name"],
+            owner_email=item["owner_email"],
+            permission=item["permission"],
+            viewed_at=item["viewed_at"],
             created_at=item["document"].created_at,
             updated_at=item["document"].updated_at,
         )

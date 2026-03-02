@@ -1,4 +1,4 @@
-"""Sharing business logic: share links, document access, permission checks."""
+"""Sharing business logic: share links, document access, permission checks, recently viewed."""
 
 import logging
 from datetime import datetime, timezone
@@ -8,6 +8,7 @@ from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
 from app.models.document import Document_, GeneralAccess
+from app.models.document_view import DocumentView
 from app.models.share_link import DocumentAccess, Permission, ShareLink
 from app.models.user import User
 
@@ -398,6 +399,80 @@ async def _find_doc_or_404(doc_id: str) -> Document_:
             detail="Document not found",
         )
     return doc
+
+
+async def record_document_view(doc_id: str, user: User) -> None:
+    """Record that a user viewed a document they don't own.
+
+    Creates or updates a DocumentView record. Skips if the user is the owner.
+
+    Args:
+        doc_id: The document ID.
+        user: The user viewing the document.
+    """
+    try:
+        doc = await Document_.get(PydanticObjectId(doc_id))
+    except (InvalidId, ValueError):
+        return
+    if doc is None or doc.owner_id == str(user.id):
+        return
+
+    existing = await DocumentView.find_one(
+        DocumentView.user_id == str(user.id),
+        DocumentView.document_id == doc_id,
+    )
+    if existing:
+        existing.viewed_at = datetime.now(timezone.utc)
+        await existing.save()
+    else:
+        view = DocumentView(
+            user_id=str(user.id),
+            document_id=doc_id,
+        )
+        await view.insert()
+
+
+async def list_recently_viewed(user: User) -> list[dict]:
+    """List documents recently viewed by the user (not owned by them).
+
+    Returns documents sorted by most recently viewed first.
+
+    Args:
+        user: The user whose recently viewed documents to list.
+
+    Returns:
+        List of dicts with document data, permission, and view time.
+    """
+    views = await DocumentView.find(
+        DocumentView.user_id == str(user.id),
+    ).sort("-viewed_at").to_list()
+
+    results = []
+    for view in views:
+        try:
+            doc = await Document_.get(PydanticObjectId(view.document_id))
+        except (InvalidId, ValueError):
+            continue
+        if doc is None or doc.is_deleted:
+            continue
+
+        perm = await get_user_permission(str(doc.id), user)
+        if perm is None:
+            continue
+
+        try:
+            owner = await User.get(PydanticObjectId(doc.owner_id))
+        except (InvalidId, ValueError):
+            owner = None
+
+        results.append({
+            "document": doc,
+            "permission": perm.value,
+            "viewed_at": view.viewed_at,
+            "owner_name": owner.name if owner else "Unknown",
+            "owner_email": owner.email if owner else "",
+        })
+    return results
 
 
 def _assert_owner(doc: Document_, user: User) -> None:

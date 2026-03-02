@@ -11,13 +11,15 @@
  * - Tailwind Typography switches to prose-invert
  */
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { useDarkMode } from "../../hooks/useDarkMode";
 import hljsLight from "highlight.js/styles/github.css?url";
 import hljsDark from "highlight.js/styles/github-dark.css?url";
+
+let mermaidIdCounter = 0;
 
 interface MarkdownPreviewProps {
   /** Raw Markdown string to render. */
@@ -31,10 +33,17 @@ interface MarkdownPreviewProps {
  * Lazily imports the mermaid library and converts the definition into an SVG.
  * Re-renders when chart content or dark mode changes.
  */
-function MermaidBlock({ chart, isDark }: { chart: string; isDark: boolean }) {
+const MermaidBlock = memo(function MermaidBlock({
+  chart,
+  isDark,
+}: {
+  chart: string;
+  isDark: boolean;
+}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
+  const stableId = useRef(`mermaid-${++mermaidIdCounter}`);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,8 +57,10 @@ function MermaidBlock({ chart, isDark }: { chart: string; isDark: boolean }) {
           securityLevel: "loose",
         });
 
-        const id = `mermaid-${Math.random().toString(36).slice(2, 10)}`;
-        const { svg: rendered } = await mermaid.render(id, chart.trim());
+        const { svg: rendered } = await mermaid.render(
+          stableId.current,
+          chart.trim(),
+        );
         if (!cancelled) {
           setSvg(rendered);
           setError("");
@@ -87,7 +98,7 @@ function MermaidBlock({ chart, isDark }: { chart: string; isDark: boolean }) {
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
-}
+});
 
 /**
  * Injects the correct highlight.js stylesheet into the document head,
@@ -116,6 +127,26 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
   const isDark = useDarkMode();
   useHighlightTheme(isDark);
 
+  const components = useMemo(
+    () => ({
+      code({
+        className: cn,
+        children,
+        ...props
+      }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
+        if (/language-mermaid/.test(cn || "")) {
+          return <MermaidBlock chart={String(children)} isDark={isDark} />;
+        }
+        return (
+          <code className={cn} {...props}>
+            {children}
+          </code>
+        );
+      },
+    }),
+    [isDark],
+  );
+
   return (
     <div
       className={`prose prose-sm max-w-none overflow-auto p-6 ${isDark ? "prose-invert" : ""} ${className ?? ""}`}
@@ -123,29 +154,7 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
-        components={{
-          code({ className, children, ...props }) {
-            const match = /language-mermaid/.exec(className || "");
-            if (match) {
-              return <MermaidBlock chart={String(children)} isDark={isDark} />;
-            }
-
-            const isInline = !className;
-            if (isInline) {
-              return (
-                <code className={className} {...props}>
-                  {children}
-                </code>
-              );
-            }
-
-            return (
-              <code className={className} {...props}>
-                {children}
-              </code>
-            );
-          },
-        }}
+        components={components}
       >
         {content}
       </ReactMarkdown>

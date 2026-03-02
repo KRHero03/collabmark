@@ -80,7 +80,27 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - Resizable Panes: draggable 4px splitter between editor and preview. Width ratio (20%-80%) persisted in `localStorage("collabmark_editor_width")`. Hidden in presentation mode. Proportional resize when comments panel open.
   - Debounced Preview: preview pane only re-renders after 1.5s of no typing (Overleaf-style). Shows "Preview outdated" / "Refresh preview" button when stale. Eliminates flickering during rapid edits, especially with Mermaid diagrams.
 
-**Total: 103 backend tests, 36 frontend tests, all passing**
+- **Phase 11**: Railway Deployment & Production Fixes
+  - Dockerfile: Node 22 + yarn (corepack) for frontend build; `WORKDIR /app/backend` for gunicorn
+  - SPA catch-all route: serves `index.html` for non-API paths (fixes direct URL navigation 404)
+  - Static assets served via `/assets` mount; all other paths fall through to SPA
+  - Environment variables configured on Railway (MongoDB, Redis, Google OAuth, JWT, CORS)
+  - Google OAuth credentials updated for production domain
+  - GitHub Actions CI/CD pipeline deploys to Railway on push to main
+
+- **Phase 12**: Mermaid Re-render Fix & Recently Viewed Tab
+  - **Mermaid fix**: MermaidBlock memoized with `React.memo`, stable render IDs via `useRef` counter,
+    `components` prop memoized with `useMemo` to prevent ReactMarkdown from re-creating blocks.
+    Yjs observer uses functional `setContent` to skip no-op state updates.
+  - **Recently Viewed tab**: New `DocumentView` model tracks when users view non-owned docs.
+    `POST /api/documents/{id}/view` records or updates view timestamp (no-op for owners).
+    `GET /api/documents/recent` returns recently viewed docs sorted by recency, excluding
+    deleted docs and docs the user has lost access to. EditorPage records a view on load.
+    HomePage has a third "Recently viewed" tab with owner info and permission badges.
+  - 17 backend tests (record view: 7 tests, list recently viewed: 10 tests)
+  - 10 frontend tests (MarkdownPreview rendering, memoization, GFM features)
+
+**Total: 117 backend tests, 46 frontend tests, all passing**
 
 ## Tech Stack
 
@@ -97,7 +117,7 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 | Message Bus | Redis (future: pub/sub for WS horizontal scaling) |
 | Testing BE  | pytest, pytest-asyncio, httpx, mongomock-motor    |
 | Testing FE  | Vitest, React Testing Library, jsdom              |
-| Deployment  | Docker, Fly.io, Gunicorn, supervisord (bundled MongoDB) |
+| Deployment  | Docker, Railway (with MongoDB & Redis add-ons), Gunicorn |
 
 ## Project Structure
 
@@ -108,7 +128,7 @@ collabmark/
       auth/          # OAuth, JWT, API key auth
       models/        # Beanie document models
         user.py, document.py, api_key.py, share_link.py,
-        document_version.py, comment.py
+        document_version.py, document_view.py, comment.py
       routes/        # REST API endpoints
         auth.py, documents.py, keys.py, sharing.py,
         versions.py, comments.py, export.py, users.py, ws.py
@@ -161,6 +181,8 @@ collabmark/
 - `GET /api/documents/{id}/collaborators` -- list collaborators (owner only)
 - `DELETE /api/documents/{id}/collaborators/{user_id}` -- remove collaborator (owner only)
 - `GET /api/documents/shared` -- list docs shared with me
+- `POST /api/documents/{id}/view` -- record document view (for "Recently Viewed" tab)
+- `GET /api/documents/recent` -- list recently viewed docs (non-owned, sorted by recency)
 
 ### Versions
 - `POST /api/documents/{id}/versions` -- create version snapshot
@@ -176,8 +198,8 @@ collabmark/
 - `PATCH /api/comments/{id}/orphan` -- mark comment as orphaned (anchored text was deleted)
 - `DELETE /api/comments/{id}` -- delete comment
 
-### Export
-- `GET /api/documents/{id}/export/pdf` -- export as PDF
+### Export (frontend-only via window.print)
+- PDF export moved to frontend using presentation mode + window.print()
 
 ### API Keys
 - `POST /api/keys` -- create API key

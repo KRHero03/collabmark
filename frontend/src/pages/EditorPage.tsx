@@ -129,6 +129,7 @@ export function EditorPage() {
       setOwnerEmail(data.owner_email || "");
       setPermission(permRes.data.permission);
       setLoading(false);
+      sharingApi.recordView(id).catch(() => {});
     });
   }, [id, user?.id]);
 
@@ -157,7 +158,8 @@ export function EditorPage() {
     if (!synced) return;
 
     const updateContent = () => {
-      setContent(ytext.toString());
+      const next = ytext.toString();
+      setContent((prev) => (prev === next ? prev : next));
     };
 
     updateContent();

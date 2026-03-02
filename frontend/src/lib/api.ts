@@ -103,6 +103,18 @@ export interface VersionDetail extends VersionListItem {
 
 export type Permission = "view" | "edit";
 
+export interface RecentlyViewedDocument {
+  id: string;
+  title: string;
+  owner_id: string;
+  owner_name: string;
+  owner_email: string;
+  permission: "view" | "edit";
+  viewed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export const sharingApi = {
   getMyPermission: (docId: string) =>
     api.get<{ permission: Permission }>(`/documents/${docId}/permission`),
@@ -119,6 +131,9 @@ export const sharingApi = {
   removeCollaborator: (docId: string, userId: string) =>
     api.delete(`/documents/${docId}/collaborators/${userId}`),
   listShared: () => api.get<SharedDocument[]>("/documents/shared"),
+  recordView: (docId: string) => api.post(`/documents/${docId}/view`),
+  listRecentlyViewed: () =>
+    api.get<RecentlyViewedDocument[]>("/documents/recent"),
 };
 
 export interface CommentData {
