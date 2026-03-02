@@ -385,26 +385,6 @@ const GROUPS: EndpointGroup[] = [
     ],
   },
   {
-    name: "Export",
-    endpoints: [
-      {
-        method: "GET",
-        path: "/api/documents/{doc_id}/export/pdf",
-        summary: "Export as PDF",
-        description:
-          "Export the document as a PDF file (or HTML fallback if PDF rendering is unavailable).",
-        params: [
-          {
-            name: "doc_id",
-            in: "path",
-            required: true,
-            description: "Document ID",
-          },
-        ],
-      },
-    ],
-  },
-  {
     name: "API Keys",
     endpoints: [
       {
