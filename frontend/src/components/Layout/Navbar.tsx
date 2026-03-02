@@ -1,4 +1,4 @@
-import { BookOpen, LogOut, Moon, Settings, Sun, User } from "lucide-react";
+import { BookOpen, FileText, LogOut, Moon, Settings, Sun, User } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../../hooks/useAuth";
 import { useCallback, useEffect, useState } from "react";
@@ -33,11 +33,7 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 flex h-14 items-center justify-between border-b border-[var(--color-border)] bg-white px-6">
       <Link to="/" className="flex items-center gap-2 font-bold text-lg">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" className="h-6 w-6">
-          <rect width="64" height="64" rx="14" fill="#2563eb"/>
-          <text x="32" y="46" fontFamily="system-ui" fontSize="38" fontWeight="700" fill="white" textAnchor="middle">M</text>
-          <circle cx="52" cy="12" r="8" fill="#22c55e"/>
-        </svg>
+        <FileText className="h-6 w-6 text-[var(--color-primary)]" />
         CollabMark
       </Link>
 
