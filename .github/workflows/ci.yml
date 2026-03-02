@@ -41,3 +41,21 @@ jobs:
       - name: Run frontend tests
         run: ./node_modules/.bin/vitest run
         working-directory: frontend
+
+  rollback:
+    needs: test
+    if: failure() && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Revert failed commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git revert --no-edit HEAD
+          git push origin main
