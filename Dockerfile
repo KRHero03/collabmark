@@ -1,10 +1,10 @@
 ## Stage 1: Build the React frontend
-FROM node:20-slim AS frontend-build
+FROM node:22-slim AS frontend-build
 WORKDIR /build
 COPY frontend/package.json frontend/package-lock.json* ./
-RUN npm ci --ignore-scripts
+RUN npm install --no-optional
 COPY frontend/ ./
-RUN npm run build
+RUN ./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build
 
 ## Stage 2: Python backend + static assets
 FROM python:3.12-slim AS runtime
