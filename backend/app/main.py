@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
         connectTimeoutMS=10_000,
     )
     db = client[settings.mongodb_db_name]
-    await init_beanie(database=db, document_models=DOCUMENT_MODELS)
+    await init_beanie(database=db, document_models=DOCUMENT_MODELS, skip_indexes=True)
     MongoYStore.set_database(db)
     await start_websocket_server()
     yield
