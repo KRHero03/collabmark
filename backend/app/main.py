@@ -38,7 +38,11 @@ STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle: DB connection, CRDT server startup/shutdown."""
-    client = AsyncIOMotorClient(settings.mongodb_url)
+    client = AsyncIOMotorClient(
+        settings.mongodb_url,
+        serverSelectionTimeoutMS=10_000,
+        connectTimeoutMS=10_000,
+    )
     db = client[settings.mongodb_db_name]
     await init_beanie(database=db, document_models=DOCUMENT_MODELS)
     MongoYStore.set_database(db)
