@@ -11,10 +11,10 @@ RUN ./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build
 FROM python:3.12-slim AS runtime
 WORKDIR /app
 
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY backend/requirements.prod.txt .
+RUN pip install --no-cache-dir -r requirements.prod.txt && rm -rf /root/.cache
 
-COPY backend/ ./backend/
+COPY backend/app/ ./backend/app/
 COPY --from=frontend-build /build/dist ./frontend/dist
 
 ENV PYTHONPATH=/app/backend
