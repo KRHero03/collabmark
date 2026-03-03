@@ -1,4 +1,4 @@
-"""Document CRUD business logic: create, get, list, update, soft-delete, restore."""
+"""Document CRUD business logic: create, get, list, update, soft-delete, restore, hard-delete."""
 
 import logging
 
@@ -6,7 +6,10 @@ from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
+from app.models.comment import Comment
 from app.models.document import Document_, DocumentCreate, DocumentUpdate, GeneralAccess
+from app.models.document_version import DocumentVersion
+from app.models.document_view import DocumentView
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 
@@ -154,6 +157,52 @@ async def restore_document(doc_id: str, user: User) -> Document_:
     doc.restore()
     await doc.save()
     return doc
+
+
+async def list_trash(user: User) -> list[Document_]:
+    """List soft-deleted documents owned by the user, sorted by deleted_at descending.
+
+    Args:
+        user: Owner whose trashed documents to list.
+
+    Returns:
+        List of soft-deleted Document_ instances.
+    """
+    return await Document_.find(
+        Document_.owner_id == str(user.id),
+        Document_.is_deleted == True,  # noqa: E712
+    ).sort("-deleted_at").to_list()
+
+
+async def hard_delete_document(doc_id: str, user: User) -> None:
+    """Permanently delete a document and all related data. Owner only.
+
+    Removes the document record plus associated CRDT updates, comments,
+    versions, collaborator access records, and view records.
+
+    Args:
+        doc_id: Document ID.
+        user: User requesting delete (must be owner).
+
+    Raises:
+        HTTPException: 404 if not found, 403 if not owner.
+    """
+    doc = await _find_doc(doc_id)
+    _assert_owner(doc, user)
+
+    str_id = str(doc.id)
+
+    await Comment.find(Comment.document_id == str_id).delete()
+    await DocumentVersion.find(DocumentVersion.document_id == str_id).delete()
+    await DocumentAccess.find(DocumentAccess.document_id == str_id).delete()
+    await DocumentView.find(DocumentView.document_id == str_id).delete()
+
+    from app.services.crdt_store import MongoYStore
+    if MongoYStore._db is not None:
+        await MongoYStore._db["crdt_updates"].delete_many({"room": str_id})
+
+    await doc.delete()
+    logger.info("Hard-deleted document %s and related data", str_id)
 
 
 async def _find_doc(doc_id: str) -> Document_:

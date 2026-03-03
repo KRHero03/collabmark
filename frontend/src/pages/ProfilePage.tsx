@@ -3,6 +3,7 @@
  */
 
 import { useEffect, useState } from "react";
+import { formatDateLong } from "../lib/dateUtils";
 import { User } from "lucide-react";
 import { Navbar } from "../components/Layout/Navbar";
 import { useAuth } from "../hooks/useAuth";
@@ -87,11 +88,7 @@ export function ProfilePage() {
                 Member Since
               </label>
               <p className="text-sm text-[var(--color-text-muted)]">
-                {new Date(user.created_at).toLocaleDateString(undefined, {
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
+                {formatDateLong(user.created_at)}
               </p>
             </div>
           </div>

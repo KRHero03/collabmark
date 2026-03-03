@@ -76,6 +76,16 @@ describe("API client", () => {
       await documentsApi.restore("abc-123");
       expect(axios.post).toHaveBeenCalledWith("/documents/abc-123/restore");
     });
+
+    it("listTrash calls GET /documents/trash", async () => {
+      await documentsApi.listTrash();
+      expect(axios.get).toHaveBeenCalledWith("/documents/trash");
+    });
+
+    it("hardDelete calls DELETE /documents/:id/permanent", async () => {
+      await documentsApi.hardDelete("abc-123");
+      expect(axios.delete).toHaveBeenCalledWith("/documents/abc-123/permanent");
+    });
   });
 
   describe("keysApi", () => {

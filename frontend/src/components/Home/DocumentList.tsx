@@ -1,17 +1,20 @@
 import { FileText, Plus, Trash2 } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { MarkdownDocument } from "../../lib/api";
+import { formatDateTime } from "../../lib/dateUtils";
 
 interface DocumentListProps {
   documents: MarkdownDocument[];
   onDelete: (id: string) => void;
   onCreate: () => void;
+  onContextMenu?: (e: React.MouseEvent, doc: MarkdownDocument) => void;
 }
 
 export function DocumentList({
   documents,
   onDelete,
   onCreate,
+  onContextMenu,
 }: DocumentListProps) {
   const navigate = useNavigate();
 
@@ -42,20 +45,19 @@ export function DocumentList({
               key={doc.id}
               className="group flex items-center justify-between rounded-lg border border-[var(--color-border)] p-4 transition hover:bg-[var(--color-bg-secondary)] cursor-pointer"
               onClick={() => navigate(`/edit/${doc.id}`)}
+              onContextMenu={(e) => {
+                if (onContextMenu) {
+                  e.preventDefault();
+                  onContextMenu(e, doc);
+                }
+              }}
             >
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-[var(--color-primary)]" />
                 <div>
                   <p className="font-medium">{doc.title}</p>
                   <p className="text-xs text-[var(--color-text-muted)]">
-                    Updated{" "}
-                    {new Date(doc.updated_at).toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    Updated {formatDateTime(doc.updated_at)}
                   </p>
                 </div>
               </div>

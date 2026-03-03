@@ -7,6 +7,7 @@ import { useState } from "react";
 import { AlertTriangle, Check, MessageSquare, Trash2, Unlink } from "lucide-react";
 import type { CommentData } from "../../lib/api";
 import type { AnchorStatus } from "../../hooks/useCommentAnchors";
+import { formatDateTime } from "../../lib/dateUtils";
 
 interface CommentThreadProps {
   comment: CommentData;
@@ -67,7 +68,7 @@ export function CommentThread({
         <div>
           <p className="text-sm font-medium">{comment.author_name}</p>
           <p className="text-xs text-[var(--color-text-muted)]">
-            {new Date(comment.created_at).toLocaleString()}
+            {formatDateTime(comment.created_at)}
           </p>
         </div>
         <div className="flex gap-1">
@@ -116,7 +117,7 @@ export function CommentThread({
             <div key={reply.id}>
               <p className="text-xs font-medium">{reply.author_name}</p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                {new Date(reply.created_at).toLocaleString()}
+                {formatDateTime(reply.created_at)}
               </p>
               <p className="text-sm">{reply.content}</p>
             </div>

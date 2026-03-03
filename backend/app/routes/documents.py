@@ -1,4 +1,4 @@
-"""Document CRUD routes: create, list, get, update, delete, restore."""
+"""Document CRUD routes: create, list, get, update, delete, restore, trash, hard-delete."""
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
@@ -57,6 +57,28 @@ async def list_documents(
     """
     docs = await document_service.list_documents(user, include_deleted)
     return [DocumentRead.from_doc(d, owner_name=user.name or "", owner_email=user.email or "") for d in docs]
+
+
+@router.get("/trash", response_model=list[DocumentRead])
+async def list_trash(
+    user: User = Depends(get_current_user),
+):
+    """List soft-deleted documents owned by the current user.
+
+    Returns documents sorted by deleted_at descending (most recently
+    trashed first).
+
+    Args:
+        user: Injected by get_current_user dependency.
+
+    Returns:
+        List of DocumentRead for the user's trashed documents.
+    """
+    docs = await document_service.list_trash(user)
+    return [
+        DocumentRead.from_doc(d, owner_name=user.name or "", owner_email=user.email or "")
+        for d in docs
+    ]
 
 
 @router.get("/{doc_id}", response_model=DocumentRead)
@@ -145,3 +167,23 @@ async def restore_document(
     """
     doc = await document_service.restore_document(doc_id, user)
     return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "")
+
+
+@router.delete("/{doc_id}/permanent", status_code=204)
+async def hard_delete_document(
+    doc_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Permanently delete a document and all related data. Owner only.
+
+    Removes the document, its CRDT updates, comments, versions,
+    collaborator access records, and view tracking records.
+
+    Args:
+        doc_id: Document ID.
+        user: Injected by get_current_user dependency.
+
+    Raises:
+        HTTPException: 404 if not found, 403 if not owner.
+    """
+    await document_service.hard_delete_document(doc_id, user)

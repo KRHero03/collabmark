@@ -24,6 +24,8 @@ export interface MarkdownDocument {
   owner_email: string;
   general_access: GeneralAccess;
   is_deleted: boolean;
+  deleted_at: string | null;
+  content_length: number;
   created_at: string;
   updated_at: string;
 }
@@ -58,6 +60,8 @@ export const documentsApi = {
   delete: (id: string) => api.delete<MarkdownDocument>(`/documents/${id}`),
   restore: (id: string) =>
     api.post<MarkdownDocument>(`/documents/${id}/restore`),
+  listTrash: () => api.get<MarkdownDocument[]>("/documents/trash"),
+  hardDelete: (id: string) => api.delete(`/documents/${id}/permanent`),
 };
 
 export interface Collaborator {

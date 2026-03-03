@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Clock, X } from "lucide-react";
 import { versionsApi, type VersionListItem, type VersionDetail } from "../../lib/api";
+import { formatDateTime } from "../../lib/dateUtils";
 import { MarkdownPreview } from "./MarkdownPreview";
 
 interface VersionHistoryProps {
@@ -74,7 +75,7 @@ export function VersionHistory({ docId, open, onClose }: VersionHistoryProps) {
               </p>
               <p className="text-xs text-[var(--color-text-muted)]">
                 {selected.author_name} &middot;{" "}
-                {new Date(selected.created_at).toLocaleString()}
+                {formatDateTime(selected.created_at)}
               </p>
             </div>
             <button
@@ -118,7 +119,7 @@ export function VersionHistory({ docId, open, onClose }: VersionHistoryProps) {
                       Version {ver.version_number}
                     </p>
                     <p className="text-xs text-[var(--color-text-muted)]">
-                      {new Date(ver.created_at).toLocaleString()}
+                      {formatDateTime(ver.created_at)}
                     </p>
                   </div>
                   <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">

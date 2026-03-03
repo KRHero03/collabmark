@@ -59,6 +59,8 @@ class DocumentRead(BaseModel):
     owner_email: str = ""
     general_access: GeneralAccess
     is_deleted: bool
+    deleted_at: Optional[datetime] = None
+    content_length: int = 0
     created_at: datetime
     updated_at: datetime
 
@@ -86,6 +88,8 @@ class DocumentRead(BaseModel):
             owner_email=owner_email,
             general_access=doc.general_access,
             is_deleted=doc.is_deleted,
+            deleted_at=doc.deleted_at,
+            content_length=len(doc.content),
             created_at=doc.created_at,
             updated_at=doc.updated_at,
         )

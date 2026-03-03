@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Copy, Key, Plus, Trash2 } from "lucide-react";
 import { Navbar } from "../components/Layout/Navbar";
 import { keysApi, type ApiKeyInfo } from "../lib/api";
+import { formatDateShort } from "../lib/dateUtils";
 
 export function SettingsPage() {
   const [keys, setKeys] = useState<ApiKeyInfo[]>([]);
@@ -101,10 +102,9 @@ export function SettingsPage() {
                   <div>
                     <p className="text-sm font-medium">{k.name}</p>
                     <p className="text-xs text-[var(--color-text-muted)]">
-                      Created{" "}
-                      {new Date(k.created_at).toLocaleDateString()}
+                      Created {formatDateShort(k.created_at)}
                       {k.last_used_at &&
-                        ` | Last used ${new Date(k.last_used_at).toLocaleDateString()}`}
+                        ` | Last used ${formatDateShort(k.last_used_at)}`}
                     </p>
                   </div>
                   <button
