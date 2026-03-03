@@ -1,9 +1,9 @@
 """Document version model for storing CRDT snapshots with author attribution."""
 
 from datetime import datetime, timezone
-from typing import Optional
 
 from beanie import Document, Indexed
+from pymongo import IndexModel, ASCENDING
 from pydantic import BaseModel, Field
 
 
@@ -24,6 +24,12 @@ class DocumentVersion(Document):
 
     class Settings:
         name = "document_versions"
+        indexes = [
+            IndexModel(
+                [("document_id", ASCENDING), ("version_number", ASCENDING)],
+                unique=True,
+            ),
+        ]
 
 
 class DocumentVersionRead(BaseModel):

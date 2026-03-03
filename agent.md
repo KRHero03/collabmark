@@ -10,9 +10,12 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 - Google OAuth sign-in
 - API key access for programmatic use
 - Google Docs-style document sharing (general access + email-based collaborators)
-- Version history with author attribution
-- Inline and doc-level commenting system
+- Version history with diff view and restore capability
+- Inline and doc-level commenting system with anchor lifecycle
+- Spaces (folders) for hierarchical document organization with ACLs
+- Trash bin with soft-delete, restore, and permanent delete
 - PDF and Markdown export
+- Toast notifications and confirmation modals for all mutations
 - Dark mode support
 - MongoDB storage, Python (FastAPI) backend, React (Vite) frontend
 
@@ -28,14 +31,15 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - Backend: share_service.py, sharing routes (collaborator management, general access, shared docs list), permission-aware document access (VIEW/EDIT), WS permission checks (VIEW and EDIT users can connect)
   - Document model has `general_access` field: `restricted` | `anyone_view` | `anyone_edit`
   - Email-based collaborator management: add/list/remove collaborators by email
-  - Permission checks: owner > explicit DocumentAccess > general_access > deny
+  - Permission checks: owner > explicit DocumentAccess > folder access inheritance > general_access > deny
   - Frontend: Google Docs-style ShareDialog (add by email, people with access list, general access toggle, copy link), sharingApi client
-  - Old token-based share link system removed (ShareLink model deprecated, SharedDocRedirect removed)
   - 22 sharing-related tests + updated integration tests
 - **Phase 5**: Version History
   - Backend: DocumentVersion model, version_service.py, version routes, auto-snapshot on document save
-  - Frontend: VersionHistory slide-out panel, version timeline, read-only snapshot preview, versionsApi client
-  - 10 version tests
+  - Deduplication: identical content to latest version returns 204 (no new version created)
+  - Frontend: VersionHistory slide-out panel with diff view (jsdiff), restore button, versionsApi client
+  - Auto-versioning: 30s idle timeout + 5min rate limit, beforeunload beacon
+  - 15 version tests (including 5 dedup tests)
 - **Phase 6**: Comments System
   - Backend: Comment model, comment_service.py, comment routes (create, reply, resolve, delete, reanchor, orphan)
   - Frontend: CommentsPanel (position-synced gutter), CommentThread (anchor status badges), useComments Zustand store, commentsApi client
@@ -57,8 +61,9 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - highlight.js github theme CSS imported
 - **Phase 7**: Export and Polish
   - Backend: PDF export via WeasyPrint (with HTML fallback), export routes
-  - Frontend: PDF export button, dark mode toggle (CSS custom properties), Profile page, Ctrl+S keyboard shortcut
+  - Frontend: PDF export button, dark mode toggle (CSS custom properties), Profile page
   - 3 export tests
+
 - **Phase 8**: Scaling and Deployment
   - Dockerfile with multi-stage build, health check, gunicorn production server
   - docker-compose.prod.yml for production
@@ -92,15 +97,41 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - **Mermaid fix**: MermaidBlock memoized with `React.memo`, stable render IDs via `useRef` counter,
     `components` prop memoized with `useMemo` to prevent ReactMarkdown from re-creating blocks.
     Yjs observer uses functional `setContent` to skip no-op state updates.
-  - **Recently Viewed tab**: New `DocumentView` model tracks when users view non-owned docs.
-    `POST /api/documents/{id}/view` records or updates view timestamp (no-op for owners).
-    `GET /api/documents/recent` returns recently viewed docs sorted by recency, excluding
+  - **Recently Viewed tab**: `DocumentView` model tracks all document views (including owner's own docs).
+    `POST /api/documents/{id}/view` records or updates view timestamp for any document.
+    `GET /api/documents/recent` returns all recently viewed docs sorted by recency, excluding
     deleted docs and docs the user has lost access to. EditorPage records a view on load.
     HomePage has a third "Recently viewed" tab with owner info and permission badges.
-  - 17 backend tests (record view: 7 tests, list recently viewed: 10 tests)
-  - 10 frontend tests (MarkdownPreview rendering, memoization, GFM features)
 
-**Total: 117 backend tests, 46 frontend tests, all passing**
+- **Phase 13**: Context Menu, Trash, Document Info, Right-Click Actions
+  - Right-click context menu: owned docs (Open in new tab, Rename, Move to Trash, Delete, Info), shared/recently viewed (Open in new tab, Info)
+  - Trash bin tab: soft-deleted docs/folders with Restore and Delete Permanently actions, Empty Trash button
+  - DocumentInfoModal: metadata display (title, owner, dates, content length, access level, deleted status)
+  - Backend hard delete: `DELETE /api/documents/{id}/permanent` with cleanup of CRDT updates, comments, shares, views, versions
+  - RenameDialog for inline document renaming
+  - Local time display everywhere via `dateUtils.ts` (formatDateShort, formatDateLong, formatDateTime)
+
+- **Phase 14**: Spaces (Folders) Feature
+  - Backend: `Folder` and `FolderAccess` models, `folder_service.py` with cascade soft-delete/restore/hard-delete
+  - Backend: 13 folder endpoints (CRUD, trash/restore/hard-delete, contents, breadcrumbs, collaborator management)
+  - Backend: Access inheritance -- documents in folders inherit parent folder's ACLs
+  - Frontend: `useFolders` Zustand store, `foldersApi` with 12 methods
+  - Frontend: FolderBreadcrumbs, CreateFolderDialog, FolderInfoModal components
+  - Frontend: File-browser view on home page (replaced "My Documents" tab with "Files" tab)
+  - Frontend: Right-click context menu support for folders (Rename, Delete, Info, Share)
+  - 72 backend folder tests, 23 frontend folder store tests
+
+- **Phase 15**: UX Polish & Version History Overhaul
+  - **Confirmation Modals**: ConfirmDialog component for all delete actions (soft-delete, hard-delete, empty trash for docs and folders)
+  - **Toast Notifications**: ToastContainer with slide-in/slide-out animations, stacked display (flex-col-reverse), phase-based state management (entering/visible/exiting), auto-dismiss after 4s
+  - **Editor Back Button**: Uses `navigate(-1)` (browser history back) for natural navigation context preservation
+  - **Auto-versioning**: Removed manual save button; versions created automatically after 30s of inactivity (rate-limited to 5min). `beforeunload` beacon for final snapshot on page close
+  - **Version Deduplication**: Backend `save_snapshot` skips creation if content identical to latest version (returns None / 204)
+  - **Diff View**: DiffView component using jsdiff (`diffLines`) replaces MarkdownPreview in VersionHistory. Shows added/removed/unchanged blocks with color coding
+  - **Version Restore**: Restore button in VersionHistory replaces Yjs content and creates a restore snapshot with attribution
+  - **Recently Viewed (All Docs)**: Updated to record and display ALL viewed documents including owner's own, sorted by recency
+
+**Total: ~150+ backend tests, 258 frontend tests (20 test files), all passing**
 
 ## Tech Stack
 
@@ -114,6 +145,7 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 | Styling     | Tailwind CSS v4                                   |
 | Editor      | CodeMirror 6 (core API + yCollab)                 |
 | Auth        | Google OAuth2 (authlib), JWT (python-jose), API keys |
+| Diffing     | diff (jsdiff) for version history diff view       |
 | Message Bus | Redis (future: pub/sub for WS horizontal scaling) |
 | Testing BE  | pytest, pytest-asyncio, httpx, mongomock-motor    |
 | Testing FE  | Vitest, React Testing Library, jsdom              |
@@ -128,26 +160,42 @@ collabmark/
       auth/          # OAuth, JWT, API key auth
       models/        # Beanie document models
         user.py, document.py, api_key.py, share_link.py,
-        document_version.py, document_view.py, comment.py
+        document_version.py, document_view.py, comment.py,
+        folder.py
       routes/        # REST API endpoints
         auth.py, documents.py, keys.py, sharing.py,
-        versions.py, comments.py, export.py, users.py, ws.py
+        versions.py, comments.py, export.py, users.py,
+        folders.py, ws.py
       services/      # Business logic layer
         document_service.py, share_service.py, version_service.py,
-        comment_service.py, crdt_store.py
+        comment_service.py, folder_service.py, crdt_store.py
       ws/            # WebSocket handler (pycrdt rooms)
-    tests/           # Backend test suite (97 tests)
+    tests/           # Backend test suite (150+ tests)
   frontend/          # React SPA (Vite + TypeScript)
     src/
       components/    # Reusable UI components
         Auth/, Editor/, Home/, Layout/, Settings/
+        Editor/DiffView.tsx       # jsdiff line-level diff rendering
+        Editor/VersionHistory.tsx # Diff + restore slide-out panel
+        Editor/EditorToolbar.tsx  # Toolbar with navigate(-1) back
+        Home/DocumentContextMenu.tsx  # Right-click context menu
+        Home/DocumentInfoModal.tsx    # Document metadata modal
+        Home/FolderBreadcrumbs.tsx    # Hierarchical navigation
+        Home/CreateFolderDialog.tsx   # New folder creation
+        Home/FolderInfoModal.tsx      # Folder metadata modal
+        Home/RenameDialog.tsx         # Inline rename modal
+        Home/ConfirmDialog.tsx        # Confirmation modal
+        Home/ToastContainer.tsx       # Animated toast notifications
       pages/         # Route-level page components
         HomePage, EditorPage, LoginPage, SettingsPage,
         ProfilePage, ApiDocsPage
-      hooks/         # Custom React hooks
-        useAuth, useDocuments, useYjsProvider, useComments,
-        useCommentAnchors, useCommentPositions
+      hooks/         # Custom React hooks / Zustand stores
+        useAuth, useDocuments, useFolders, useToast,
+        useYjsProvider, useComments, useCommentAnchors,
+        useCommentPositions
       lib/           # API client, utilities
+        api.ts       # Axios client with all API methods
+        dateUtils.ts # Local time formatting utilities
   Dockerfile         # Multi-stage (build frontend + bundle with backend)
   docker-compose.yml # MongoDB + Redis for local dev
   docker-compose.prod.yml # Production compose
@@ -168,12 +216,29 @@ collabmark/
 - `PUT /api/users/me` -- update profile
 
 ### Documents
-- `POST /api/documents` -- create document
+- `POST /api/documents` -- create document (accepts optional `folder_id`)
 - `GET /api/documents` -- list own documents
+- `GET /api/documents/trash` -- list soft-deleted documents
 - `GET /api/documents/{id}` -- get document (owner or shared)
-- `PUT /api/documents/{id}` -- update document (owner or edit access)
+- `PUT /api/documents/{id}` -- update document (owner or edit access, accepts `folder_id`)
 - `DELETE /api/documents/{id}` -- soft-delete (owner only)
 - `POST /api/documents/{id}/restore` -- restore (owner only)
+- `DELETE /api/documents/{id}/permanent` -- hard-delete with full cleanup (owner only)
+
+### Folders
+- `POST /api/folders` -- create folder (accepts optional `parent_id`)
+- `GET /api/folders/{id}` -- get folder
+- `PUT /api/folders/{id}` -- update folder (name, parent_id)
+- `DELETE /api/folders/{id}` -- cascade soft-delete (owner only)
+- `POST /api/folders/{id}/restore` -- cascade restore (owner only)
+- `DELETE /api/folders/{id}/permanent` -- cascade hard-delete (owner only)
+- `GET /api/folders/trash` -- list trashed folders
+- `GET /api/folders/shared` -- list folders shared with me
+- `GET /api/folders/contents` -- list contents of a folder (or root)
+- `GET /api/folders/breadcrumbs` -- get breadcrumb path for a folder
+- `POST /api/folders/{id}/collaborators` -- add folder collaborator
+- `GET /api/folders/{id}/collaborators` -- list folder collaborators
+- `DELETE /api/folders/{id}/collaborators/{user_id}` -- remove folder collaborator
 
 ### Sharing
 - `PUT /api/documents/{id}/access` -- update general access setting (owner only)
@@ -181,11 +246,11 @@ collabmark/
 - `GET /api/documents/{id}/collaborators` -- list collaborators (owner only)
 - `DELETE /api/documents/{id}/collaborators/{user_id}` -- remove collaborator (owner only)
 - `GET /api/documents/shared` -- list docs shared with me
-- `POST /api/documents/{id}/view` -- record document view (for "Recently Viewed" tab)
-- `GET /api/documents/recent` -- list recently viewed docs (non-owned, sorted by recency)
+- `POST /api/documents/{id}/view` -- record document view (all docs including own)
+- `GET /api/documents/recent` -- list all recently viewed docs (including own, sorted by recency)
 
 ### Versions
-- `POST /api/documents/{id}/versions` -- create version snapshot
+- `POST /api/documents/{id}/versions` -- create version snapshot (returns 204 if deduplicated)
 - `GET /api/documents/{id}/versions` -- list version timeline
 - `GET /api/documents/{id}/versions/{num}` -- get version detail
 
@@ -210,7 +275,7 @@ collabmark/
 - `WS /ws/doc/{document_id}` -- CRDT collaboration (VIEW or EDIT access required)
 
 ### Frontend Pages
-- `/` -- Home page (owned docs, shared docs, recent access)
+- `/` -- Home page (Files browser, shared docs, recently viewed, trash)
 - `/login` -- Google OAuth login
 - `/edit/:id` -- Document editor (also the share URL)
 - `/settings` -- API key management
@@ -235,6 +300,7 @@ collabmark/
 - Backend: pytest + pytest-asyncio + httpx ASGI transport + mongomock-motor
 - Frontend: Vitest + React Testing Library + jsdom + @testing-library/user-event
 - Test files mirror source structure: `test_<module>.py` / `<Component>.test.tsx`
+- Frontend: do NOT import `screen` directly from @testing-library/react (CI issue); destructure from `render()` return instead
 
 ### Backend Conventions
 - Models in `app/models/` are Beanie Documents with `Settings.name` for collection
@@ -252,6 +318,8 @@ collabmark/
 - Tailwind CSS utility classes; CSS custom properties for theme colors
 - Vite proxy forwards `/api` and `/ws` to backend at localhost:8000
 - Dark mode via `.dark` class on `<html>` with CSS custom property overrides
+- Date/time display uses `dateUtils.ts` (formatDateShort, formatDateLong, formatDateTime) for consistent local time formatting
+- Toast notifications via `useToast` Zustand store for all mutation feedback
 
 ### Git & Commits
 - Branch format: `{username}/{description}` (kebab-case)
@@ -277,7 +345,7 @@ Periodic compaction merges incremental updates to prevent unbounded growth.
 
 ### Permission-aware document access (Google Docs model)
 Owner has full control (CRUD, share, delete/restore).
-Access is determined by a three-tier priority: owner > explicit DocumentAccess > general_access > deny.
+Access is determined by a four-tier priority: owner > explicit DocumentAccess > folder access inheritance > general_access > deny.
 
 **general_access** field on Document_ controls link-based access:
 - `restricted`: only owner and explicit collaborators can access
@@ -287,13 +355,23 @@ Access is determined by a three-tier priority: owner > explicit DocumentAccess >
 **Explicit collaborators** are added by email via `POST /api/documents/{id}/collaborators`.
 The share link is simply the document URL (`/edit/{doc_id}`).
 
+**Folder access inheritance**: documents within a folder inherit the folder's ACLs. If a folder is shared with a user, they can access all documents within it at the folder's permission level.
+
 WebSocket connections require at least VIEW permission (VIEW or EDIT users can connect).
 Write permissions are enforced by the editor UI (read-only mode for VIEW users).
 
-### Version History via content snapshots
-Document content is snapshotted on each save (auto-versioning).
+### Version History via content snapshots with deduplication
+Document content is snapshotted automatically (30s idle + 5min rate limit).
 Versions stored in `document_versions` collection with author metadata.
-Read-only preview reconstructs the document at any point in time.
+Deduplication: if content is identical to the latest version, no new version is created.
+Diff view shows line-level changes between selected version and current document.
+Restore replaces Yjs content and creates a new attributed snapshot.
+
+### Spaces (Folders) -- Hierarchical Document Organization
+Folders are a separate entity (`Folder` model) with their own ACLs (`FolderAccess` model).
+Folders support nesting (parent_id) and cascade operations (soft-delete, restore, hard-delete).
+Documents can optionally belong to a folder via `folder_id` field.
+Frontend presents a file-browser view with breadcrumb navigation.
 
 ### Comments via MongoDB + single-depth threads
 Comments stored in MongoDB `comments` collection (not in CRDT state).
@@ -323,3 +401,22 @@ card vertically with its anchored text in the editor. When multiple comments are
 same line, a top-down stacking algorithm pushes cards below each other with an 8px gap.
 Displaced cards show a dashed connecting line to their ideal position. Orphaned comments
 are shown in a separate "Orphaned" section at the bottom of the panel.
+
+## Common Pitfalls & Technical Challenges
+
+### Frontend Testing
+- **`screen` import issue**: `@testing-library/react` in CI doesn't export `screen` properly. Always destructure from `render()` return value instead.
+- **`@testing-library/dom`**: Must be listed as an explicit devDependency for CI to work with yarn.
+- **Toast test ordering**: Toasts are prepended (newest first), not appended. Tests must find toasts by message content, not array index.
+- **Ambiguous selectors**: When multiple elements have the same text (e.g., "Delete" button + modal title), use more specific selectors like `getByRole('button', { name: ... })`.
+
+### Backend Testing
+- **Beanie model fields**: Models like `Comment` and `DocumentVersion` have required fields (`author_id`, `author_name`, `version_number`) that must be provided in test fixtures.
+- **Route ordering**: Static routes (e.g., `/trash`, `/shared`, `/contents`) MUST be registered before parameterized routes (e.g., `/{doc_id}`) in FastAPI routers.
+
+### CI/CD
+- **npm vs yarn**: Use `corepack enable && yarn install` in CI to align with the Dockerfile. npm has caused crashes in GitHub Actions.
+- **Git auth**: When pushing, ensure the correct GitHub CLI user is active (`gh auth switch --user <username>`).
+
+### CRDT & Real-time
+- **Content persistence on deploy**: `pycrdt-websocket`'s `YRoom` must explicitly load existing data from `MongoYStore` when a room is opened. Without this, deployments cause content loss until the room is re-opened by a client with local state.

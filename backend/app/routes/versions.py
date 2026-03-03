@@ -1,6 +1,7 @@
 """Version history routes: create snapshots, list versions, retrieve version."""
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.auth.dependencies import get_current_user
@@ -33,17 +34,22 @@ async def create_version(
 ):
     """Create a version snapshot for a document.
 
+    Returns 204 (no content) if the content is identical to the latest version
+    (deduplication). Otherwise returns 201 with the new version.
+
     Args:
         doc_id: Document ID.
         payload: Content and optional summary.
         user: Injected by get_current_user dependency.
 
     Returns:
-        DocumentVersionRead of the created version.
+        DocumentVersionRead of the created version, or 204 if deduplicated.
     """
     version = await version_service.save_snapshot(
         doc_id, user, payload.content, payload.summary
     )
+    if version is None:
+        return JSONResponse(status_code=204, content=None)
     return DocumentVersionRead.from_doc(version)
 
 

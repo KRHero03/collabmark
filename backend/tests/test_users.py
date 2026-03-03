@@ -48,3 +48,40 @@ class TestUpdateMe:
             json={"name": "Hacker"},
         )
         assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_update_avatar_url_only(self, async_client: AsyncClient, test_user: User):
+        cookies = _auth_cookies(test_user)
+        async_client.cookies.update(cookies)
+        response = await async_client.put(
+            "/api/users/me",
+            json={"avatar_url": "https://example.com/new-avatar.png"},
+        )
+        assert response.status_code == 200
+        assert response.json()["avatar_url"] == "https://example.com/new-avatar.png"
+        assert response.json()["name"] == "Test User"
+
+    @pytest.mark.asyncio
+    async def test_update_partial_data_name_and_avatar(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        cookies = _auth_cookies(test_user)
+        async_client.cookies.update(cookies)
+        response = await async_client.put(
+            "/api/users/me",
+            json={"name": "New Name", "avatar_url": "https://example.com/avatar.png"},
+        )
+        assert response.status_code == 200
+        assert response.json()["name"] == "New Name"
+        assert response.json()["avatar_url"] == "https://example.com/avatar.png"
+
+    @pytest.mark.asyncio
+    async def test_update_empty_payload_preserves_data(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        cookies = _auth_cookies(test_user)
+        async_client.cookies.update(cookies)
+        response = await async_client.put("/api/users/me", json={})
+        assert response.status_code == 200
+        assert response.json()["name"] == "Test User"
+        assert response.json()["email"] == "test@example.com"

@@ -9,7 +9,9 @@
 import { useEffect, useRef } from "react";
 import {
   ExternalLink,
+  FolderOpen,
   Pencil,
+  Share2,
   Trash2,
   Info,
   RotateCcw,
@@ -97,31 +99,89 @@ export function DocumentContextMenu({
   );
 }
 
+export interface EntityPermissions {
+  can_view: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_share: boolean;
+}
+
+export function getEntityActions(
+  entityType: "document" | "folder",
+  perms: EntityPermissions,
+  handlers: {
+    onOpen: () => void;
+    onShare?: () => void;
+    onRename?: () => void;
+    onTrash?: () => void;
+    onInfo: () => void;
+    onViewAcl?: () => void;
+  },
+): ContextMenuAction[] {
+  const actions: ContextMenuAction[] = [];
+
+  const openIcon = entityType === "folder"
+    ? <FolderOpen className="h-4 w-4" />
+    : <ExternalLink className="h-4 w-4" />;
+  actions.push({ label: "Open", icon: openIcon, onClick: handlers.onOpen });
+
+  if (perms.can_share && handlers.onShare) {
+    actions.push({ label: "Share", icon: <Share2 className="h-4 w-4" />, onClick: handlers.onShare });
+  }
+  if (perms.can_edit && handlers.onRename) {
+    actions.push({ label: "Rename", icon: <Pencil className="h-4 w-4" />, onClick: handlers.onRename });
+  }
+  if (perms.can_delete && handlers.onTrash) {
+    actions.push({ label: "Move to Trash", icon: <Trash2 className="h-4 w-4" />, onClick: handlers.onTrash, variant: "danger" });
+  }
+  if (handlers.onViewAcl) {
+    actions.push({ label: "View Permissions", icon: <Info className="h-4 w-4" />, onClick: handlers.onViewAcl });
+  }
+  actions.push({ label: "Info", icon: <Info className="h-4 w-4" />, onClick: handlers.onInfo });
+
+  return actions;
+}
+
 export function getOwnedDocActions(handlers: {
   onOpen: () => void;
+  onShare: () => void;
   onRename: () => void;
   onTrash: () => void;
   onInfo: () => void;
 }): ContextMenuAction[] {
-  return [
-    { label: "Open", icon: <ExternalLink className="h-4 w-4" />, onClick: handlers.onOpen },
-    { label: "Rename", icon: <Pencil className="h-4 w-4" />, onClick: handlers.onRename },
-    { label: "Move to Trash", icon: <Trash2 className="h-4 w-4" />, onClick: handlers.onTrash, variant: "danger" },
-    { label: "Info", icon: <Info className="h-4 w-4" />, onClick: handlers.onInfo },
-  ];
+  return getEntityActions("document", { can_view: true, can_edit: true, can_delete: true, can_share: true }, handlers);
 }
 
 export function getSharedDocActions(handlers: {
   onOpen: () => void;
   onInfo: () => void;
 }): ContextMenuAction[] {
+  return getEntityActions("document", { can_view: true, can_edit: false, can_delete: false, can_share: false }, handlers);
+}
+
+export function getTrashDocActions(handlers: {
+  onRestore: () => void;
+  onDeletePermanently: () => void;
+  onInfo: () => void;
+}): ContextMenuAction[] {
   return [
-    { label: "Open", icon: <ExternalLink className="h-4 w-4" />, onClick: handlers.onOpen },
+    { label: "Restore", icon: <RotateCcw className="h-4 w-4" />, onClick: handlers.onRestore },
+    { label: "Delete permanently", icon: <XCircle className="h-4 w-4" />, onClick: handlers.onDeletePermanently, variant: "danger" },
     { label: "Info", icon: <Info className="h-4 w-4" />, onClick: handlers.onInfo },
   ];
 }
 
-export function getTrashDocActions(handlers: {
+export function getFolderActions(handlers: {
+  onOpen: () => void;
+  onShare: () => void;
+  onRename: () => void;
+  onTrash: () => void;
+  onInfo: () => void;
+}): ContextMenuAction[] {
+  return getEntityActions("folder", { can_view: true, can_edit: true, can_delete: true, can_share: true }, handlers);
+}
+
+export function getTrashFolderActions(handlers: {
   onRestore: () => void;
   onDeletePermanently: () => void;
   onInfo: () => void;

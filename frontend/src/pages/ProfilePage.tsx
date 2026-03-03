@@ -4,8 +4,8 @@
 
 import { useEffect, useState } from "react";
 import { formatDateLong } from "../lib/dateUtils";
-import { User } from "lucide-react";
 import { Navbar } from "../components/Layout/Navbar";
+import { UserAvatar } from "../components/Layout/UserAvatar";
 import { useAuth } from "../hooks/useAuth";
 import { authApi } from "../lib/api";
 
@@ -45,15 +45,7 @@ export function ProfilePage() {
 
         <section className="rounded-lg border border-[var(--color-border)] bg-white p-6">
           <div className="mb-6 flex items-center gap-4">
-            {user.avatar_url ? (
-              <img
-                src={user.avatar_url}
-                alt={user.name}
-                className="h-16 w-16 rounded-full"
-              />
-            ) : (
-              <User className="h-16 w-16 rounded-full bg-gray-200 p-3" />
-            )}
+            <UserAvatar url={user.avatar_url} name={user.name} size="lg" />
             <div>
               <p className="text-lg font-semibold">{user.name}</p>
               <p className="text-sm text-[var(--color-text-muted)]">

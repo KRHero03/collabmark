@@ -165,6 +165,117 @@ class TestGetVersion:
         assert resp.status_code == 404
 
 
+class TestVersionDeduplication:
+    @pytest.mark.asyncio
+    async def test_duplicate_content_returns_204(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        """Submitting identical content as the latest version returns 204."""
+        async_client.cookies.update(_auth_cookies(test_user))
+        doc = await _make_doc(test_user)
+
+        resp1 = await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "same content"},
+        )
+        assert resp1.status_code == 201
+
+        resp2 = await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "same content"},
+        )
+        assert resp2.status_code == 204
+
+    @pytest.mark.asyncio
+    async def test_duplicate_does_not_increment_version(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        """After dedup, the next different content still gets next version number."""
+        async_client.cookies.update(_auth_cookies(test_user))
+        doc = await _make_doc(test_user)
+
+        await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "v1"},
+        )
+        # Duplicate - should be deduped
+        await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "v1"},
+        )
+        # New content - should be v2
+        resp = await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "v2"},
+        )
+        assert resp.status_code == 201
+        assert resp.json()["version_number"] == 2
+
+        # Verify only 2 versions exist
+        list_resp = await async_client.get(f"/api/documents/{doc.id}/versions")
+        assert len(list_resp.json()) == 2
+
+    @pytest.mark.asyncio
+    async def test_different_content_not_deduped(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        """Different content always creates a new version."""
+        async_client.cookies.update(_auth_cookies(test_user))
+        doc = await _make_doc(test_user)
+
+        resp1 = await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "content A"},
+        )
+        assert resp1.status_code == 201
+
+        resp2 = await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "content B"},
+        )
+        assert resp2.status_code == 201
+        assert resp2.json()["version_number"] == 2
+
+    @pytest.mark.asyncio
+    async def test_empty_content_dedup(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        """Empty content is also properly deduplicated."""
+        async_client.cookies.update(_auth_cookies(test_user))
+        doc = await _make_doc(test_user)
+
+        resp1 = await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": ""},
+        )
+        assert resp1.status_code == 201
+
+        resp2 = await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": ""},
+        )
+        assert resp2.status_code == 204
+
+    @pytest.mark.asyncio
+    async def test_whitespace_difference_not_deduped(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        """Content differing only by whitespace is treated as different."""
+        async_client.cookies.update(_auth_cookies(test_user))
+        doc = await _make_doc(test_user)
+
+        await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "hello"},
+        )
+        resp = await async_client.post(
+            f"/api/documents/{doc.id}/versions",
+            json={"content": "hello "},
+        )
+        assert resp.status_code == 201
+        assert resp.json()["version_number"] == 2
+
+
 class TestAutoVersionOnSave:
     @pytest.mark.asyncio
     async def test_update_content_creates_version(

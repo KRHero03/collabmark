@@ -75,3 +75,37 @@ class TestApiKeyLifecycle:
             headers={"X-API-Key": "cm_invalid_key_here"},
         )
         assert response.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_revoke_invalid_key_id_404(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        async_client.cookies.update(_auth_cookies(test_user))
+        resp = await async_client.delete("/api/keys/invalid-id")
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_revoke_key_not_owned_by_user_404(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        from app.models.api_key import ApiKey
+
+        other = User(
+            google_id="other-keys",
+            email="other-keys@example.com",
+            name="Other",
+        )
+        await other.insert()
+
+        key = ApiKey(
+            user_id=str(other.id),
+            key_hash=ApiKey.hash_key("cm_test123"),
+            name="Other Key",
+        )
+        await key.insert()
+
+        async_client.cookies.update(_auth_cookies(test_user))
+        resp = await async_client.delete(f"/api/keys/{key.id}")
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()

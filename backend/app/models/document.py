@@ -22,6 +22,8 @@ class Document_(Document):
     title: str = "Untitled"
     content: str = ""
     owner_id: Indexed(str)
+    folder_id: Optional[str] = None
+    root_folder_id: Optional[str] = None
     general_access: GeneralAccess = GeneralAccess.RESTRICTED
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None
@@ -57,6 +59,7 @@ class DocumentRead(BaseModel):
     owner_id: str
     owner_name: str = ""
     owner_email: str = ""
+    folder_id: Optional[str] = None
     general_access: GeneralAccess
     is_deleted: bool
     deleted_at: Optional[datetime] = None
@@ -86,6 +89,7 @@ class DocumentRead(BaseModel):
             owner_id=doc.owner_id,
             owner_name=owner_name,
             owner_email=owner_email,
+            folder_id=doc.folder_id,
             general_access=doc.general_access,
             is_deleted=doc.is_deleted,
             deleted_at=doc.deleted_at,
@@ -100,6 +104,7 @@ class DocumentCreate(BaseModel):
 
     title: str = "Untitled"
     content: str = ""
+    folder_id: Optional[str] = None
 
 
 class DocumentUpdate(BaseModel):
@@ -107,3 +112,4 @@ class DocumentUpdate(BaseModel):
 
     title: Optional[str] = None
     content: Optional[str] = None
+    folder_id: Optional[str] = None

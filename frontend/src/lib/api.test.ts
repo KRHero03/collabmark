@@ -7,7 +7,16 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import axios from "axios";
-import { documentsApi, keysApi, authApi } from "./api";
+import {
+  documentsApi,
+  keysApi,
+  authApi,
+  foldersApi,
+  aclApi,
+  sharingApi,
+  commentsApi,
+  versionsApi,
+} from "./api";
 
 vi.mock("axios", () => {
   const mockAxios = {
@@ -15,6 +24,7 @@ vi.mock("axios", () => {
     get: vi.fn(),
     post: vi.fn(),
     put: vi.fn(),
+    patch: vi.fn(),
     delete: vi.fn(),
     interceptors: {
       request: { use: vi.fn() },
@@ -88,6 +98,100 @@ describe("API client", () => {
     });
   });
 
+  describe("foldersApi", () => {
+    it("create calls POST /folders", async () => {
+      await foldersApi.create({ name: "My Folder" });
+      expect(axios.post).toHaveBeenCalledWith("/folders", { name: "My Folder" });
+    });
+
+    it("create with parent_id", async () => {
+      await foldersApi.create({ name: "Child", parent_id: "parent-1" });
+      expect(axios.post).toHaveBeenCalledWith("/folders", {
+        name: "Child",
+        parent_id: "parent-1",
+      });
+    });
+
+    it("get calls GET /folders/:id", async () => {
+      await foldersApi.get("folder-1");
+      expect(axios.get).toHaveBeenCalledWith("/folders/folder-1");
+    });
+
+    it("update calls PUT /folders/:id", async () => {
+      await foldersApi.update("folder-1", { name: "Renamed" });
+      expect(axios.put).toHaveBeenCalledWith("/folders/folder-1", {
+        name: "Renamed",
+      });
+    });
+
+    it("delete calls DELETE /folders/:id", async () => {
+      await foldersApi.delete("folder-1");
+      expect(axios.delete).toHaveBeenCalledWith("/folders/folder-1");
+    });
+
+    it("restore calls POST /folders/:id/restore", async () => {
+      await foldersApi.restore("folder-1");
+      expect(axios.post).toHaveBeenCalledWith("/folders/folder-1/restore");
+    });
+
+    it("hardDelete calls DELETE /folders/:id/permanent", async () => {
+      await foldersApi.hardDelete("folder-1");
+      expect(axios.delete).toHaveBeenCalledWith("/folders/folder-1/permanent");
+    });
+
+    it("listTrash calls GET /folders/trash", async () => {
+      await foldersApi.listTrash();
+      expect(axios.get).toHaveBeenCalledWith("/folders/trash");
+    });
+
+    it("listShared calls GET /folders/shared", async () => {
+      await foldersApi.listShared();
+      expect(axios.get).toHaveBeenCalledWith("/folders/shared");
+    });
+
+    it("listContents calls GET /folders/contents without params for root", async () => {
+      await foldersApi.listContents(null);
+      expect(axios.get).toHaveBeenCalledWith("/folders/contents", { params: {} });
+    });
+
+    it("listContents calls GET /folders/contents with folder_id", async () => {
+      await foldersApi.listContents("folder-1");
+      expect(axios.get).toHaveBeenCalledWith("/folders/contents", {
+        params: { folder_id: "folder-1" },
+      });
+    });
+
+    it("getBreadcrumbs calls GET /folders/breadcrumbs", async () => {
+      await foldersApi.getBreadcrumbs("folder-1");
+      expect(axios.get).toHaveBeenCalledWith("/folders/breadcrumbs", {
+        params: { folder_id: "folder-1" },
+      });
+    });
+
+    it("addCollaborator calls POST /folders/:id/collaborators", async () => {
+      await foldersApi.addCollaborator("folder-1", {
+        email: "user@example.com",
+        permission: "edit",
+      });
+      expect(axios.post).toHaveBeenCalledWith("/folders/folder-1/collaborators", {
+        email: "user@example.com",
+        permission: "edit",
+      });
+    });
+
+    it("listCollaborators calls GET /folders/:id/collaborators", async () => {
+      await foldersApi.listCollaborators("folder-1");
+      expect(axios.get).toHaveBeenCalledWith("/folders/folder-1/collaborators");
+    });
+
+    it("removeCollaborator calls DELETE /folders/:id/collaborators/:uid", async () => {
+      await foldersApi.removeCollaborator("folder-1", "user-1");
+      expect(axios.delete).toHaveBeenCalledWith(
+        "/folders/folder-1/collaborators/user-1",
+      );
+    });
+  });
+
   describe("keysApi", () => {
     it("list calls GET /keys", async () => {
       await keysApi.list();
@@ -102,6 +206,179 @@ describe("API client", () => {
     it("revoke calls DELETE /keys/:id", async () => {
       await keysApi.revoke("key-456");
       expect(axios.delete).toHaveBeenCalledWith("/keys/key-456");
+    });
+  });
+
+  describe("aclApi", () => {
+    it("getDocumentAcl calls GET /documents/:id/acl with exact doc ID", async () => {
+      await aclApi.getDocumentAcl("doc-abc-123");
+      expect(axios.get).toHaveBeenCalledWith("/documents/doc-abc-123/acl");
+    });
+
+    it("getFolderAcl calls GET /folders/:id/acl with exact folder ID", async () => {
+      await aclApi.getFolderAcl("folder-xyz-789");
+      expect(axios.get).toHaveBeenCalledWith("/folders/folder-xyz-789/acl");
+    });
+  });
+
+  describe("sharingApi", () => {
+    it("getMyPermission calls GET /documents/:id/permission", async () => {
+      await sharingApi.getMyPermission("doc-abc-123");
+      expect(axios.get).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/permission",
+      );
+    });
+
+    it("updateGeneralAccess calls PUT /documents/:id/access with payload", async () => {
+      await sharingApi.updateGeneralAccess("doc-abc-123", "anyone_view");
+      expect(axios.put).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/access",
+        { general_access: "anyone_view" },
+      );
+    });
+
+    it("addCollaborator calls POST /documents/:id/collaborators with payload", async () => {
+      await sharingApi.addCollaborator("doc-abc-123", {
+        email: "collab@example.com",
+        permission: "edit",
+      });
+      expect(axios.post).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/collaborators",
+        { email: "collab@example.com", permission: "edit" },
+      );
+    });
+
+    it("listCollaborators calls GET /documents/:id/collaborators", async () => {
+      await sharingApi.listCollaborators("doc-abc-123");
+      expect(axios.get).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/collaborators",
+      );
+    });
+
+    it("removeCollaborator calls DELETE /documents/:id/collaborators/:userId", async () => {
+      await sharingApi.removeCollaborator("doc-abc-123", "user-xyz-789");
+      expect(axios.delete).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/collaborators/user-xyz-789",
+      );
+    });
+
+    it("listShared calls GET /documents/shared", async () => {
+      await sharingApi.listShared();
+      expect(axios.get).toHaveBeenCalledWith("/documents/shared");
+    });
+
+    it("recordView calls POST /documents/:id/view", async () => {
+      await sharingApi.recordView("doc-abc-123");
+      expect(axios.post).toHaveBeenCalledWith("/documents/doc-abc-123/view");
+    });
+
+    it("listRecentlyViewed calls GET /documents/recent", async () => {
+      await sharingApi.listRecentlyViewed();
+      expect(axios.get).toHaveBeenCalledWith("/documents/recent");
+    });
+  });
+
+  describe("commentsApi", () => {
+    it("list calls GET /documents/:id/comments", async () => {
+      await commentsApi.list("doc-abc-123");
+      expect(axios.get).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/comments",
+      );
+    });
+
+    it("create calls POST /documents/:id/comments with payload", async () => {
+      await commentsApi.create("doc-abc-123", {
+        content: "Great point!",
+        anchor_from: 0,
+        anchor_to: 10,
+        quoted_text: "hello world",
+      });
+      expect(axios.post).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/comments",
+        {
+          content: "Great point!",
+          anchor_from: 0,
+          anchor_to: 10,
+          quoted_text: "hello world",
+        },
+      );
+    });
+
+    it("reply calls POST /comments/:id/reply with content payload", async () => {
+      await commentsApi.reply("comment-xyz-789", {
+        content: "I agree",
+      });
+      expect(axios.post).toHaveBeenCalledWith(
+        "/comments/comment-xyz-789/reply",
+        { content: "I agree" },
+      );
+    });
+
+    it("resolve calls POST /comments/:id/resolve", async () => {
+      await commentsApi.resolve("comment-xyz-789");
+      expect(axios.post).toHaveBeenCalledWith(
+        "/comments/comment-xyz-789/resolve",
+      );
+    });
+
+    it("reanchor calls PATCH /comments/:id/reanchor with payload", async () => {
+      await commentsApi.reanchor("comment-xyz-789", {
+        anchor_from: 5,
+        anchor_to: 15,
+      });
+      expect(axios.patch).toHaveBeenCalledWith(
+        "/comments/comment-xyz-789/reanchor",
+        { anchor_from: 5, anchor_to: 15 },
+      );
+    });
+
+    it("orphan calls PATCH /comments/:id/orphan", async () => {
+      await commentsApi.orphan("comment-xyz-789");
+      expect(axios.patch).toHaveBeenCalledWith(
+        "/comments/comment-xyz-789/orphan",
+      );
+    });
+
+    it("delete calls DELETE /comments/:id", async () => {
+      await commentsApi.delete("comment-xyz-789");
+      expect(axios.delete).toHaveBeenCalledWith(
+        "/comments/comment-xyz-789",
+      );
+    });
+  });
+
+  describe("versionsApi", () => {
+    it("list calls GET /documents/:id/versions", async () => {
+      await versionsApi.list("doc-abc-123");
+      expect(axios.get).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/versions",
+      );
+    });
+
+    it("get calls GET /documents/:id/versions/:versionNumber", async () => {
+      await versionsApi.get("doc-abc-123", 42);
+      expect(axios.get).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/versions/42",
+      );
+    });
+
+    it("create calls POST /documents/:id/versions with payload", async () => {
+      await versionsApi.create("doc-abc-123", {
+        content: "# Document content",
+        summary: "Initial version",
+      });
+      expect(axios.post).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/versions",
+        { content: "# Document content", summary: "Initial version" },
+      );
+    });
+
+    it("create sends minimal payload without summary", async () => {
+      await versionsApi.create("doc-abc-123", { content: "minimal" });
+      expect(axios.post).toHaveBeenCalledWith(
+        "/documents/doc-abc-123/versions",
+        { content: "minimal" },
+      );
     });
   });
 });

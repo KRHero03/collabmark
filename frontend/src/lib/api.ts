@@ -22,12 +22,62 @@ export interface MarkdownDocument {
   owner_id: string;
   owner_name: string;
   owner_email: string;
+  folder_id: string | null;
   general_access: GeneralAccess;
   is_deleted: boolean;
   deleted_at: string | null;
   content_length: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface FolderItem {
+  id: string;
+  name: string;
+  owner_id: string;
+  owner_name: string;
+  owner_email: string;
+  parent_id: string | null;
+  general_access: GeneralAccess;
+  is_deleted: boolean;
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FolderContents {
+  folders: FolderItem[];
+  documents: MarkdownDocument[];
+  permission?: "view" | "edit";
+}
+
+export interface SharedFolder {
+  id: string;
+  name: string;
+  owner_id: string;
+  owner_name: string;
+  owner_email: string;
+  permission: "view" | "edit";
+  last_accessed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RecentlyViewedFolder {
+  id: string;
+  name: string;
+  owner_id: string;
+  owner_name: string;
+  owner_email: string;
+  permission: "view" | "edit";
+  viewed_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Breadcrumb {
+  id: string;
+  name: string;
 }
 
 export interface ApiKeyInfo {
@@ -52,16 +102,48 @@ export const authApi = {
 
 export const documentsApi = {
   list: () => api.get<MarkdownDocument[]>("/documents"),
-  create: (data: { title?: string; content?: string }) =>
+  create: (data: { title?: string; content?: string; folder_id?: string | null }) =>
     api.post<MarkdownDocument>("/documents", data),
   get: (id: string) => api.get<MarkdownDocument>(`/documents/${id}`),
-  update: (id: string, data: { title?: string; content?: string }) =>
+  update: (id: string, data: { title?: string; content?: string; folder_id?: string | null }) =>
     api.put<MarkdownDocument>(`/documents/${id}`, data),
   delete: (id: string) => api.delete<MarkdownDocument>(`/documents/${id}`),
   restore: (id: string) =>
     api.post<MarkdownDocument>(`/documents/${id}/restore`),
   listTrash: () => api.get<MarkdownDocument[]>("/documents/trash"),
   hardDelete: (id: string) => api.delete(`/documents/${id}/permanent`),
+};
+
+export const foldersApi = {
+  create: (data: { name?: string; parent_id?: string | null }) =>
+    api.post<FolderItem>("/folders", data),
+  get: (id: string) => api.get<FolderItem>(`/folders/${id}`),
+  update: (id: string, data: { name?: string; parent_id?: string | null; general_access?: GeneralAccess }) =>
+    api.put<FolderItem>(`/folders/${id}`, data),
+  delete: (id: string) => api.delete<FolderItem>(`/folders/${id}`),
+  restore: (id: string) => api.post<FolderItem>(`/folders/${id}/restore`),
+  hardDelete: (id: string) => api.delete(`/folders/${id}/permanent`),
+  listTrash: () => api.get<FolderItem[]>("/folders/trash"),
+  listShared: () => api.get<SharedFolder[]>("/folders/shared"),
+  recordView: (folderId: string) => api.post(`/folders/${folderId}/view`),
+  listRecentlyViewed: () =>
+    api.get<RecentlyViewedFolder[]>("/folders/recent"),
+  listContents: (folderId?: string | null) =>
+    api.get<FolderContents>("/folders/contents", {
+      params: folderId ? { folder_id: folderId } : {},
+    }),
+  getBreadcrumbs: (folderId: string) =>
+    api.get<Breadcrumb[]>("/folders/breadcrumbs", {
+      params: { folder_id: folderId },
+    }),
+  addCollaborator: (
+    folderId: string,
+    data: { email: string; permission: "view" | "edit" },
+  ) => api.post<Collaborator>(`/folders/${folderId}/collaborators`, data),
+  listCollaborators: (folderId: string) =>
+    api.get<Collaborator[]>(`/folders/${folderId}/collaborators`),
+  removeCollaborator: (folderId: string, userId: string) =>
+    api.delete(`/folders/${folderId}/collaborators/${userId}`),
 };
 
 export interface Collaborator {
@@ -84,6 +166,35 @@ export interface SharedDocument {
   created_at: string;
   updated_at: string;
 }
+
+export interface AclEntry {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  avatar_url: string | null;
+  can_view: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_share: boolean;
+  role: "root_owner" | "owner" | "editor" | "viewer" | "none";
+  inherited_from_id: string | null;
+  inherited_from_name: string | null;
+}
+
+export interface EffectivePermission {
+  can_view: boolean;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_share: boolean;
+  role: string;
+}
+
+export const aclApi = {
+  getDocumentAcl: (docId: string) =>
+    api.get<AclEntry[]>(`/documents/${docId}/acl`),
+  getFolderAcl: (folderId: string) =>
+    api.get<AclEntry[]>(`/folders/${folderId}/acl`),
+};
 
 export const keysApi = {
   list: () => api.get<ApiKeyInfo[]>("/keys"),

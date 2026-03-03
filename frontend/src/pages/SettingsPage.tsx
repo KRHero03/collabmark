@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Copy, Key, Plus, Trash2 } from "lucide-react";
 import { Navbar } from "../components/Layout/Navbar";
 import { keysApi, type ApiKeyInfo } from "../lib/api";
+import { copyToClipboard } from "../lib/clipboard";
 import { formatDateShort } from "../lib/dateUtils";
 
 export function SettingsPage() {
@@ -33,7 +34,7 @@ export function SettingsPage() {
   };
 
   const handleCopy = (key: string) => {
-    navigator.clipboard.writeText(key);
+    copyToClipboard(key);
   };
 
   return (
@@ -64,6 +65,7 @@ export function SettingsPage() {
                 <button
                   onClick={() => handleCopy(createdKey)}
                   className="rounded p-1 hover:bg-green-100"
+                  data-testid="copy-api-key"
                 >
                   <Copy className="h-4 w-4 text-green-700" />
                 </button>

@@ -69,7 +69,7 @@ class TestRecordView:
         assert view.document_id == str(doc.id)
 
     @pytest.mark.asyncio
-    async def test_record_view_skipped_for_owner(
+    async def test_record_view_records_own_document(
         self, async_client: AsyncClient, test_user: User
     ):
         doc = await _make_doc(test_user, title="My Own Doc")
@@ -80,7 +80,7 @@ class TestRecordView:
         count = await DocumentView.find(
             DocumentView.user_id == str(test_user.id),
         ).count()
-        assert count == 0
+        assert count == 1
 
     @pytest.mark.asyncio
     async def test_record_view_updates_timestamp_on_revisit(
@@ -185,7 +185,7 @@ class TestListRecentlyViewed:
         assert data[1]["title"] == "Doc A"
 
     @pytest.mark.asyncio
-    async def test_does_not_include_own_documents(
+    async def test_includes_own_documents(
         self, async_client: AsyncClient, test_user: User
     ):
         doc = await _make_doc(test_user, title="My Doc")
@@ -195,7 +195,10 @@ class TestListRecentlyViewed:
         resp = await async_client.get("/api/documents/recent")
 
         assert resp.status_code == 200
-        assert resp.json() == []
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["id"] == str(doc.id)
+        assert data[0]["title"] == "My Doc"
 
     @pytest.mark.asyncio
     async def test_does_not_include_deleted_documents(
@@ -235,6 +238,20 @@ class TestListRecentlyViewed:
     ):
         owner = await _make_user("owner-8", "owner8@test.com", "Owner8")
         doc = await _make_doc(owner, title="Editable Doc", general_access=GeneralAccess.ANYONE_EDIT)
+        async_client.cookies.update(_auth_cookies(test_user))
+
+        await async_client.post(f"/api/documents/{doc.id}/view")
+        resp = await async_client.get("/api/documents/recent")
+
+        data = resp.json()
+        assert len(data) == 1
+        assert data[0]["permission"] == "edit"
+
+    @pytest.mark.asyncio
+    async def test_own_document_shows_edit_permission(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        doc = await _make_doc(test_user, title="My Own Doc")
         async_client.cookies.update(_auth_cookies(test_user))
 
         await async_client.post(f"/api/documents/{doc.id}/view")

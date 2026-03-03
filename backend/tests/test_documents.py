@@ -2,12 +2,18 @@ import pytest
 from httpx import AsyncClient
 
 from app.auth.jwt import create_access_token
+from app.models.document import Document_
+from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 
 
 def _auth_cookies(user: User) -> dict[str, str]:
     token = create_access_token(str(user.id))
     return {"access_token": token}
+
+
+def _auth(user: User) -> dict[str, str]:
+    return _auth_cookies(user)
 
 
 class TestCreateDocument:
@@ -130,3 +136,33 @@ class TestSoftDelete:
         )
         assert restore_resp.status_code == 200
         assert restore_resp.json()["is_deleted"] is False
+
+
+class TestDocumentRoutesResolveOwner:
+    """Test _resolve_owner with invalid/missing owner returns Unknown."""
+
+    @pytest.mark.asyncio
+    async def test_get_document_owner_not_found_returns_unknown(
+        self, async_client: AsyncClient, test_user: User
+    ):
+        from app.models.document import Document_
+        from app.models.share_link import DocumentAccess, Permission
+
+        doc = Document_(
+            title="Orphan Doc",
+            content="",
+            owner_id="000000000000000000000001",
+        )
+        await doc.insert()
+        await DocumentAccess(
+            document_id=str(doc.id),
+            user_id=str(test_user.id),
+            permission=Permission.VIEW,
+            granted_by="000000000000000000000001",
+        ).insert()
+
+        async_client.cookies.update(_auth_cookies(test_user))
+        resp = await async_client.get(f"/api/documents/{doc.id}")
+        assert resp.status_code == 200
+        assert resp.json()["owner_name"] == "Unknown"
+        assert resp.json()["owner_email"] == ""

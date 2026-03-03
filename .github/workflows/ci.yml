@@ -31,7 +31,7 @@ jobs:
         working-directory: frontend
 
       - name: TypeScript type check
-        run: ./node_modules/.bin/tsc --noEmit
+        run: ./node_modules/.bin/tsc -b
         working-directory: frontend
 
       - name: Run frontend tests

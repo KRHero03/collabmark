@@ -111,11 +111,18 @@ async def resolve_share_link(token: str) -> tuple[ShareLink, Document_]:
             detail="Share link not found or expired",
         )
 
-    if link.expires_at and link.expires_at < datetime.now(timezone.utc):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Share link has expired",
+    if link.expires_at:
+        now = datetime.now(timezone.utc)
+        expires_at = (
+            link.expires_at
+            if link.expires_at.tzinfo
+            else link.expires_at.replace(tzinfo=timezone.utc)
         )
+        if expires_at < now:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Share link has expired",
+            )
 
     doc = await _find_doc_or_404(link.document_id)
     if doc.is_deleted:
@@ -196,7 +203,7 @@ async def list_shared_documents(user: User) -> list[dict]:
 async def get_user_permission(doc_id: str, user: User) -> Permission | None:
     """Check if a user has access to a document.
 
-    Priority: owner (EDIT) > explicit DocumentAccess > general_access > None.
+    Priority: owner (EDIT) > explicit DocumentAccess > folder chain inheritance > general_access > None.
 
     Args:
         doc_id: The document ID.
@@ -205,31 +212,8 @@ async def get_user_permission(doc_id: str, user: User) -> Permission | None:
     Returns:
         Permission level, or None if no access.
     """
-    try:
-        doc = await Document_.get(PydanticObjectId(doc_id))
-    except (InvalidId, ValueError):
-        return None
-    if doc is None:
-        return None
-
-    if doc.owner_id == str(user.id):
-        return Permission.EDIT
-
-    access = await DocumentAccess.find_one(
-        DocumentAccess.document_id == doc_id,
-        DocumentAccess.user_id == str(user.id),
-    )
-    if access:
-        access.touch_access()
-        await access.save()
-        return access.permission
-
-    if doc.general_access == GeneralAccess.ANYONE_EDIT:
-        return Permission.EDIT
-    if doc.general_access == GeneralAccess.ANYONE_VIEW:
-        return Permission.VIEW
-
-    return None
+    from app.services.acl_service import get_base_permission
+    return await get_base_permission("document", doc_id, str(user.id))
 
 
 async def update_general_access(
@@ -402,9 +386,9 @@ async def _find_doc_or_404(doc_id: str) -> Document_:
 
 
 async def record_document_view(doc_id: str, user: User) -> None:
-    """Record that a user viewed a document they don't own.
+    """Record that a user viewed a document (including their own).
 
-    Creates or updates a DocumentView record. Skips if the user is the owner.
+    Creates or updates a DocumentView record.
 
     Args:
         doc_id: The document ID.
@@ -414,7 +398,7 @@ async def record_document_view(doc_id: str, user: User) -> None:
         doc = await Document_.get(PydanticObjectId(doc_id))
     except (InvalidId, ValueError):
         return
-    if doc is None or doc.owner_id == str(user.id):
+    if doc is None:
         return
 
     existing = await DocumentView.find_one(
@@ -433,7 +417,7 @@ async def record_document_view(doc_id: str, user: User) -> None:
 
 
 async def list_recently_viewed(user: User) -> list[dict]:
-    """List documents recently viewed by the user (not owned by them).
+    """List all documents recently viewed by the user (including their own).
 
     Returns documents sorted by most recently viewed first.
 

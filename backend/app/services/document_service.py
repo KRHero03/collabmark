@@ -41,10 +41,19 @@ async def create_document(owner: User, payload: DocumentCreate) -> Document_:
             detail=f"Document limit reached ({MAX_DOCUMENTS_PER_USER})",
         )
 
+    root_folder_id: str | None = None
+    if payload.folder_id is not None:
+        from app.services.folder_service import _assert_folder_access, _find_folder
+        folder = await _find_folder(payload.folder_id)
+        await _assert_folder_access(folder, owner, Permission.EDIT)
+        root_folder_id = folder.root_folder_id or str(folder.id)
+
     doc = Document_(
         title=payload.title,
         content=payload.content,
         owner_id=str(owner.id),
+        folder_id=payload.folder_id,
+        root_folder_id=root_folder_id,
     )
     await doc.insert()
     return doc
@@ -109,6 +118,8 @@ async def update_document(
         doc.title = payload.title
     if payload.content is not None:
         doc.content = payload.content
+    if payload.folder_id is not None:
+        doc.folder_id = payload.folder_id
     doc.touch()
     await doc.save()
 
@@ -120,40 +131,18 @@ async def update_document(
 
 
 async def soft_delete_document(doc_id: str, user: User) -> Document_:
-    """Soft-delete a document. Owner only.
-
-    Args:
-        doc_id: Document ID.
-        user: User requesting delete (must be owner).
-
-    Returns:
-        The soft-deleted Document_ instance.
-
-    Raises:
-        HTTPException: 404 if not found, 403 if not owner.
-    """
+    """Soft-delete a document. Requires delete permission (ACL-aware)."""
     doc = await _find_doc(doc_id)
-    _assert_owner(doc, user)
+    await _assert_can_delete(doc, user)
     doc.soft_delete()
     await doc.save()
     return doc
 
 
 async def restore_document(doc_id: str, user: User) -> Document_:
-    """Restore a soft-deleted document. Owner only.
-
-    Args:
-        doc_id: Document ID.
-        user: User requesting restore (must be owner).
-
-    Returns:
-        The restored Document_ instance.
-
-    Raises:
-        HTTPException: 404 if not found, 403 if not owner.
-    """
+    """Restore a soft-deleted document. Requires delete permission (ACL-aware)."""
     doc = await _find_doc(doc_id)
-    _assert_owner(doc, user)
+    await _assert_can_delete(doc, user)
     doc.restore()
     await doc.save()
     return doc
@@ -175,20 +164,9 @@ async def list_trash(user: User) -> list[Document_]:
 
 
 async def hard_delete_document(doc_id: str, user: User) -> None:
-    """Permanently delete a document and all related data. Owner only.
-
-    Removes the document record plus associated CRDT updates, comments,
-    versions, collaborator access records, and view records.
-
-    Args:
-        doc_id: Document ID.
-        user: User requesting delete (must be owner).
-
-    Raises:
-        HTTPException: 404 if not found, 403 if not owner.
-    """
+    """Permanently delete a document and all related data. Requires delete permission (ACL-aware)."""
     doc = await _find_doc(doc_id)
-    _assert_owner(doc, user)
+    await _assert_can_delete(doc, user)
 
     str_id = str(doc.id)
 
@@ -231,13 +209,24 @@ def _assert_owner(doc: Document_, user: User) -> None:
         )
 
 
+async def _assert_can_delete(doc: Document_, user: User) -> None:
+    """ACL-aware delete check: root owner or entity owner (for docs, always deletable by owner)."""
+    from app.services.acl_service import resolve_effective_permission
+    perm = await resolve_effective_permission("document", str(doc.id), user)
+    if not perm.can_delete:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete this document",
+        )
+
+
 async def _assert_access(
     doc: Document_, user: User, min_permission: Permission
 ) -> None:
-    """Check that user is owner, has explicit DocumentAccess, or is covered
-    by the document's general_access setting.
+    """Check that user is owner, has explicit DocumentAccess, inherits access
+    from a parent folder, or is covered by the document's general_access setting.
 
-    Priority: owner > explicit DocumentAccess > general_access > deny.
+    Priority: owner > explicit DocumentAccess > folder chain inheritance > general_access > deny.
 
     Args:
         doc: The document to check access for.
@@ -264,6 +253,17 @@ async def _assert_access(
         access.touch_access()
         await access.save()
         return
+
+    if doc.folder_id is not None:
+        from app.services.folder_service import get_folder_permission
+        folder_perm = await get_folder_permission(doc.folder_id, user)
+        if folder_perm is not None:
+            if min_permission == Permission.EDIT and folder_perm == Permission.VIEW:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You only have view access via the parent folder",
+                )
+            return
 
     ga = doc.general_access
     if ga == GeneralAccess.ANYONE_EDIT:

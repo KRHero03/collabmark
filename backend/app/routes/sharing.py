@@ -178,8 +178,7 @@ async def record_view(
 ):
     """Record that the current user viewed a document.
 
-    No-op if the user is the document owner. Creates or updates
-    the view timestamp for the 'Recently Viewed' tab.
+    Creates or updates the view timestamp for the 'Recently Viewed' tab.
 
     Args:
         doc_id: Document ID.
@@ -195,7 +194,7 @@ async def record_view(
 async def list_recently_viewed(
     user: User = Depends(get_current_user),
 ):
-    """List documents recently viewed by the current user (not owned).
+    """List all documents recently viewed by the current user (including owned).
 
     Args:
         user: Injected by get_current_user dependency.

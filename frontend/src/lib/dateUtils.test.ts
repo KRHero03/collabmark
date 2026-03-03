@@ -15,7 +15,7 @@ function stubLocale() {
 
   vi.spyOn(Date.prototype, "toLocaleString").mockImplementation(function (
     this: Date,
-    _locale?: string | string[],
+    _locale?: Intl.LocalesArgument,
     options?: Intl.DateTimeFormatOptions,
   ) {
     return origLocaleString.call(this, "en-US", {
@@ -26,7 +26,7 @@ function stubLocale() {
 
   vi.spyOn(Date.prototype, "toLocaleDateString").mockImplementation(function (
     this: Date,
-    _locale?: string | string[],
+    _locale?: Intl.LocalesArgument,
     options?: Intl.DateTimeFormatOptions,
   ) {
     return origLocaleDateString.call(this, "en-US", {

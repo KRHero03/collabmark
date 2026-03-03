@@ -80,8 +80,12 @@ export function CommentsPanel({
       quoted_text: selectedText || undefined,
     };
 
-    await addComment(docId, payload);
-    setNewComment("");
+    try {
+      await addComment(docId, payload);
+      setNewComment("");
+    } catch {
+      // Error is already handled inside useComments hook
+    }
   }, [
     docId,
     newComment,
@@ -127,7 +131,7 @@ export function CommentsPanel({
   const unresolvedCount = comments.filter((c) => !c.is_resolved).length;
 
   return (
-    <div className="flex h-full w-[360px] flex-col border-l border-[var(--color-border)] bg-white">
+    <div className="flex h-full w-full flex-col border-l border-[var(--color-border)] bg-white md:w-[360px]">
       <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
         <h2 className="flex items-center gap-2 text-lg font-semibold">
           <MessageSquare className="h-5 w-5" />

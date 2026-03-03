@@ -1,4 +1,4 @@
-"""Document CRUD routes: create, list, get, update, delete, restore, trash, hard-delete."""
+"""Document CRUD routes: create, list, get, update, delete, restore, trash, hard-delete, ACL."""
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
@@ -8,6 +8,7 @@ from app.auth.dependencies import get_current_user
 from app.models.document import Document_, DocumentCreate, DocumentRead, DocumentUpdate
 from app.models.user import User
 from app.services import document_service
+from app.services.acl_service import get_acl_summary
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -187,3 +188,29 @@ async def hard_delete_document(
         HTTPException: 404 if not found, 403 if not owner.
     """
     await document_service.hard_delete_document(doc_id, user)
+
+
+@router.get("/{doc_id}/acl")
+async def get_document_acl(
+    doc_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Get consolidated ACL for a document showing all users with effective permissions."""
+    await document_service.get_document(doc_id, user)
+    entries = await get_acl_summary("document", doc_id)
+    return [
+        {
+            "user_id": e.user_id,
+            "user_name": e.user_name,
+            "user_email": e.user_email,
+            "avatar_url": e.avatar_url,
+            "can_view": e.can_view,
+            "can_edit": e.can_edit,
+            "can_delete": e.can_delete,
+            "can_share": e.can_share,
+            "role": e.role,
+            "inherited_from_id": e.inherited_from_id,
+            "inherited_from_name": e.inherited_from_name,
+        }
+        for e in entries
+    ]

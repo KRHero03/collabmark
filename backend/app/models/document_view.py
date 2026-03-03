@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class DocumentView(Document):
-    """Records when a user views a document they don't own.
+    """Records when a user views any document (including their own).
 
     One record per (user_id, document_id) pair. The viewed_at timestamp
     is updated on each subsequent view to keep the list sorted by recency.

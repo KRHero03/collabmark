@@ -5,6 +5,7 @@ import logging
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
+from pymongo.errors import DuplicateKeyError
 
 from app.models.document import Document_
 from app.models.document_version import DocumentVersion
@@ -12,11 +13,18 @@ from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
+MAX_DEDUP_RETRIES = 2
+
 
 async def save_snapshot(
     doc_id: str, user: User, content: str, summary: str = ""
-) -> DocumentVersion:
+) -> DocumentVersion | None:
     """Save a new version snapshot for a document.
+
+    Deduplicates: if the content is identical to the latest snapshot,
+    no new version is created and None is returned. Uses a unique
+    compound index on (document_id, version_number) to handle
+    concurrent inserts safely via retry.
 
     Args:
         doc_id: The document ID.
@@ -25,33 +33,47 @@ async def save_snapshot(
         summary: Optional human-readable summary of changes.
 
     Returns:
-        The created DocumentVersion.
+        The created DocumentVersion, or None if content is unchanged.
 
     Raises:
         HTTPException: 404 if document not found.
     """
     doc = await _find_doc_or_404(doc_id)
 
-    latest = (
-        await DocumentVersion.find(DocumentVersion.document_id == doc_id)
-        .sort("-version_number")
-        .first_or_none()
-    )
-    next_version = (latest.version_number + 1) if latest else 1
+    for _attempt in range(MAX_DEDUP_RETRIES + 1):
+        latest = (
+            await DocumentVersion.find(DocumentVersion.document_id == doc_id)
+            .sort("-version_number")
+            .first_or_none()
+        )
 
-    if not summary:
-        summary = f"Version {next_version} by {user.name}"
+        if latest is not None and latest.content == content:
+            return None
 
-    version = DocumentVersion(
-        document_id=doc_id,
-        version_number=next_version,
-        content=content,
-        author_id=str(user.id),
-        author_name=user.name,
-        summary=summary,
-    )
-    await version.insert()
-    return version
+        next_version = (latest.version_number + 1) if latest else 1
+        resolved_summary = summary or f"Version {next_version} by {user.name}"
+
+        version = DocumentVersion(
+            document_id=doc_id,
+            version_number=next_version,
+            content=content,
+            author_id=str(user.id),
+            author_name=user.name,
+            summary=resolved_summary,
+        )
+        try:
+            await version.insert()
+            return version
+        except DuplicateKeyError:
+            logger.info(
+                "Version %d for doc %s already exists, retrying",
+                next_version,
+                doc_id,
+            )
+            continue
+
+    logger.warning("Failed to insert version for doc %s after retries", doc_id)
+    return None
 
 
 async def list_versions(doc_id: str) -> list[DocumentVersion]:

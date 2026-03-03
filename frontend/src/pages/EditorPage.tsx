@@ -5,9 +5,9 @@
  * Uses Yjs for real-time CRDT-based collaboration. Document metadata
  * (title) is managed via REST API; content is synced via WebSocket.
  *
- * Integrates comment anchoring: the MarkdownEditor exposes its EditorView
- * and selection events; the useCommentAnchors and useCommentPositions hooks
- * resolve inline comment positions against the live Y.Doc.
+ * Content is auto-saved via CRDT WebSocket. Version snapshots are
+ * created automatically after 30 seconds of inactivity (rate-limited
+ * to at most one snapshot every 5 minutes).
  *
  * Panel toggle behaviour: toolbar buttons toggle panels (History, Comments).
  * Only one panel can be open at a time; opening one closes the other.
@@ -29,12 +29,13 @@ import { EditorToolbar } from "../components/Editor/EditorToolbar";
 import { ShareDialog } from "../components/Editor/ShareDialog";
 import { VersionHistory } from "../components/Editor/VersionHistory";
 import { CommentsPanel } from "../components/Editor/CommentsPanel";
-import { documentsApi, sharingApi, type GeneralAccess, type Permission } from "../lib/api";
+import { documentsApi, sharingApi, versionsApi, type GeneralAccess, type Permission } from "../lib/api";
 import { useYjsProvider } from "../hooks/useYjsProvider";
 import { useAuth } from "../hooks/useAuth";
 import { useComments } from "../hooks/useComments";
 import { useCommentAnchors } from "../hooks/useCommentAnchors";
 import { useCommentPositions } from "../hooks/useCommentPositions";
+import { useToast } from "../hooks/useToast";
 
 /** Encode a Uint8Array to a Base64 string. */
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -49,19 +50,23 @@ const DEBOUNCE_MS = 1500;
 const EDITOR_WIDTH_KEY = "collabmark_editor_width";
 const MIN_WIDTH = 20;
 const MAX_WIDTH = 80;
+const AUTO_VERSION_IDLE_MS = 30_000;
+const AUTO_VERSION_MIN_INTERVAL_MS = 5 * 60_000;
 
 export function EditorPage() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { addToast } = useToast();
   const [title, setTitle] = useState("Untitled");
   const [content, setContent] = useState("");
   const [debouncedContent, setDebouncedContent] = useState("");
-  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [shareOpen, setShareOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [presentationMode, setPresentationMode] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"editor" | "preview">("editor");
+  const [isMobile, setIsMobile] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
   const [generalAccess, setGeneralAccess] = useState<GeneralAccess>("restricted");
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -157,12 +162,18 @@ export function EditorPage() {
   useEffect(() => {
     if (!synced) return;
 
+    const initialText = ytext.toString();
+    setContent((prev) => (prev === initialText ? prev : initialText));
+
+    if (!snapshotContentRef.current) {
+      snapshotContentRef.current = initialText;
+    }
+
     const updateContent = () => {
       const next = ytext.toString();
       setContent((prev) => (prev === next ? prev : next));
     };
 
-    updateContent();
     ytext.observe(updateContent);
 
     return () => {
@@ -207,23 +218,91 @@ export function EditorPage() {
   const previewStale = content !== debouncedContent;
   const flushPreview = useCallback(() => setDebouncedContent(content), [content]);
 
-  const save = useCallback(async () => {
-    if (!id || permission === "view") return;
-    setSaving(true);
-    await documentsApi.update(id, { title, content: ytext.toString() });
-    setSaving(false);
-  }, [id, title, ytext, permission]);
+  // --- Auto-versioning: snapshot after 30s of idle, rate-limited to 5min ---
+  const lastSnapshotTime = useRef(0);
+  const snapshotContentRef = useRef("");
+  const autoVersionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    if (!id || permission === "view" || !synced) return;
+
+    if (autoVersionTimer.current) clearTimeout(autoVersionTimer.current);
+
+    if (!content || content === snapshotContentRef.current) return;
+
+    autoVersionTimer.current = setTimeout(async () => {
+      const now = Date.now();
+      if (now - lastSnapshotTime.current < AUTO_VERSION_MIN_INTERVAL_MS) return;
+      const currentText = ytext.toString();
+      if (currentText === snapshotContentRef.current) return;
+      try {
+        await versionsApi.create(id, { content: currentText, summary: "Auto-saved" });
+        snapshotContentRef.current = currentText;
+        lastSnapshotTime.current = Date.now();
+      } catch {
+        /* silent — non-critical */
+      }
+    }, AUTO_VERSION_IDLE_MS);
+
+    return () => {
+      if (autoVersionTimer.current) clearTimeout(autoVersionTimer.current);
+    };
+  }, [content, id, permission, synced, ytext]);
+
+  useEffect(() => {
+    if (!id || permission === "view") return;
+    const handleBeforeUnload = () => {
+      const currentText = ytext.toString();
+      if (currentText && currentText !== snapshotContentRef.current) {
+        const now = Date.now();
+        if (now - lastSnapshotTime.current >= AUTO_VERSION_MIN_INTERVAL_MS) {
+          navigator.sendBeacon(
+            `/api/documents/${id}/versions`,
+            new Blob(
+              [JSON.stringify({ content: currentText, summary: "Auto-saved on exit" })],
+              { type: "application/json" },
+            ),
+          );
+        }
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [id, permission, ytext]);
+
+  // Prevent default Ctrl+S (no-op now that save is automatic)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "s") {
         e.preventDefault();
-        if (permission === "edit") save();
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [save, permission]);
+  }, []);
+
+  const handleRestore = useCallback(
+    async (versionContent: string, versionNumber: number) => {
+      if (!id || permission === "view") return;
+      ydoc.transact(() => {
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, versionContent);
+      });
+      setHistoryOpen(false);
+      addToast(`Restored to version ${versionNumber}`, "success");
+      try {
+        await versionsApi.create(id, {
+          content: versionContent,
+          summary: `Restored from version ${versionNumber}`,
+        });
+        snapshotContentRef.current = versionContent;
+        lastSnapshotTime.current = Date.now();
+      } catch {
+        /* silent — non-critical */
+      }
+    },
+    [id, permission, ydoc, ytext, addToast],
+  );
 
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -271,7 +350,6 @@ ${previewEl.innerHTML}
 </html>`);
     printWindow.document.close();
 
-    // Wait for images/SVGs to settle before triggering print
     setTimeout(() => {
       printWindow.print();
       printWindow.close();
@@ -362,6 +440,14 @@ ${previewEl.innerHTML}
     return () => window.removeEventListener("keydown", handler);
   }, [presentationMode]);
 
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;
@@ -402,7 +488,6 @@ ${previewEl.innerHTML}
       <EditorToolbar
         title={title}
         onTitleChange={(t) => { titleSetByUser.current = true; setTitle(t); saveTitle(t); }}
-        onSave={save}
         onExportMd={handleExportMd}
         onExportPdf={handleExportPdf}
         onShare={() => setShareOpen(true)}
@@ -410,7 +495,6 @@ ${previewEl.innerHTML}
         onComments={presentationMode ? undefined : toggleComments}
         onPresentation={togglePresentation}
         presentationMode={presentationMode}
-        saving={saving}
         readOnly={permission === "view"}
       />
       {!synced && (
@@ -420,7 +504,6 @@ ${previewEl.innerHTML}
       )}
 
       {presentationMode ? (
-        /* ---- Presentation mode: centered preview only ---- */
         <div className="flex-1 overflow-auto">
           <div className="mx-auto max-w-4xl px-8 py-10">
             {previewStale && (
@@ -439,10 +522,81 @@ ${previewEl.innerHTML}
             </div>
           </div>
         </div>
+      ) : isMobile ? (
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex shrink-0 gap-1 border-b border-[var(--color-border)] bg-white p-1">
+            <button
+              onClick={() => setMobileTab("editor")}
+              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+                mobileTab === "editor"
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "text-[var(--color-text-muted)] hover:bg-gray-50"
+              }`}
+            >
+              Editor
+            </button>
+            <button
+              onClick={() => setMobileTab("preview")}
+              className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
+                mobileTab === "preview"
+                  ? "bg-[var(--color-primary)] text-white"
+                  : "text-[var(--color-text-muted)] hover:bg-gray-50"
+              }`}
+            >
+              Preview
+            </button>
+          </div>
+          {mobileTab === "editor" ? (
+            <div
+              ref={editorContainerRef}
+              className="min-h-0 flex-1 overflow-auto"
+            >
+              {provider && (
+                <MarkdownEditor
+                  ytext={ytext}
+                  awareness={provider.awareness}
+                  userName={user?.name}
+                  onViewReady={setEditorView}
+                  onSelectionChange={handleSelectionChange}
+                  onAddComment={permission === "edit" ? handleAddComment : undefined}
+                  commentRanges={commentRanges}
+                  readOnly={permission === "view"}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="relative min-h-0 flex-1 overflow-auto">
+              {previewStale && (
+                <button
+                  onClick={flushPreview}
+                  className="absolute right-3 top-2 z-10 rounded-md bg-amber-100 px-2 py-0.5 text-xs text-amber-800 transition hover:bg-amber-200 dark:bg-amber-900 dark:text-amber-200"
+                >
+                  Refresh preview
+                </button>
+              )}
+              <div ref={previewRef} className="p-4">
+                <MarkdownPreview content={debouncedContent} />
+              </div>
+            </div>
+          )}
+          {commentsOpen && id && (
+            <CommentsPanel
+              docId={id}
+              open={commentsOpen}
+              onClose={() => setCommentsOpen(false)}
+              currentUserId={user?.id || ""}
+              selectedText={selection?.text}
+              selectionRange={
+                selection ? { from: selection.from, to: selection.to } : undefined
+              }
+              selectionRelative={selectionRelative ?? undefined}
+              anchors={anchors}
+              positions={positions}
+            />
+          )}
+        </div>
       ) : (
-        /* ---- Normal mode: editor + preview + comments ---- */
         <div ref={splitContainerRef} className="flex flex-1 overflow-hidden">
-          {/* Editor pane */}
           <div
             ref={editorContainerRef}
             className="overflow-auto border-r border-[var(--color-border)]"
@@ -466,13 +620,11 @@ ${previewEl.innerHTML}
             )}
           </div>
 
-          {/* Resize handle */}
           <div
             onMouseDown={handleResizeStart}
             className="w-1 flex-shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-primary)]"
           />
 
-          {/* Preview pane */}
           <div
             className="relative overflow-auto"
             style={{
@@ -494,7 +646,6 @@ ${previewEl.innerHTML}
             </div>
           </div>
 
-          {/* Comments gutter (inline, position-synced) */}
           {commentsOpen && id && (
             <CommentsPanel
               docId={id}
@@ -513,7 +664,6 @@ ${previewEl.innerHTML}
         </div>
       )}
 
-      {/* Backdrop overlay for History panel */}
       {historyOpen && (
         <div
           className="fixed inset-0 z-30 bg-black/20"
@@ -537,6 +687,8 @@ ${previewEl.innerHTML}
             docId={id}
             open={historyOpen}
             onClose={() => setHistoryOpen(false)}
+            currentContent={content}
+            onRestore={handleRestore}
           />
         </>
       )}

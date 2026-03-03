@@ -7,6 +7,7 @@ const baseDoc: MarkdownDocument = {
   id: "doc-1",
   title: "Test Document",
   content: "Hello world",
+  folder_id: null,
   owner_id: "user-1",
   owner_name: "Alice",
   owner_email: "alice@example.com",
