@@ -5,6 +5,9 @@
     <link rel="icon" type="image/svg+xml" href="/collabmark.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CollabMark</title>
+    <script>
+      if (localStorage.getItem("theme") === "dark") document.documentElement.classList.add("dark");
+    </script>
   </head>
   <body>
     <div id="root"></div>

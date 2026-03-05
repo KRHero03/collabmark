@@ -149,7 +149,7 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
 
   return (
     <div
-      className={`prose prose-sm max-w-none overflow-auto p-6 ${isDark ? "prose-invert" : ""} ${className ?? ""}`}
+      className={`prose prose-sm dark:prose-invert max-w-none overflow-auto p-6 ${className ?? ""}`}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}

@@ -244,19 +244,12 @@ describe("MarkdownPreview", () => {
       expect(del?.textContent).toBe("strikethrough");
     });
 
-    it("applies prose-invert when dark mode", () => {
-      mockUseDarkMode.mockReturnValue(true);
-
-      const { container } = render(<MarkdownPreview content="x" />);
-      expect(container.firstElementChild?.className).toContain("prose-invert");
-    });
-
-    it("does not apply prose-invert when light mode", () => {
+    it("always includes dark:prose-invert for CSS-based dark mode", () => {
       mockUseDarkMode.mockReturnValue(false);
 
       const { container } = render(<MarkdownPreview content="x" />);
-      expect(container.firstElementChild?.className).not.toContain(
-        "prose-invert",
+      expect(container.firstElementChild?.className).toContain(
+        "dark:prose-invert",
       );
     });
   });
