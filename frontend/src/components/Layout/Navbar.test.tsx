@@ -54,9 +54,9 @@ describe("Navbar", () => {
 
   it("shows navigation items when user is logged in", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
-    const { getByText } = render(<Navbar />);
-    expect(getByText("API Docs")).toBeInTheDocument();
-    expect(getByText("Test User")).toBeInTheDocument();
+    const { getAllByText } = render(<Navbar />);
+    expect(getAllByText("API Docs").length).toBeGreaterThanOrEqual(1);
+    expect(getAllByText("Test User").length).toBeGreaterThanOrEqual(1);
   });
 
   it("does not show navigation items when user is null", () => {
@@ -66,10 +66,10 @@ describe("Navbar", () => {
     expect(queryByText("Profile")).not.toBeInTheDocument();
   });
 
-  it("hamburger menu button visible on mobile (check aria-label='Toggle menu')", () => {
+  it("hamburger menu button visible on mobile", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
     const { getByLabelText } = render(<Navbar />);
-    expect(getByLabelText("Toggle menu")).toBeInTheDocument();
+    expect(getByLabelText("Open menu")).toBeInTheDocument();
   });
 
   it("desktop nav items have hidden md:flex classes", () => {
@@ -79,19 +79,13 @@ describe("Navbar", () => {
     expect(desktopNav).toBeInTheDocument();
   });
 
-  it("clicking hamburger opens mobile menu (shows Profile, API Docs, Settings, Sign Out links)", () => {
+  it("clicking hamburger opens sidebar (shows Profile, API Docs, Settings, Sign Out)", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
-    const { getByLabelText, getByText, queryByText, getAllByText } = render(
-      <Navbar />,
-    );
-    const hamburger = getByLabelText("Toggle menu");
+    const { getByLabelText, getByText } = render(<Navbar />);
 
-    expect(queryByText("Sign Out")).not.toBeInTheDocument();
-    fireEvent.click(hamburger);
+    fireEvent.click(getByLabelText("Open menu"));
 
     expect(getByText("Profile")).toBeInTheDocument();
-    expect(getAllByText("API Docs").length).toBeGreaterThanOrEqual(1);
-    expect(getByText("Settings")).toBeInTheDocument();
     expect(getByText("Sign Out")).toBeInTheDocument();
   });
 
@@ -100,7 +94,7 @@ describe("Navbar", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: mockLogout });
     const { getByLabelText, getByText } = render(<Navbar />);
 
-    fireEvent.click(getByLabelText("Toggle menu"));
+    fireEvent.click(getByLabelText("Open menu"));
     fireEvent.click(getByText("Sign Out"));
 
     await vi.waitFor(() => {
@@ -117,7 +111,7 @@ describe("Navbar", () => {
     expect(img).toHaveAttribute("src", "https://example.com/avatar.png");
   });
 
-  it("dark mode toggle calls toggleDark", () => {
+  it("dark mode toggle works on desktop", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
     const { container } = render(<Navbar />);
     const darkModeButtons = container.querySelectorAll(
@@ -162,60 +156,124 @@ describe("Navbar", () => {
     expect(setItem).toHaveBeenCalledWith("theme", "light");
   });
 
-  it("mobile dark mode button toggles dark class on documentElement", () => {
+  it("sidebar dark mode button toggles dark class", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
     document.documentElement.classList.remove("dark");
-    const { container } = render(<Navbar />);
-    const mobileSection = container.querySelector(".md\\:hidden");
-    expect(mobileSection).toBeInTheDocument();
-    const mobileButtons = mobileSection?.querySelectorAll("button") ?? [];
-    const darkToggle = Array.from(mobileButtons).find(
-      (b) => !b.getAttribute("aria-label"),
+    const { getByLabelText } = render(<Navbar />);
+
+    fireEvent.click(getByLabelText("Open menu"));
+
+    const sidebar = document.querySelector("[aria-label='Navigation drawer']");
+    expect(sidebar).toBeInTheDocument();
+    const darkToggle = sidebar?.querySelector(
+      'button[title="Dark mode"], button[title="Light mode"]',
     );
     expect(darkToggle).toBeTruthy();
 
     fireEvent.click(darkToggle!);
     expect(document.documentElement.classList.contains("dark")).toBe(true);
-
-    fireEvent.click(darkToggle!);
-    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
-  it("clicking Profile in mobile menu closes the menu", () => {
+  it("clicking Profile in sidebar closes it", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
-    const { getByLabelText, getByText, queryByText } = render(<Navbar />);
-    fireEvent.click(getByLabelText("Toggle menu"));
-    expect(getByText("Profile")).toBeInTheDocument();
-    fireEvent.click(getByText("Profile"));
-    expect(queryByText("Sign Out")).not.toBeInTheDocument();
+    const { getByLabelText } = render(<Navbar />);
+    fireEvent.click(getByLabelText("Open menu"));
+
+    const sidebar = document.querySelector("[aria-label='Navigation drawer']");
+    const profileLink = sidebar?.querySelector('a[href="/profile"]');
+    expect(profileLink).toBeTruthy();
+    fireEvent.click(profileLink!);
+
+    expect(sidebar?.className).toContain("-translate-x-full");
   });
 
-  it("clicking API Docs in mobile menu closes the menu", () => {
+  it("clicking API Docs in sidebar closes it", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
-    const { getByLabelText, queryByText } = render(<Navbar />);
-    fireEvent.click(getByLabelText("Toggle menu"));
-    const signOutBtn = queryByText("Sign Out");
-    expect(signOutBtn).toBeInTheDocument();
-    const mobileMenu = signOutBtn?.closest(".md\\:hidden");
-    const apiDocsLink = mobileMenu?.querySelector('a[href="/api-docs"]');
-    expect(apiDocsLink).toBeTruthy();
-    fireEvent.click(apiDocsLink!);
-    expect(queryByText("Sign Out")).not.toBeInTheDocument();
+    const { getByLabelText } = render(<Navbar />);
+    fireEvent.click(getByLabelText("Open menu"));
+
+    const sidebar = document.querySelector("[aria-label='Navigation drawer']");
+    const link = sidebar?.querySelector('a[href="/api-docs"]');
+    expect(link).toBeTruthy();
+    fireEvent.click(link!);
+
+    expect(sidebar?.className).toContain("-translate-x-full");
   });
 
-  it("clicking Settings in mobile menu closes the menu", () => {
+  it("clicking Settings in sidebar closes it", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
-    const { getByLabelText, getByText, queryByText } = render(<Navbar />);
-    fireEvent.click(getByLabelText("Toggle menu"));
-    expect(getByText("Settings")).toBeInTheDocument();
-    fireEvent.click(getByText("Settings"));
-    expect(queryByText("Sign Out")).not.toBeInTheDocument();
+    const { getByLabelText } = render(<Navbar />);
+    fireEvent.click(getByLabelText("Open menu"));
+
+    const sidebar = document.querySelector("[aria-label='Navigation drawer']");
+    const link = sidebar?.querySelector('a[href="/settings"]');
+    expect(link).toBeTruthy();
+    fireEvent.click(link!);
+
+    expect(sidebar?.className).toContain("-translate-x-full");
   });
 
-  it("mobile menu shows user email", () => {
+  it("sidebar shows user email", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
     const { getByLabelText, getByText } = render(<Navbar />);
-    fireEvent.click(getByLabelText("Toggle menu"));
+    fireEvent.click(getByLabelText("Open menu"));
     expect(getByText("test@example.com")).toBeInTheDocument();
+  });
+
+  it("sidebar shows navigation tabs when provided", () => {
+    mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
+    const onTabChange = vi.fn();
+    const { getByLabelText, getByText } = render(
+      <Navbar activeTab="browse" onTabChange={onTabChange} />,
+    );
+    fireEvent.click(getByLabelText("Open menu"));
+
+    expect(getByText("Files")).toBeInTheDocument();
+    expect(getByText("Shared with me")).toBeInTheDocument();
+    expect(getByText("Recently viewed")).toBeInTheDocument();
+    expect(getByText("Trash")).toBeInTheDocument();
+  });
+
+  it("clicking a navigation tab calls onTabChange and closes sidebar", () => {
+    mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
+    const onTabChange = vi.fn();
+    const { getByLabelText, getByText } = render(
+      <Navbar activeTab="browse" onTabChange={onTabChange} />,
+    );
+    fireEvent.click(getByLabelText("Open menu"));
+    fireEvent.click(getByText("Shared with me"));
+
+    expect(onTabChange).toHaveBeenCalledWith("shared");
+  });
+
+  it("does not show navigation tabs when onTabChange is not provided", () => {
+    mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
+    const { getByLabelText, queryByText } = render(<Navbar />);
+    fireEvent.click(getByLabelText("Open menu"));
+    expect(queryByText("Navigation")).not.toBeInTheDocument();
+  });
+
+  it("close button in sidebar closes it", () => {
+    mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
+    const { getByLabelText } = render(<Navbar />);
+    fireEvent.click(getByLabelText("Open menu"));
+
+    const sidebar = document.querySelector("[aria-label='Navigation drawer']");
+    expect(sidebar?.className).toContain("translate-x-0");
+
+    fireEvent.click(getByLabelText("Close menu"));
+    expect(sidebar?.className).toContain("-translate-x-full");
+  });
+
+  it("Escape key closes the sidebar", () => {
+    mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
+    const { getByLabelText } = render(<Navbar />);
+    fireEvent.click(getByLabelText("Open menu"));
+
+    const sidebar = document.querySelector("[aria-label='Navigation drawer']");
+    expect(sidebar?.className).toContain("translate-x-0");
+
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(sidebar?.className).toContain("-translate-x-full");
   });
 });

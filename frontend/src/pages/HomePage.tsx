@@ -509,9 +509,24 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg-secondary)]">
-      <Navbar />
+      <Navbar activeTab={tab} onTabChange={setTab} />
       <main className="mx-auto max-w-4xl px-3 py-4 md:px-6 md:py-8">
-        <div className="mb-6 flex flex-nowrap gap-1 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-white p-1">
+        {/* Mobile: current section label */}
+        <div className="mb-4 flex items-center gap-2 md:hidden">
+          {tab === "browse" && <Folder className="h-4 w-4 text-[var(--color-primary)]" />}
+          {tab === "shared" && <Users className="h-4 w-4 text-[var(--color-primary)]" />}
+          {tab === "recent" && <Clock className="h-4 w-4 text-[var(--color-primary)]" />}
+          {tab === "trash" && <Trash2 className="h-4 w-4 text-[var(--color-primary)]" />}
+          <span className="text-sm font-semibold text-[var(--color-text)]">
+            {tab === "browse" && "Files"}
+            {tab === "shared" && "Shared with me"}
+            {tab === "recent" && "Recently viewed"}
+            {tab === "trash" && "Trash"}
+          </span>
+        </div>
+
+        {/* Desktop: inline tab bar */}
+        <div className="mb-6 hidden flex-nowrap gap-1 overflow-x-auto rounded-lg border border-[var(--color-border)] bg-white p-1 md:flex">
           {tabBtn(
             "browse",
             <span className="inline-flex items-center gap-1">
