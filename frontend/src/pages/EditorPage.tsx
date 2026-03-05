@@ -36,6 +36,7 @@ import { useComments } from "../hooks/useComments";
 import { useCommentAnchors } from "../hooks/useCommentAnchors";
 import { useCommentPositions } from "../hooks/useCommentPositions";
 import { useToast } from "../hooks/useToast";
+import { detectNeedsLandscape } from "../lib/pdfExport";
 
 /** Encode a Uint8Array to a Base64 string. */
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -310,6 +311,11 @@ export function EditorPage() {
     const previewEl = previewRef.current;
     if (!previewEl) return;
 
+    const needsLandscape = detectNeedsLandscape(previewEl);
+
+    const pageSize = needsLandscape ? "landscape" : "portrait";
+    const maxWidth = needsLandscape ? "1100px" : "800px";
+
     const stylesheets = Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
       .map((el) => el.outerHTML)
       .join("\n");
@@ -326,18 +332,18 @@ ${stylesheets}
 <style>
   @media print {
     body { margin: 0; padding: 40px; }
-    @page { margin: 20mm; }
+    @page { size: ${pageSize}; margin: 20mm; }
   }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    max-width: 800px; margin: 40px auto; padding: 0 20px;
+    max-width: ${maxWidth}; margin: 40px auto; padding: 0 20px;
     font-size: 14px; line-height: 1.6; color: #333;
   }
-  pre { background: #f5f5f5; padding: 16px; border-radius: 6px; overflow-x: auto; }
+  pre { background: #f5f5f5; padding: 16px; border-radius: 6px; white-space: pre-wrap; word-break: break-all; }
   pre code { background: none; }
   code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-size: 13px; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+  table { border-collapse: collapse; width: 100%; table-layout: fixed; word-wrap: break-word; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: left; overflow-wrap: break-word; }
   th { background: #f5f5f5; }
   blockquote { border-left: 3px solid #ddd; margin: 0; padding-left: 16px; color: #666; }
   svg { max-width: 100%; height: auto; }
