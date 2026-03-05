@@ -73,7 +73,7 @@ export function EditorToolbar({
         <div className="flex items-center gap-3">
           <button
             onClick={goBack}
-            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="rounded p-1 text-[var(--color-text-muted)] hover:bg-black/5 dark:hover:bg-white/10"
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
@@ -83,7 +83,7 @@ export function EditorToolbar({
         </div>
         <button
           onClick={onPresentation}
-          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
         >
           <Minimize2 className="h-4 w-4" />
           Exit Presentation
@@ -104,7 +104,7 @@ export function EditorToolbar({
       {onHistory && (
         <button
           onClick={onHistory}
-          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
         >
           <Clock className="h-4 w-4" />
           History
@@ -114,7 +114,7 @@ export function EditorToolbar({
       {onComments && (
         <button
           onClick={onComments}
-          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
         >
           <MessageSquare className="h-4 w-4" />
           Comments
@@ -124,7 +124,7 @@ export function EditorToolbar({
       {onShare && (
         <button
           onClick={onShare}
-          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
         >
           <Link className="h-4 w-4" />
           Share
@@ -134,7 +134,7 @@ export function EditorToolbar({
       {onPresentation && (
         <button
           onClick={onPresentation}
-          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
           title="Presentation mode"
         >
           <Monitor className="h-4 w-4" />
@@ -143,7 +143,7 @@ export function EditorToolbar({
 
       <button
         onClick={onExportMd}
-        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+        className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
       >
         <FileDown className="h-4 w-4" />
         .md
@@ -152,7 +152,7 @@ export function EditorToolbar({
       {onExportPdf && (
         <button
           onClick={onExportPdf}
-          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
         >
           <FileText className="h-4 w-4" />
           PDF
@@ -166,7 +166,7 @@ export function EditorToolbar({
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <button
           onClick={goBack}
-          className="flex-shrink-0 rounded p-1 text-[var(--color-text-muted)] hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="flex-shrink-0 rounded p-1 text-[var(--color-text-muted)] hover:bg-black/5 dark:hover:bg-white/10"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -192,20 +192,20 @@ export function EditorToolbar({
         <div className="relative" ref={moreRef}>
           <button
             onClick={() => setMoreOpen((o) => !o)}
-            className="inline-flex items-center rounded-md p-2 text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="inline-flex items-center rounded-md p-2 text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
             aria-label="More options"
           >
             <MoreHorizontal className="h-5 w-5" />
           </button>
         {moreOpen && (
-          <div className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-[var(--color-border)] bg-white py-1 shadow-lg dark:bg-gray-900">
+          <div className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] py-1 shadow-lg">
             {onHistory && (
               <button
                 onClick={() => {
                   onHistory();
                   setMoreOpen(false);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <Clock className="h-4 w-4" />
                 History
@@ -217,7 +217,7 @@ export function EditorToolbar({
                   onComments();
                   setMoreOpen(false);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <MessageSquare className="h-4 w-4" />
                 Comments
@@ -229,7 +229,7 @@ export function EditorToolbar({
                   onShare();
                   setMoreOpen(false);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <Link className="h-4 w-4" />
                 Share
@@ -241,7 +241,7 @@ export function EditorToolbar({
                   onPresentation?.();
                   setMoreOpen(false);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <Monitor className="h-4 w-4" />
                 Presentation
@@ -252,7 +252,7 @@ export function EditorToolbar({
                 onExportMd();
                 setMoreOpen(false);
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
             >
               <FileDown className="h-4 w-4" />
               Export .md
@@ -263,7 +263,7 @@ export function EditorToolbar({
                   onExportPdf();
                   setMoreOpen(false);
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
               >
                 <FileText className="h-4 w-4" />
                 Export PDF

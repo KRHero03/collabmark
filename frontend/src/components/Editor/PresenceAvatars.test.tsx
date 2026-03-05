@@ -210,6 +210,14 @@ describe("PresenceAvatars", () => {
       expect(getByText("Active now (1)")).toBeDefined();
     });
 
+    it("avatars do not have scale-on-hover class", () => {
+      const { getByTitle } = render(
+        <PresenceAvatars users={[alice]} />,
+      );
+      const avatar = getByTitle("Alice Johnson");
+      expect(avatar.className).not.toContain("scale");
+    });
+
     it("cleans up mousedown listener when dropdown closes", () => {
       const addSpy = vi.spyOn(document, "addEventListener");
       const removeSpy = vi.spyOn(document, "removeEventListener");

@@ -100,7 +100,7 @@ export function PresenceAvatars({ users, currentUserName }: PresenceAvatarsProps
             key={u.name}
             user={u}
             size={28}
-            className="transition-transform hover:scale-110"
+            className=""
           />
         ))}
         {overflow > 0 && (
@@ -117,8 +117,8 @@ export function PresenceAvatars({ users, currentUserName }: PresenceAvatarsProps
 
       {/* Dropdown user list */}
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-64 max-h-64 overflow-y-auto rounded-lg border border-[var(--color-border)] bg-white shadow-xl dark:bg-gray-900">
-          <div className="sticky top-0 border-b border-[var(--color-border)] bg-white px-3 py-2 dark:bg-gray-900">
+        <div className="absolute right-0 top-full z-50 mt-2 max-h-64 w-56 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] shadow-xl">
+          <div className="sticky top-0 border-b border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2">
             <span className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide">
               Active now ({totalCount})
             </span>
@@ -126,9 +126,9 @@ export function PresenceAvatars({ users, currentUserName }: PresenceAvatarsProps
           {allUsers.map((u) => (
             <div
               key={u.name}
-              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-800"
+              className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 dark:hover:bg-white/10"
             >
-              <Avatar user={u} size={28} />
+              <Avatar user={u} size={24} />
               <span className="min-w-0 truncate text-sm text-[var(--color-text)]">
                 {u.name}
               </span>
