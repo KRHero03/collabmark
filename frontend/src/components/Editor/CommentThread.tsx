@@ -8,6 +8,7 @@ import { AlertTriangle, Check, MessageSquare, Trash2, Unlink } from "lucide-reac
 import type { CommentData } from "../../lib/api";
 import type { AnchorStatus } from "../../hooks/useCommentAnchors";
 import { formatDateTime } from "../../lib/dateUtils";
+import { UserAvatar } from "../Layout/UserAvatar";
 
 interface CommentThreadProps {
   comment: CommentData;
@@ -65,11 +66,14 @@ export function CommentThread({
       )}
 
       <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium">{comment.author_name}</p>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            {formatDateTime(comment.created_at)}
-          </p>
+        <div className="flex items-center gap-2">
+          <UserAvatar url={comment.author_avatar_url} name={comment.author_name} size="sm" className="flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium">{comment.author_name}</p>
+            <p className="text-xs text-[var(--color-text-muted)]">
+              {formatDateTime(comment.created_at)}
+            </p>
+          </div>
         </div>
         <div className="flex gap-1">
           {!comment.is_resolved && (
@@ -114,12 +118,15 @@ export function CommentThread({
       {comment.replies.length > 0 && (
         <div className="mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
           {comment.replies.map((reply) => (
-            <div key={reply.id}>
-              <p className="text-xs font-medium">{reply.author_name}</p>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                {formatDateTime(reply.created_at)}
-              </p>
-              <p className="text-sm">{reply.content}</p>
+            <div key={reply.id} className="flex gap-2">
+              <UserAvatar url={reply.author_avatar_url} name={reply.author_name} size="sm" className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs font-medium">{reply.author_name}</p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {formatDateTime(reply.created_at)}
+                </p>
+                <p className="text-sm">{reply.content}</p>
+              </div>
             </div>
           ))}
         </div>

@@ -294,6 +294,31 @@ describe("PresenceAvatars", () => {
     });
   });
 
+  describe("same-user deduplication across tabs", () => {
+    it("filters out remote peers whose name matches currentUserName", () => {
+      const selfFromOtherTab: PresenceUser = {
+        name: "Me",
+        avatarUrl: "https://img/me.png",
+        color: "#abc",
+      };
+      const { getByLabelText, getByText, queryByText } = render(
+        <PresenceAvatars users={[selfFromOtherTab, alice]} currentUserName="Me" />,
+      );
+      expect(getByLabelText("2 active users")).toBeDefined();
+      fireEvent.click(getByLabelText("2 active users"));
+      expect(getByText("Me (you)")).toBeDefined();
+      expect(getByText("Alice Johnson")).toBeDefined();
+      expect(queryByText(/^Me$/)).toBeNull();
+    });
+
+    it("does not filter peers with different names", () => {
+      const { getByLabelText } = render(
+        <PresenceAvatars users={[alice, bob]} currentUserName="Me" />,
+      );
+      expect(getByLabelText("3 active users")).toBeDefined();
+    });
+  });
+
   describe("edge cases", () => {
     it("handles user with empty string avatarUrl as fallback", () => {
       const emptyUrl: PresenceUser = {

@@ -44,6 +44,7 @@ function makeComment(overrides: Partial<CommentData> = {}): CommentData {
     document_id: "doc-1",
     author_id: "user-1",
     author_name: "Test User",
+    author_avatar_url: null,
     content: "A comment",
     anchor_from: 0,
     anchor_to: 5,

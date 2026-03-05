@@ -446,12 +446,12 @@ describe("FolderShareDialog", () => {
     expect(screen.getByText("(Owner)")).toBeInTheDocument();
   });
 
-  it("owner with empty name shows ? as fallback", async () => {
+  it("owner with empty name shows fallback avatar", async () => {
     vi.mocked(foldersApi.listCollaborators).mockResolvedValue({
       data: [],
     } as never);
 
-    render(
+    const { getByTestId } = render(
       <FolderShareDialog
         {...defaultProps}
         ownerName=""
@@ -461,13 +461,6 @@ describe("FolderShareDialog", () => {
 
     await waitFor(() => {});
 
-    const ownerInitials = document.querySelectorAll(
-      "[class*='rounded-full'][class*='text-white']",
-    );
-    const ownerDiv = Array.from(ownerInitials).find(
-      (el) => el.textContent?.trim() === "?",
-    );
-    expect(ownerDiv).toBeTruthy();
-    expect(ownerDiv?.textContent).toBe("?");
+    expect(getByTestId("avatar-fallback")).toBeTruthy();
   });
 });

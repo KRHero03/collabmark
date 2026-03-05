@@ -11,6 +11,7 @@ import {
   type Collaborator,
   type GeneralAccess,
 } from "../../lib/api";
+import { UserAvatar } from "../Layout/UserAvatar";
 
 interface ShareDialogProps {
   docId: string;
@@ -20,6 +21,7 @@ interface ShareDialogProps {
   generalAccess: GeneralAccess;
   ownerEmail: string;
   ownerName: string;
+  ownerAvatarUrl?: string | null;
   onGeneralAccessChange: (ga: GeneralAccess) => void;
 }
 
@@ -31,6 +33,7 @@ export function ShareDialog({
   generalAccess,
   ownerEmail,
   ownerName,
+  ownerAvatarUrl,
   onGeneralAccessChange,
 }: ShareDialogProps) {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
@@ -195,9 +198,7 @@ export function ShareDialog({
             {/* Owner (always shown) */}
             <li className="flex items-center justify-between rounded-md px-3 py-2">
               <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--color-primary)] text-xs font-bold text-white">
-                  {ownerName?.[0]?.toUpperCase() ?? "?"}
-                </div>
+                <UserAvatar url={ownerAvatarUrl} name={ownerName || "?"} size="md" />
                 <div>
                   <p className="text-sm font-medium text-[var(--color-text)]">
                     {ownerName}{" "}
@@ -219,9 +220,7 @@ export function ShareDialog({
                 className="flex items-center justify-between rounded-md px-3 py-2 hover:bg-[var(--color-hover)]"
               >
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
-                    {c.name?.[0]?.toUpperCase() ?? "?"}
-                  </div>
+                  <UserAvatar url={c.avatar_url} name={c.name || "?"} size="md" />
                   <div>
                     <p className="text-sm font-medium text-[var(--color-text)]">
                       {c.name}

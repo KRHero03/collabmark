@@ -9,6 +9,7 @@ const mockFolder: FolderItem = {
   owner_id: "user-1",
   owner_name: "John Doe",
   owner_email: "john@example.com",
+  owner_avatar_url: null,
   parent_id: null,
   general_access: "restricted",
   is_deleted: false,

@@ -30,6 +30,7 @@ class Comment(Document):
     document_id: Indexed(str)
     author_id: str
     author_name: str
+    author_avatar_url: Optional[str] = None
     content: str
 
     anchor_from: Optional[int] = None
@@ -109,6 +110,7 @@ class CommentRead(BaseModel):
     document_id: str
     author_id: str
     author_name: str
+    author_avatar_url: Optional[str] = None
     content: str
     anchor_from: Optional[int] = None
     anchor_to: Optional[int] = None
@@ -138,6 +140,7 @@ class CommentRead(BaseModel):
             document_id=comment.document_id,
             author_id=comment.author_id,
             author_name=comment.author_name,
+            author_avatar_url=comment.author_avatar_url,
             content=comment.content,
             anchor_from=comment.anchor_from,
             anchor_to=comment.anchor_to,

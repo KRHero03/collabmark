@@ -22,14 +22,14 @@ from app.services.acl_service import get_acl_summary
 router = APIRouter(prefix="/api/folders", tags=["folders"])
 
 
-async def _resolve_owner(folder: Folder) -> tuple[str, str]:
+async def _resolve_owner(folder: Folder) -> tuple[str, str, str | None]:
     try:
         owner = await User.get(PydanticObjectId(folder.owner_id))
     except (InvalidId, ValueError):
         owner = None
     if owner is None:
-        return ("Unknown", "")
-    return (owner.name or "Unknown", owner.email or "")
+        return ("Unknown", "", None)
+    return (owner.name or "Unknown", owner.email or "", owner.avatar_url)
 
 
 @router.post("", response_model=FolderRead, status_code=201)
@@ -39,7 +39,7 @@ async def create_folder(
 ):
     """Create a new folder. Optionally nest it under a parent folder."""
     folder = await folder_service.create_folder(user, payload)
-    return FolderRead.from_folder(folder, owner_name=user.name or "", owner_email=user.email or "")
+    return FolderRead.from_folder(folder, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
 
 
 @router.get("/trash", response_model=list[FolderRead])
@@ -48,7 +48,7 @@ async def list_trash_folders(
 ):
     """List all soft-deleted folders owned by the current user."""
     folders = await folder_service.list_trash_folders(user)
-    return [FolderRead.from_folder(f, owner_name=user.name or "", owner_email=user.email or "") for f in folders]
+    return [FolderRead.from_folder(f, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url) for f in folders]
 
 
 @router.get("/shared", response_model=list[SharedFolderRead])
@@ -82,26 +82,26 @@ async def list_folder_contents(
     data = await folder_service.list_folder_contents(user, folder_id)
     owner_cache: dict[str, tuple[str, str]] = {}
 
-    async def resolve(owner_id: str) -> tuple[str, str]:
+    async def resolve(owner_id: str) -> tuple[str, str, str | None]:
         if owner_id in owner_cache:
             return owner_cache[owner_id]
         try:
             o = await User.get(PydanticObjectId(owner_id))
         except (InvalidId, ValueError):
             o = None
-        result = (o.name or "Unknown", o.email or "") if o else ("Unknown", "")
+        result = (o.name or "Unknown", o.email or "", o.avatar_url) if o else ("Unknown", "", None)
         owner_cache[owner_id] = result
         return result
 
     folders = []
     for f in data["folders"]:
-        oname, oemail = await resolve(f.owner_id)
-        folders.append(FolderRead.from_folder(f, owner_name=oname, owner_email=oemail))
+        oname, oemail, oavatar = await resolve(f.owner_id)
+        folders.append(FolderRead.from_folder(f, owner_name=oname, owner_email=oemail, owner_avatar_url=oavatar))
 
     documents = []
     for d in data["documents"]:
-        oname, oemail = await resolve(d.owner_id)
-        documents.append(DocumentRead.from_doc(d, owner_name=oname, owner_email=oemail))
+        oname, oemail, oavatar = await resolve(d.owner_id)
+        documents.append(DocumentRead.from_doc(d, owner_name=oname, owner_email=oemail, owner_avatar_url=oavatar))
 
     return {"folders": folders, "documents": documents, "permission": data.get("permission", "edit")}
 
@@ -156,8 +156,8 @@ async def get_folder(
 ):
     """Get a folder by ID. Returns 404 if not found or not accessible."""
     folder = await folder_service.get_folder(folder_id, user)
-    name, email = await _resolve_owner(folder)
-    return FolderRead.from_folder(folder, owner_name=name, owner_email=email)
+    name, email, avatar = await _resolve_owner(folder)
+    return FolderRead.from_folder(folder, owner_name=name, owner_email=email, owner_avatar_url=avatar)
 
 
 @router.put("/{folder_id}", response_model=FolderRead)
@@ -168,8 +168,8 @@ async def update_folder(
 ):
     """Update a folder's name or move it to a different parent."""
     folder = await folder_service.update_folder(folder_id, user, payload)
-    name, email = await _resolve_owner(folder)
-    return FolderRead.from_folder(folder, owner_name=name, owner_email=email)
+    name, email, avatar = await _resolve_owner(folder)
+    return FolderRead.from_folder(folder, owner_name=name, owner_email=email, owner_avatar_url=avatar)
 
 
 @router.delete("/{folder_id}", response_model=FolderRead)
@@ -179,7 +179,7 @@ async def delete_folder(
 ):
     """Cascade soft-delete a folder and all its contents."""
     folder = await folder_service.soft_delete_folder(folder_id, user)
-    return FolderRead.from_folder(folder, owner_name=user.name or "", owner_email=user.email or "")
+    return FolderRead.from_folder(folder, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
 
 
 @router.post("/{folder_id}/restore", response_model=FolderRead)
@@ -189,7 +189,7 @@ async def restore_folder(
 ):
     """Cascade restore a folder and all its contents."""
     folder = await folder_service.restore_folder(folder_id, user)
-    return FolderRead.from_folder(folder, owner_name=user.name or "", owner_email=user.email or "")
+    return FolderRead.from_folder(folder, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
 
 
 @router.delete("/{folder_id}/permanent", status_code=204)

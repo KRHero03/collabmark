@@ -59,6 +59,7 @@ class DocumentRead(BaseModel):
     owner_id: str
     owner_name: str = ""
     owner_email: str = ""
+    owner_avatar_url: Optional[str] = None
     folder_id: Optional[str] = None
     general_access: GeneralAccess
     is_deleted: bool
@@ -74,6 +75,7 @@ class DocumentRead(BaseModel):
         *,
         owner_name: str = "",
         owner_email: str = "",
+        owner_avatar_url: str | None = None,
     ) -> "DocumentRead":
         """Build DocumentRead from a Document_ document.
 
@@ -89,6 +91,7 @@ class DocumentRead(BaseModel):
             owner_id=doc.owner_id,
             owner_name=owner_name,
             owner_email=owner_email,
+            owner_avatar_url=owner_avatar_url,
             folder_id=doc.folder_id,
             general_access=doc.general_access,
             is_deleted=doc.is_deleted,

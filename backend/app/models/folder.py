@@ -67,6 +67,7 @@ class FolderRead(BaseModel):
     owner_id: str
     owner_name: str = ""
     owner_email: str = ""
+    owner_avatar_url: Optional[str] = None
     parent_id: Optional[str] = None
     general_access: GeneralAccess
     is_deleted: bool
@@ -81,6 +82,7 @@ class FolderRead(BaseModel):
         *,
         owner_name: str = "",
         owner_email: str = "",
+        owner_avatar_url: str | None = None,
     ) -> "FolderRead":
         return cls(
             id=str(folder.id),
@@ -88,6 +90,7 @@ class FolderRead(BaseModel):
             owner_id=folder.owner_id,
             owner_name=owner_name,
             owner_email=owner_email,
+            owner_avatar_url=owner_avatar_url,
             parent_id=folder.parent_id,
             general_access=folder.general_access,
             is_deleted=folder.is_deleted,

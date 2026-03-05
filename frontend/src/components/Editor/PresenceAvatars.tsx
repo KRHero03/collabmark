@@ -74,12 +74,16 @@ export function PresenceAvatars({ users, currentUserName, currentUserAvatar }: P
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  const remotePeers = currentUserName
+    ? users.filter((u) => u.name !== currentUserName)
+    : users;
+
   const allUsers: PresenceUser[] = currentUserName
     ? [
         { name: `${currentUserName} (you)`, avatarUrl: currentUserAvatar ?? null, color: "#3b82f6" },
-        ...users,
+        ...remotePeers,
       ]
-    : users;
+    : remotePeers;
 
   const totalCount = allUsers.length;
 

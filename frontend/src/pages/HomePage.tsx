@@ -294,6 +294,7 @@ export function HomePage() {
       owner_id: doc.owner_id,
       owner_name: "owner_name" in doc ? doc.owner_name : "",
       owner_email: "owner_email" in doc ? doc.owner_email : "",
+      owner_avatar_url: null,
       folder_id: null,
       general_access: "restricted",
       is_deleted: false,
@@ -332,6 +333,7 @@ export function HomePage() {
       owner_id: f.owner_id,
       owner_name: f.owner_name,
       owner_email: f.owner_email,
+      owner_avatar_url: null,
       parent_id: null,
       general_access: "restricted",
       is_deleted: false,
@@ -976,6 +978,7 @@ export function HomePage() {
           generalAccess={shareDoc.general_access as "restricted" | "anyone_view" | "anyone_edit"}
           ownerEmail={shareDoc.owner_email}
           ownerName={shareDoc.owner_name}
+          ownerAvatarUrl={shareDoc.owner_avatar_url}
           onGeneralAccessChange={(ga) =>
             setShareDoc((prev) => (prev ? { ...prev, general_access: ga } : prev))
           }
@@ -991,6 +994,7 @@ export function HomePage() {
           generalAccess={shareFolder.general_access as "restricted" | "anyone_view" | "anyone_edit"}
           ownerEmail={shareFolder.owner_email}
           ownerName={shareFolder.owner_name}
+          ownerAvatarUrl={shareFolder.owner_avatar_url}
           onGeneralAccessChange={(ga) =>
             setShareFolder((prev) => (prev ? { ...prev, general_access: ga } : prev))
           }

@@ -13,15 +13,15 @@ from app.services.acl_service import get_acl_summary
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
 
-async def _resolve_owner(doc: Document_) -> tuple[str, str]:
-    """Look up the owner User and return (name, email)."""
+async def _resolve_owner(doc: Document_) -> tuple[str, str, str | None]:
+    """Look up the owner User and return (name, email, avatar_url)."""
     try:
         owner = await User.get(PydanticObjectId(doc.owner_id))
     except (InvalidId, ValueError):
         owner = None
     if owner is None:
-        return ("Unknown", "")
-    return (owner.name or "Unknown", owner.email or "")
+        return ("Unknown", "", None)
+    return (owner.name or "Unknown", owner.email or "", owner.avatar_url)
 
 
 @router.post("", response_model=DocumentRead, status_code=201)
@@ -39,7 +39,7 @@ async def create_document(
         DocumentRead of the created document.
     """
     doc = await document_service.create_document(user, payload)
-    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "")
+    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
 
 
 @router.get("", response_model=list[DocumentRead])
@@ -57,7 +57,7 @@ async def list_documents(
         List of DocumentRead for the user's documents.
     """
     docs = await document_service.list_documents(user, include_deleted)
-    return [DocumentRead.from_doc(d, owner_name=user.name or "", owner_email=user.email or "") for d in docs]
+    return [DocumentRead.from_doc(d, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url) for d in docs]
 
 
 @router.get("/trash", response_model=list[DocumentRead])
@@ -77,7 +77,7 @@ async def list_trash(
     """
     docs = await document_service.list_trash(user)
     return [
-        DocumentRead.from_doc(d, owner_name=user.name or "", owner_email=user.email or "")
+        DocumentRead.from_doc(d, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
         for d in docs
     ]
 
@@ -100,8 +100,8 @@ async def get_document(
         HTTPException: 404 if not found, 403 if not owner.
     """
     doc = await document_service.get_document(doc_id, user)
-    name, email = await _resolve_owner(doc)
-    return DocumentRead.from_doc(doc, owner_name=name, owner_email=email)
+    name, email, avatar = await _resolve_owner(doc)
+    return DocumentRead.from_doc(doc, owner_name=name, owner_email=email, owner_avatar_url=avatar)
 
 
 @router.put("/{doc_id}", response_model=DocumentRead)
@@ -124,8 +124,8 @@ async def update_document(
         HTTPException: 404 if not found, 403 if not owner.
     """
     doc = await document_service.update_document(doc_id, user, payload)
-    name, email = await _resolve_owner(doc)
-    return DocumentRead.from_doc(doc, owner_name=name, owner_email=email)
+    name, email, avatar = await _resolve_owner(doc)
+    return DocumentRead.from_doc(doc, owner_name=name, owner_email=email, owner_avatar_url=avatar)
 
 
 @router.delete("/{doc_id}", response_model=DocumentRead)
@@ -146,7 +146,7 @@ async def delete_document(
         HTTPException: 404 if not found, 403 if not owner.
     """
     doc = await document_service.soft_delete_document(doc_id, user)
-    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "")
+    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
 
 
 @router.post("/{doc_id}/restore", response_model=DocumentRead)
@@ -167,7 +167,7 @@ async def restore_document(
         HTTPException: 404 if not found, 403 if not owner.
     """
     doc = await document_service.restore_document(doc_id, user)
-    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "")
+    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
 
 
 @router.delete("/{doc_id}/permanent", status_code=204)

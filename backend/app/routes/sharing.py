@@ -36,7 +36,7 @@ async def update_general_access(
     doc = await share_service.update_general_access(
         doc_id, user, payload.general_access
     )
-    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "")
+    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
 
 
 @router.post(

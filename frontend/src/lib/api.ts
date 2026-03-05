@@ -22,6 +22,7 @@ export interface MarkdownDocument {
   owner_id: string;
   owner_name: string;
   owner_email: string;
+  owner_avatar_url: string | null;
   folder_id: string | null;
   general_access: GeneralAccess;
   is_deleted: boolean;
@@ -37,6 +38,7 @@ export interface FolderItem {
   owner_id: string;
   owner_name: string;
   owner_email: string;
+  owner_avatar_url: string | null;
   parent_id: string | null;
   general_access: GeneralAccess;
   is_deleted: boolean;
@@ -256,6 +258,7 @@ export interface CommentData {
   document_id: string;
   author_id: string;
   author_name: string;
+  author_avatar_url: string | null;
   content: string;
   anchor_from: number | null;
   anchor_to: number | null;

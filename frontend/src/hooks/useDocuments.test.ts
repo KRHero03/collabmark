@@ -29,6 +29,7 @@ const mockDoc = {
   owner_id: "user-1",
   owner_name: "Test User",
   owner_email: "test@example.com",
+  owner_avatar_url: null,
   folder_id: null,
   general_access: "restricted" as const,
   is_deleted: false,

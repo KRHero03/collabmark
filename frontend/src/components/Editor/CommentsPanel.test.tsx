@@ -31,6 +31,7 @@ function makeComment(overrides: Partial<CommentData> = {}): CommentData {
     document_id: "doc1",
     author_id: "u1",
     author_name: "Alice",
+    author_avatar_url: null,
     content: "Test comment",
     anchor_from: null,
     anchor_to: null,

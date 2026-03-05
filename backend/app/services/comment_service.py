@@ -30,6 +30,7 @@ async def create_comment(
         document_id=doc_id,
         author_id=str(user.id),
         author_name=user.name,
+        author_avatar_url=user.avatar_url,
         content=payload.content,
         anchor_from=payload.anchor_from,
         anchor_to=payload.anchor_to,
@@ -69,6 +70,7 @@ async def reply_to_comment(
         document_id=parent.document_id,
         author_id=str(user.id),
         author_name=user.name,
+        author_avatar_url=user.avatar_url,
         content=content,
         parent_id=str(parent.id),
     )

@@ -73,6 +73,7 @@ export function EditorPage() {
   const [generalAccess, setGeneralAccess] = useState<GeneralAccess>("restricted");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerName, setOwnerName] = useState("");
+  const [ownerAvatarUrl, setOwnerAvatarUrl] = useState<string | null>(null);
   const [permission, setPermission] = useState<Permission>("edit");
 
   const titleSetByUser = useRef(false);
@@ -135,6 +136,7 @@ export function EditorPage() {
       setGeneralAccess(data.general_access ?? "restricted");
       setOwnerName(data.owner_name || "Unknown");
       setOwnerEmail(data.owner_email || "");
+      setOwnerAvatarUrl(data.owner_avatar_url ?? null);
       setPermission(permRes.data.permission);
       setLoading(false);
       sharingApi.recordView(id).catch(() => {});
@@ -694,6 +696,7 @@ ${previewEl.innerHTML}
             generalAccess={generalAccess}
             ownerEmail={ownerEmail}
             ownerName={ownerName}
+            ownerAvatarUrl={ownerAvatarUrl}
             onGeneralAccessChange={setGeneralAccess}
           />
           <VersionHistory

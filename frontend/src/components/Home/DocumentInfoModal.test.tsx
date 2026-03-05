@@ -11,6 +11,7 @@ const baseDoc: MarkdownDocument = {
   owner_id: "user-1",
   owner_name: "Alice",
   owner_email: "alice@example.com",
+  owner_avatar_url: null,
   general_access: "restricted",
   is_deleted: false,
   deleted_at: null,
