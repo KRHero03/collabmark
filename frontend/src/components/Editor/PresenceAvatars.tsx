@@ -56,9 +56,10 @@ function Avatar({
 interface PresenceAvatarsProps {
   users: PresenceUser[];
   currentUserName?: string;
+  currentUserAvatar?: string | null;
 }
 
-export function PresenceAvatars({ users, currentUserName }: PresenceAvatarsProps) {
+export function PresenceAvatars({ users, currentUserName, currentUserAvatar }: PresenceAvatarsProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -75,7 +76,7 @@ export function PresenceAvatars({ users, currentUserName }: PresenceAvatarsProps
 
   const allUsers: PresenceUser[] = currentUserName
     ? [
-        { name: `${currentUserName} (you)`, avatarUrl: null, color: "#3b82f6" },
+        { name: `${currentUserName} (you)`, avatarUrl: currentUserAvatar ?? null, color: "#3b82f6" },
         ...users,
       ]
     : users;

@@ -28,6 +28,7 @@ interface EditorToolbarProps {
   readOnly?: boolean;
   presenceUsers?: PresenceUser[];
   currentUserName?: string;
+  currentUserAvatar?: string | null;
 }
 
 export function EditorToolbar({
@@ -43,6 +44,7 @@ export function EditorToolbar({
   readOnly,
   presenceUsers = [],
   currentUserName,
+  currentUserAvatar,
 }: EditorToolbarProps) {
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -181,14 +183,14 @@ export function EditorToolbar({
 
       {/* Desktop: presence + full toolbar */}
       <div className="hidden items-center gap-2 md:flex">
-        <PresenceAvatars users={presenceUsers} currentUserName={currentUserName} />
+        <PresenceAvatars users={presenceUsers} currentUserName={currentUserName} currentUserAvatar={currentUserAvatar} />
         <div className="mx-1 h-6 w-px bg-[var(--color-border)]" />
         {toolbarButtons}
       </div>
 
       {/* Mobile: presence + overflow dropdown */}
       <div className="flex items-center gap-2 md:hidden">
-        <PresenceAvatars users={presenceUsers} currentUserName={currentUserName} />
+        <PresenceAvatars users={presenceUsers} currentUserName={currentUserName} currentUserAvatar={currentUserAvatar} />
         <div className="relative" ref={moreRef}>
           <button
             onClick={() => setMoreOpen((o) => !o)}

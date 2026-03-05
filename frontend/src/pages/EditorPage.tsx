@@ -506,6 +506,7 @@ ${previewEl.innerHTML}
         readOnly={permission === "view"}
         presenceUsers={presenceUsers}
         currentUserName={user?.name}
+        currentUserAvatar={user?.avatar_url}
       />
       {!synced && (
         <div className="flex items-center justify-center bg-yellow-50 px-4 py-1 text-xs text-yellow-700">
