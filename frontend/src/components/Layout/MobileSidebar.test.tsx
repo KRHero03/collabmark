@@ -58,9 +58,20 @@ describe("MobileSidebar", () => {
     expect(getByText("test@example.com")).toBeInTheDocument();
   });
 
-  it("shows CollabMark title in header", () => {
+  it("CollabMark title in header is a link to home", () => {
     const { getByText } = render(<MobileSidebar {...defaultProps} />);
-    expect(getByText("CollabMark")).toBeInTheDocument();
+    const title = getByText("CollabMark");
+    expect(title).toBeInTheDocument();
+    expect(title.closest("a")).toHaveAttribute("href", "/");
+  });
+
+  it("clicking CollabMark title calls onClose", () => {
+    const onClose = vi.fn();
+    const { getByText } = render(
+      <MobileSidebar {...defaultProps} onClose={onClose} />,
+    );
+    fireEvent.click(getByText("CollabMark"));
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("navigation tabs render when onTabChange is provided", () => {
@@ -108,14 +119,25 @@ describe("MobileSidebar", () => {
     expect(sharedTab?.className).toContain("color-primary");
   });
 
-  it("account links (Profile, API Docs, Settings) have correct hrefs", () => {
-    const { container } = render(<MobileSidebar {...defaultProps} />);
+  it("account links (Home, Profile, API Docs, Settings) have correct hrefs", () => {
+    const { container, getByText } = render(<MobileSidebar {...defaultProps} />);
+    const homeLink = getByText("Home").closest("a");
+    expect(homeLink).toHaveAttribute("href", "/");
     const profileLink = container.querySelector('a[href="/profile"]');
     const apiDocsLink = container.querySelector('a[href="/api-docs"]');
     const settingsLink = container.querySelector('a[href="/settings"]');
     expect(profileLink).toBeInTheDocument();
     expect(apiDocsLink).toBeInTheDocument();
     expect(settingsLink).toBeInTheDocument();
+  });
+
+  it("clicking Home link calls onClose", () => {
+    const onClose = vi.fn();
+    const { getByText } = render(
+      <MobileSidebar {...defaultProps} onClose={onClose} />,
+    );
+    fireEvent.click(getByText("Home"));
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("clicking Sign Out calls onLogout and onClose", () => {

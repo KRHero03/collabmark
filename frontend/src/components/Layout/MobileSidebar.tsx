@@ -4,6 +4,7 @@ import {
   BookOpen,
   Clock,
   Folder,
+  Home,
   LogOut,
   Moon,
   Settings,
@@ -81,7 +82,7 @@ export function MobileSidebar({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-          <span className="text-lg font-bold text-[var(--color-text)]">CollabMark</span>
+          <Link to="/" onClick={onClose} className="text-lg font-bold text-[var(--color-text)] hover:opacity-80">CollabMark</Link>
           <div className="flex items-center gap-2">
             <button
               onClick={onToggleDark}
@@ -151,6 +152,14 @@ export function MobileSidebar({
             Account
           </p>
           <nav className="flex flex-col gap-0.5">
+            <Link
+              to="/"
+              onClick={onClose}
+              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <Home className="h-4 w-4 flex-shrink-0 text-[var(--color-text-muted)]" />
+              Home
+            </Link>
             <Link
               to="/profile"
               onClick={onClose}
