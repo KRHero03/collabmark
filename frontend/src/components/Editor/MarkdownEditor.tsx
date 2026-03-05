@@ -48,6 +48,8 @@ interface MarkdownEditorProps {
   awareness: Awareness;
   /** The current user's display name (shown in remote cursors). */
   userName?: string;
+  /** The current user's avatar URL for presence display. */
+  userAvatarUrl?: string | null;
   /** The current user's cursor color. */
   userColor?: string;
   /** Callback when the EditorView is ready (for pixel coordinate queries). */
@@ -112,6 +114,7 @@ export function MarkdownEditor({
   ytext,
   awareness,
   userName = "Anonymous",
+  userAvatarUrl,
   userColor,
   onViewReady,
   onSelectionChange,
@@ -144,6 +147,7 @@ export function MarkdownEditor({
 
     awareness.setLocalStateField("user", {
       name: userName,
+      avatarUrl: userAvatarUrl ?? null,
       color,
       colorLight: color + "33",
     });
@@ -219,7 +223,7 @@ export function MarkdownEditor({
       view.destroy();
       viewRef.current = null;
     };
-  }, [ytext, awareness, userName, userColor, onViewReady, readOnly]);
+  }, [ytext, awareness, userName, userAvatarUrl, userColor, onViewReady, readOnly]);
 
   useEffect(() => {
     const view = viewRef.current;

@@ -36,6 +36,7 @@ import { useComments } from "../hooks/useComments";
 import { useCommentAnchors } from "../hooks/useCommentAnchors";
 import { useCommentPositions } from "../hooks/useCommentPositions";
 import { useToast } from "../hooks/useToast";
+import { usePresence } from "../hooks/usePresence";
 import { detectNeedsLandscape } from "../lib/pdfExport";
 
 /** Encode a Uint8Array to a Base64 string. */
@@ -93,6 +94,7 @@ export function EditorPage() {
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
   const { ydoc, ytext, provider, synced } = useYjsProvider(id);
+  const presenceUsers = usePresence(provider?.awareness ?? null);
   const { comments } = useComments();
 
   const anchors = useCommentAnchors({
@@ -502,6 +504,8 @@ ${previewEl.innerHTML}
         onPresentation={togglePresentation}
         presentationMode={presentationMode}
         readOnly={permission === "view"}
+        presenceUsers={presenceUsers}
+        currentUserName={user?.name}
       />
       {!synced && (
         <div className="flex items-center justify-center bg-yellow-50 px-4 py-1 text-xs text-yellow-700">
@@ -562,6 +566,7 @@ ${previewEl.innerHTML}
                   ytext={ytext}
                   awareness={provider.awareness}
                   userName={user?.name}
+                  userAvatarUrl={user?.avatar_url}
                   onViewReady={setEditorView}
                   onSelectionChange={handleSelectionChange}
                   onAddComment={permission === "edit" ? handleAddComment : undefined}
@@ -617,6 +622,7 @@ ${previewEl.innerHTML}
                 ytext={ytext}
                 awareness={provider.awareness}
                 userName={user?.name}
+                userAvatarUrl={user?.avatar_url}
                 onViewReady={setEditorView}
                 onSelectionChange={handleSelectionChange}
                 onAddComment={permission === "edit" ? handleAddComment : undefined}

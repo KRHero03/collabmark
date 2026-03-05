@@ -12,6 +12,8 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { PresenceAvatars } from "./PresenceAvatars";
+import type { PresenceUser } from "../../hooks/usePresence";
 
 interface EditorToolbarProps {
   title: string;
@@ -24,6 +26,8 @@ interface EditorToolbarProps {
   onPresentation?: () => void;
   presentationMode?: boolean;
   readOnly?: boolean;
+  presenceUsers?: PresenceUser[];
+  currentUserName?: string;
 }
 
 export function EditorToolbar({
@@ -37,6 +41,8 @@ export function EditorToolbar({
   onPresentation,
   presentationMode,
   readOnly,
+  presenceUsers = [],
+  currentUserName,
 }: EditorToolbarProps) {
   const navigate = useNavigate();
   const [moreOpen, setMoreOpen] = useState(false);
@@ -173,18 +179,24 @@ export function EditorToolbar({
         />
       </div>
 
-      {/* Desktop: full toolbar */}
-      <div className="hidden items-center gap-2 md:flex">{toolbarButtons}</div>
+      {/* Desktop: presence + full toolbar */}
+      <div className="hidden items-center gap-2 md:flex">
+        <PresenceAvatars users={presenceUsers} currentUserName={currentUserName} />
+        <div className="mx-1 h-6 w-px bg-[var(--color-border)]" />
+        {toolbarButtons}
+      </div>
 
-      {/* Mobile: overflow dropdown */}
-      <div className="relative md:hidden" ref={moreRef}>
-        <button
-          onClick={() => setMoreOpen((o) => !o)}
-          className="inline-flex items-center rounded-md p-2 text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
-          aria-label="More options"
-        >
-          <MoreHorizontal className="h-5 w-5" />
-        </button>
+      {/* Mobile: presence + overflow dropdown */}
+      <div className="flex items-center gap-2 md:hidden">
+        <PresenceAvatars users={presenceUsers} currentUserName={currentUserName} />
+        <div className="relative" ref={moreRef}>
+          <button
+            onClick={() => setMoreOpen((o) => !o)}
+            className="inline-flex items-center rounded-md p-2 text-[var(--color-text-muted)] transition hover:bg-gray-100 dark:hover:bg-gray-800"
+            aria-label="More options"
+          >
+            <MoreHorizontal className="h-5 w-5" />
+          </button>
         {moreOpen && (
           <div className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-[var(--color-border)] bg-white py-1 shadow-lg dark:bg-gray-900">
             {onHistory && (
@@ -259,6 +271,7 @@ export function EditorToolbar({
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );

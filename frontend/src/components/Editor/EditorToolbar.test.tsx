@@ -147,6 +147,56 @@ describe("EditorToolbar", () => {
     expect(getByText("View only")).toBeDefined();
   });
 
+  describe("presence avatars", () => {
+    it("renders presence widgets (desktop + mobile) when presenceUsers provided", () => {
+      const users = [
+        { name: "Alice", avatarUrl: null, color: "#f00" },
+        { name: "Bob", avatarUrl: null, color: "#0f0" },
+      ];
+      const { getAllByLabelText } = render(
+        <EditorToolbar
+          {...defaultProps}
+          presenceUsers={users}
+          currentUserName="Me"
+        />,
+      );
+      const buttons = getAllByLabelText("3 active users");
+      expect(buttons.length).toBe(2);
+    });
+
+    it("renders separator divider between presence and toolbar buttons", () => {
+      const users = [{ name: "Alice", avatarUrl: null, color: "#f00" }];
+      const { container } = render(
+        <EditorToolbar
+          {...defaultProps}
+          presenceUsers={users}
+          currentUserName="Me"
+        />,
+      );
+      const separator = container.querySelector(".mx-1.h-6.w-px");
+      expect(separator).toBeTruthy();
+    });
+
+    it("renders presence widget even with empty presenceUsers (shows current user only)", () => {
+      const { getAllByLabelText } = render(
+        <EditorToolbar
+          {...defaultProps}
+          presenceUsers={[]}
+          currentUserName="Me"
+        />,
+      );
+      const buttons = getAllByLabelText("1 active user");
+      expect(buttons.length).toBe(2);
+    });
+
+    it("does not render presence widget when no users and no currentUserName", () => {
+      const { queryByLabelText } = render(
+        <EditorToolbar {...defaultProps} presenceUsers={[]} />,
+      );
+      expect(queryByLabelText(/active user/)).toBeNull();
+    });
+  });
+
   it("presentation mode back button works", () => {
     Object.defineProperty(window.history, "length", {
       value: 2,
