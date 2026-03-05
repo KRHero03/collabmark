@@ -25,6 +25,7 @@ import { MessageSquarePlus } from "lucide-react";
 import * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 import type { AnchorStatus } from "../../hooks/useCommentAnchors";
+import { markdownKeymap } from "./markdownShortcuts";
 
 /** Selection range in absolute character offsets. */
 export interface EditorSelection {
@@ -193,6 +194,7 @@ export function MarkdownEditor({
         basicSetup,
         markdown({ codeLanguages: languages }),
         EditorView.lineWrapping,
+        ...(!readOnly ? [markdownKeymap] : []),
         yCollab(ytext, awareness),
         commentDecoField,
         selectionListener,
