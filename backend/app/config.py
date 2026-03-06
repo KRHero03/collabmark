@@ -37,7 +37,6 @@ class Settings(BaseSettings):
         "http://localhost:5173",
         "http://localhost:8000",
     ]
-    super_admin_emails: list[str] = []
 
 
 settings = Settings()

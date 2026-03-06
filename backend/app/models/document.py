@@ -24,7 +24,6 @@ class Document_(Document):
     owner_id: Indexed(str)
     folder_id: Optional[str] = None
     root_folder_id: Optional[str] = None
-    org_id: Optional[str] = None
     general_access: GeneralAccess = GeneralAccess.RESTRICTED
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None

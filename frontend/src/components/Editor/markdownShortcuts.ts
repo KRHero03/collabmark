@@ -98,10 +98,3 @@ const markdownBindings: KeyBinding[] = [
  * CodeMirror extension that registers all markdown formatting shortcuts.
  */
 export const markdownKeymap = keymap.of(markdownBindings);
-
-/** @internal Exported for testing only */
-export const _wrapCommand = wrapCommand;
-/** @internal Exported for testing only */
-export const _htmlWrapCommand = htmlWrapCommand;
-/** @internal Exported for testing only */
-export const _headingCommand = headingCommand;

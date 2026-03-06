@@ -8,14 +8,12 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class User(Document):
-    """Beanie document for a user. Key fields: google_id, email, name, avatar_url, org_id, auth_provider."""
+    """Beanie document for a user. Key fields: google_id, email, name, avatar_url."""
 
-    google_id: Optional[str] = None
+    google_id: Indexed(str, unique=True)
     email: Indexed(EmailStr, unique=True)
     name: str
     avatar_url: Optional[str] = None
-    org_id: Optional[str] = None
-    auth_provider: str = "google"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
@@ -34,8 +32,6 @@ class UserRead(BaseModel):
     email: str
     name: str
     avatar_url: Optional[str] = None
-    org_id: Optional[str] = None
-    auth_provider: str = "google"
     created_at: datetime
 
     @classmethod
@@ -46,8 +42,6 @@ class UserRead(BaseModel):
             email=user.email,
             name=user.name,
             avatar_url=user.avatar_url,
-            org_id=user.org_id,
-            auth_provider=user.auth_provider,
             created_at=user.created_at,
         )
 

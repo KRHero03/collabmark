@@ -26,13 +26,11 @@ from app.models.document_view import DocumentView
 from app.models.folder import Folder, FolderAccess, FolderView
 from app.models.share_link import DocumentAccess, ShareLink
 from app.models.user import User
-from app.models.organization import Organization, OrgMembership
-from app.models.org_sso_config import OrgSSOConfig
-from app.routes import auth, comments, documents, folders, keys, orgs, sharing, users, versions, ws
+from app.routes import auth, comments, documents, folders, keys, sharing, users, versions, ws
 from app.services.crdt_store import MongoYStore
 from app.ws.handler import start_websocket_server, stop_websocket_server
 
-DOCUMENT_MODELS = [User, Document_, ApiKey, DocumentAccess, ShareLink, DocumentVersion, Comment, DocumentView, Folder, FolderAccess, FolderView, Organization, OrgMembership, OrgSSOConfig]
+DOCUMENT_MODELS = [User, Document_, ApiKey, DocumentAccess, ShareLink, DocumentVersion, Comment, DocumentView, Folder, FolderAccess, FolderView]
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -81,7 +79,6 @@ app.include_router(documents.router)
 app.include_router(folders.router)
 app.include_router(keys.router)
 app.include_router(comments.router)
-app.include_router(orgs.router)
 app.include_router(ws.router)
 
 

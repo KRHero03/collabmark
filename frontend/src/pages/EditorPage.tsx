@@ -63,7 +63,6 @@ export function EditorPage() {
   const [content, setContent] = useState("");
   const [debouncedContent, setDebouncedContent] = useState("");
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -124,33 +123,24 @@ export function EditorPage() {
 
   useEffect(() => {
     if (!id) return;
-    setLoadError(null);
     Promise.all([
       documentsApi.get(id),
       sharingApi.getMyPermission(id),
-    ])
-      .then(([docRes, permRes]) => {
-        const data = docRes.data;
-        setTitle(data.title);
-        if (data.title && data.title !== "Untitled") {
-          titleSetByUser.current = true;
-        }
-        setIsOwner(data.owner_id === user?.id);
-        setGeneralAccess(data.general_access ?? "restricted");
-        setOwnerName(data.owner_name || "Unknown");
-        setOwnerEmail(data.owner_email || "");
-        setOwnerAvatarUrl(data.owner_avatar_url ?? null);
-        setPermission(permRes.data.permission);
-        setLoading(false);
-        sharingApi.recordView(id).catch(() => {});
-      })
-      .catch((err) => {
-        setLoading(false);
-        const status = err?.response?.status;
-        if (status === 404) setLoadError("Document not found");
-        else if (status === 403) setLoadError("Permission denied");
-        else setLoadError("Failed to load document");
-      });
+    ]).then(([docRes, permRes]) => {
+      const data = docRes.data;
+      setTitle(data.title);
+      if (data.title && data.title !== "Untitled") {
+        titleSetByUser.current = true;
+      }
+      setIsOwner(data.owner_id === user?.id);
+      setGeneralAccess(data.general_access ?? "restricted");
+      setOwnerName(data.owner_name || "Unknown");
+      setOwnerEmail(data.owner_email || "");
+      setOwnerAvatarUrl(data.owner_avatar_url ?? null);
+      setPermission(permRes.data.permission);
+      setLoading(false);
+      sharingApi.recordView(id).catch(() => {});
+    });
   }, [id, user?.id]);
 
   useEffect(() => {
@@ -377,19 +367,15 @@ ${previewEl.innerHTML}
   }, [title]);
 
   const handleExportMd = useCallback(() => {
-    try {
-      const text = ytext.toString();
-      const blob = new Blob([text], { type: "text/markdown" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title || "document"}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      addToast("Failed to export Markdown", "error");
-    }
-  }, [ytext, title, addToast]);
+    const text = ytext.toString();
+    const blob = new Blob([text], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "document"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [ytext, title]);
 
   const toggleHistory = useCallback(() => {
     setHistoryOpen((prev) => {
@@ -506,16 +492,6 @@ ${previewEl.innerHTML}
     );
   }
 
-  if (loadError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg border border-red-200 bg-red-50 px-6 py-4 text-red-800" data-testid="load-error">
-          {loadError}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen flex-col">
       <Navbar />
@@ -541,15 +517,8 @@ ${previewEl.innerHTML}
       )}
 
       {presentationMode ? (
-        <div className="relative flex-1 overflow-auto">
-          <div className="relative mx-auto max-w-4xl px-8 py-10">
-            <button
-              onClick={() => setPresentationMode(false)}
-              className="absolute right-4 top-4 rounded-md bg-gray-200 px-3 py-1 text-sm hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
-              data-testid="exit-presentation-btn"
-            >
-              Exit
-            </button>
+        <div className="flex-1 overflow-auto">
+          <div className="mx-auto max-w-4xl px-8 py-10">
             {previewStale && (
               <button
                 onClick={flushPreview}
@@ -667,7 +636,6 @@ ${previewEl.innerHTML}
           </div>
 
           <div
-            data-testid="resize-divider"
             onMouseDown={handleResizeStart}
             className="w-1 flex-shrink-0 cursor-col-resize bg-[var(--color-border)] transition-colors hover:bg-[var(--color-primary)]"
           />

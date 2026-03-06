@@ -16,7 +16,6 @@ import {
   sharingApi,
   commentsApi,
   versionsApi,
-  orgsApi,
 } from "./api";
 
 vi.mock("axios", () => {
@@ -150,11 +149,6 @@ describe("API client", () => {
       expect(axios.get).toHaveBeenCalledWith("/folders/shared");
     });
 
-    it("listRecentlyViewed calls GET /folders/recent", async () => {
-      await foldersApi.listRecentlyViewed();
-      expect(axios.get).toHaveBeenCalledWith("/folders/recent");
-    });
-
     it("listContents calls GET /folders/contents without params for root", async () => {
       await foldersApi.listContents(null);
       expect(axios.get).toHaveBeenCalledWith("/folders/contents", { params: {} });
@@ -195,82 +189,6 @@ describe("API client", () => {
       expect(axios.delete).toHaveBeenCalledWith(
         "/folders/folder-1/collaborators/user-1",
       );
-    });
-
-    it("recordView calls POST /folders/:id/view", async () => {
-      await foldersApi.recordView("folder-123");
-      expect(axios.post).toHaveBeenCalledWith("/folders/folder-123/view");
-    });
-  });
-
-  describe("orgsApi", () => {
-    it("create calls POST /orgs with correct data", async () => {
-      await orgsApi.create({
-        name: "Acme Corp",
-        slug: "acme",
-        verified_domains: ["acme.com"],
-      });
-      expect(axios.post).toHaveBeenCalledWith("/orgs", {
-        name: "Acme Corp",
-        slug: "acme",
-        verified_domains: ["acme.com"],
-      });
-    });
-
-    it("list calls GET /orgs", async () => {
-      await orgsApi.list();
-      expect(axios.get).toHaveBeenCalledWith("/orgs");
-    });
-
-    it("get calls GET /orgs/:id", async () => {
-      await orgsApi.get("org-123");
-      expect(axios.get).toHaveBeenCalledWith("/orgs/org-123");
-    });
-
-    it("update calls PUT /orgs/:id", async () => {
-      await orgsApi.update("org-123", { name: "Updated Name" });
-      expect(axios.put).toHaveBeenCalledWith("/orgs/org-123", {
-        name: "Updated Name",
-      });
-    });
-
-    it("listMembers calls GET /orgs/:id/members", async () => {
-      await orgsApi.listMembers("org-123");
-      expect(axios.get).toHaveBeenCalledWith("/orgs/org-123/members");
-    });
-
-    it("addMember calls POST /orgs/:id/members", async () => {
-      await orgsApi.addMember("org-123", {
-        user_id: "user-456",
-        role: "member",
-      });
-      expect(axios.post).toHaveBeenCalledWith("/orgs/org-123/members", {
-        user_id: "user-456",
-        role: "member",
-      });
-    });
-
-    it("removeMember calls DELETE /orgs/:id/members/:userId", async () => {
-      await orgsApi.removeMember("org-123", "user-456");
-      expect(axios.delete).toHaveBeenCalledWith(
-        "/orgs/org-123/members/user-456",
-      );
-    });
-
-    it("getSSOConfig calls GET /orgs/:id/sso", async () => {
-      await orgsApi.getSSOConfig("org-123");
-      expect(axios.get).toHaveBeenCalledWith("/orgs/org-123/sso");
-    });
-
-    it("updateSSOConfig calls PUT /orgs/:id/sso", async () => {
-      await orgsApi.updateSSOConfig("org-123", {
-        protocol: "oidc",
-        enabled: true,
-      });
-      expect(axios.put).toHaveBeenCalledWith("/orgs/org-123/sso", {
-        protocol: "oidc",
-        enabled: true,
-      });
     });
   });
 

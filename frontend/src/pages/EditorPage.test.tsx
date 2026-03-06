@@ -10,20 +10,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, fireEvent, cleanup, waitFor, act } from "@testing-library/react";
 import { EditorPage } from "./EditorPage";
 
-// Mock yjs for createRelativePositionFromTypeIndex / encodeRelativePosition
-const mockEncodeRelativePosition = vi.fn(() => new Uint8Array([1, 2, 3]));
-const mockCreateRelativePositionFromTypeIndex = vi.fn(() => ({}));
-vi.mock("yjs", async () => {
-  const actual = await vi.importActual<typeof import("yjs")>("yjs");
-  return {
-    ...actual,
-    createRelativePositionFromTypeIndex: (...args: unknown[]) =>
-      mockCreateRelativePositionFromTypeIndex(...args),
-    encodeRelativePosition: (...args: unknown[]) =>
-      mockEncodeRelativePosition(...args),
-  };
-});
-
 // Mock react-router
 vi.mock("react-router", () => ({
   Link: ({
@@ -68,10 +54,7 @@ vi.mock("../hooks/useCommentAnchors", () => ({ useCommentAnchors: () => new Map(
 vi.mock("../hooks/useCommentPositions", () => ({ useCommentPositions: () => new Map() }));
 
 // Mock pdfExport
-const mockDetectNeedsLandscape = vi.fn(() => false);
-vi.mock("../lib/pdfExport", () => ({
-  detectNeedsLandscape: (el: unknown) => mockDetectNeedsLandscape(el),
-}));
+vi.mock("../lib/pdfExport", () => ({ detectNeedsLandscape: () => false }));
 
 // Mock useYjsProvider - key mock
 const mockYtext = {
@@ -132,34 +115,9 @@ vi.mock("../lib/api", () => ({
 vi.mock("../components/Layout/Navbar", () => ({ Navbar: () => <div data-testid="navbar" /> }));
 
 vi.mock("../components/Editor/MarkdownEditor", () => ({
-  MarkdownEditor: (props: {
-    ytext?: { toString?: () => string };
-    readOnly?: boolean;
-    onSelectionChange?: (sel: { from: number; to: number; text: string }) => void;
-    onAddComment?: (sel: { from: number; to: number; text: string }) => void;
-  }) => (
+  MarkdownEditor: (props: { ytext?: { toString?: () => string }; readOnly?: boolean }) => (
     <div data-testid="markdown-editor" data-readonly={props.readOnly}>
       {props.ytext?.toString?.()}
-      {props.onSelectionChange && (
-        <button
-          data-testid="trigger-selection"
-          onClick={() =>
-            props.onSelectionChange!({ from: 0, to: 5, text: "Hello" })
-          }
-        >
-          Select
-        </button>
-      )}
-      {props.onAddComment && (
-        <button
-          data-testid="trigger-add-comment"
-          onClick={() =>
-            props.onAddComment!({ from: 0, to: 5, text: "Hello" })
-          }
-        >
-          Add comment
-        </button>
-      )}
     </div>
   ),
 }));
@@ -239,7 +197,7 @@ vi.mock("../components/Editor/VersionHistory", () => ({
       <div data-testid="version-history">
         <button
           data-testid="restore-btn"
-          onClick={() => props.onRestore?.("restored content", 3)}
+          onClick={() => props.onRestore?.("Restored content", 3)}
         >
           Restore
         </button>
@@ -248,14 +206,8 @@ vi.mock("../components/Editor/VersionHistory", () => ({
 }));
 
 vi.mock("../components/Editor/CommentsPanel", () => ({
-  CommentsPanel: (props: { open?: boolean; onClose?: () => void }) =>
-    props.open ? (
-      <div data-testid="comments-panel">
-        <button data-testid="comments-close-btn" onClick={props.onClose}>
-          Close
-        </button>
-      </div>
-    ) : null,
+  CommentsPanel: (props: { open?: boolean }) =>
+    props.open ? <div data-testid="comments-panel" /> : null,
 }));
 
 const defaultDocResponse = {
@@ -277,7 +229,6 @@ describe("EditorPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
-    mockDetectNeedsLandscape.mockReturnValue(false);
     mockDocumentsGet.mockResolvedValue(defaultDocResponse);
     mockSharingGetPermission.mockResolvedValue(defaultPermResponse);
     mockSharingRecordView.mockResolvedValue({});
@@ -609,36 +560,6 @@ describe("EditorPage", () => {
       expect(mockPrint).toHaveBeenCalled();
       expect(mockClose).toHaveBeenCalled();
     });
-
-    it("export PDF uses landscape when detectNeedsLandscape returns true", async () => {
-      mockDetectNeedsLandscape.mockReturnValue(true);
-      const mockWrite = vi.fn();
-      const mockOpen = vi.fn().mockReturnValue({
-        document: {
-          write: mockWrite,
-          close: vi.fn(),
-        },
-        print: vi.fn(),
-        close: vi.fn(),
-      });
-
-      Object.defineProperty(window, "open", {
-        value: mockOpen,
-        writable: true,
-      });
-
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("export-pdf-btn")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("export-pdf-btn"));
-
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining("landscape")
-      );
-    });
   });
 
   describe("Version restore", () => {
@@ -659,7 +580,7 @@ describe("EditorPage", () => {
 
       expect(mockYdoc.transact).toHaveBeenCalled();
       expect(mockYtext.delete).toHaveBeenCalledWith(0, mockYtext.length);
-      expect(mockYtext.insert).toHaveBeenCalledWith(0, "restored content");
+      expect(mockYtext.insert).toHaveBeenCalledWith(0, "Restored content");
       expect(mockAddToast).toHaveBeenCalledWith("Restored to version 3", "success");
     });
   });
@@ -684,402 +605,4 @@ describe("EditorPage", () => {
       expect(preventDefaultSpy).toHaveBeenCalled();
     });
   });
-
-  describe("Document not found (404)", () => {
-    it("shows error when documentsApi.get rejects with 404", async () => {
-      const err = new Error("Not found") as Error & { response?: { status?: number } };
-      err.response = { status: 404 };
-      mockDocumentsGet.mockRejectedValue(err);
-      mockSharingGetPermission.mockRejectedValue(err);
-
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("load-error")).toBeInTheDocument();
-        expect(getByTestId("load-error")).toHaveTextContent("Document not found");
-      });
-    });
-  });
-
-  describe("Permission denied (403)", () => {
-    it("shows error when documentsApi.get rejects with 403", async () => {
-      const err = new Error("Forbidden") as Error & { response?: { status?: number } };
-      err.response = { status: 403 };
-      mockDocumentsGet.mockRejectedValue(err);
-      mockSharingGetPermission.mockRejectedValue(err);
-
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("load-error")).toBeInTheDocument();
-        expect(getByTestId("load-error")).toHaveTextContent("Permission denied");
-      });
-    });
-
-    it("shows read-only when doc owned by someone else and permission is view", async () => {
-      mockSharingGetPermission.mockResolvedValue({ data: { permission: "view" } });
-      mockDocumentsGet.mockResolvedValue({
-        ...defaultDocResponse,
-        data: { ...defaultDocResponse.data, owner_id: "other-user-id" },
-      });
-
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("readonly-indicator")).toBeInTheDocument();
-        expect(getByTestId("markdown-editor")).toHaveAttribute("data-readonly", "true");
-      });
-    });
-  });
-
-  describe("Split pane resize", () => {
-    it("resizes split pane on mousedown, mousemove, mouseup", async () => {
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("resize-divider")).toBeInTheDocument();
-      });
-
-      const divider = getByTestId("resize-divider");
-      const container = divider.parentElement!;
-      vi.spyOn(container, "getBoundingClientRect").mockReturnValue({
-        left: 0,
-        top: 0,
-        width: 1000,
-        height: 600,
-        right: 1000,
-        bottom: 600,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      });
-
-      fireEvent.mouseDown(divider);
-
-      act(() => {
-        window.dispatchEvent(
-          new MouseEvent("mousemove", { clientX: 300, bubbles: true })
-        );
-      });
-
-      act(() => {
-        window.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
-      });
-
-      expect(container.querySelector("[style*='width']")).toBeInTheDocument();
-    });
-  });
-
-  describe("Presentation mode exit", () => {
-    it("exits presentation mode when clicking exit button", async () => {
-      const { getByTestId, queryByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("presentation-btn")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("presentation-btn"));
-      expect(getByTestId("exit-presentation-btn")).toBeInTheDocument();
-
-      fireEvent.click(getByTestId("exit-presentation-btn"));
-
-      await waitFor(() => {
-        expect(queryByTestId("exit-presentation-btn")).not.toBeInTheDocument();
-      });
-    });
-
-    it("exits presentation mode on Escape key", async () => {
-      const { getByTestId, queryByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("presentation-btn")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("presentation-btn"));
-      expect(getByTestId("exit-presentation-btn")).toBeInTheDocument();
-
-      fireEvent.keyDown(document, { key: "Escape" });
-
-      await waitFor(() => {
-        expect(queryByTestId("exit-presentation-btn")).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("Comments panel toggle", () => {
-    it("clicking comments button twice opens then closes", async () => {
-      const { getByTestId, queryByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("comments-btn")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("comments-btn"));
-      expect(getByTestId("comments-panel")).toBeInTheDocument();
-
-      fireEvent.click(getByTestId("comments-btn"));
-      await waitFor(() => {
-        expect(queryByTestId("comments-panel")).not.toBeInTheDocument();
-      });
-    });
-
-    it("opening Comments closes History (mutual exclusion)", async () => {
-      const { getByTestId, queryByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("history-btn")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("history-btn"));
-      expect(getByTestId("version-history")).toBeInTheDocument();
-
-      fireEvent.click(getByTestId("comments-btn"));
-      await waitFor(() => {
-        expect(getByTestId("comments-panel")).toBeInTheDocument();
-      });
-      expect(queryByTestId("version-history")).not.toBeInTheDocument();
-    });
-  });
-
-  describe("Backdrop and panel close", () => {
-    it("clicking backdrop closes History panel", async () => {
-      const { getByTestId, queryByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("history-btn")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("history-btn"));
-      expect(getByTestId("version-history")).toBeInTheDocument();
-
-      const backdrop = document.querySelector(".fixed.inset-0.z-30");
-      expect(backdrop).toBeInTheDocument();
-      fireEvent.click(backdrop!);
-
-      await waitFor(() => {
-        expect(queryByTestId("version-history")).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("Preview stale and flush", () => {
-    it("flush preview button updates debounced content when preview is stale", async () => {
-      mockYtext.toString.mockReturnValue("# Hello World");
-      const { getByTestId, getByText } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("markdown-preview")).toBeInTheDocument();
-      });
-
-      // Change content to make preview stale (content changes, debounced hasn't caught up)
-      mockYtext.toString.mockReturnValue("# Updated Content");
-      // Trigger ytext observer - we need to simulate the observer firing
-      const updateContent = mockYtext.observe.mock.calls[0]?.[0];
-      if (updateContent) {
-        act(() => updateContent());
-      }
-
-      await waitFor(() => {
-        const refreshBtn = getByText(/Refresh preview|Preview outdated/);
-        if (refreshBtn) {
-          fireEvent.click(refreshBtn);
-        }
-      });
-    });
-  });
-
-  describe("Mobile layout", () => {
-    it("shows mobile tabs when isMobile is true", async () => {
-      Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: vi.fn().mockImplementation((query: string) => ({
-          matches: true,
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      });
-
-      const { getByText } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByText("Editor")).toBeInTheDocument();
-        expect(getByText("Preview")).toBeInTheDocument();
-      });
-    });
-
-    it("switching mobile tabs shows editor and preview", async () => {
-      Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: vi.fn().mockImplementation((query: string) => ({
-          matches: true,
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      });
-
-      const { getByText, getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByText("Editor")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByText("Preview"));
-      await waitFor(() => {
-        expect(getByTestId("markdown-preview")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByText("Editor"));
-      await waitFor(() => {
-        expect(getByTestId("markdown-editor")).toBeInTheDocument();
-      });
-    });
-
-    it("CommentsPanel onClose closes panel in mobile layout", async () => {
-      Object.defineProperty(window, "matchMedia", {
-        writable: true,
-        value: vi.fn().mockImplementation((query: string) => ({
-          matches: true,
-          media: query,
-          onchange: null,
-          addListener: vi.fn(),
-          removeListener: vi.fn(),
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-          dispatchEvent: vi.fn(),
-        })),
-      });
-
-      const { getByTestId, queryByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("comments-btn")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("comments-btn"));
-      await waitFor(() => {
-        expect(getByTestId("comments-panel")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("comments-close-btn"));
-      await waitFor(() => {
-        expect(queryByTestId("comments-panel")).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe("Generic load error", () => {
-    it("shows generic error when API rejects without 404/403", async () => {
-      mockDocumentsGet.mockRejectedValue(new Error("Network error"));
-      mockSharingGetPermission.mockRejectedValue(new Error("Network error"));
-
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("load-error")).toBeInTheDocument();
-        expect(getByTestId("load-error")).toHaveTextContent("Failed to load document");
-      });
-    });
-  });
-
-  describe("Selection and add comment", () => {
-    it("add comment button opens CommentsPanel and closes History", async () => {
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("trigger-add-comment")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("trigger-add-comment"));
-
-      await waitFor(() => {
-        expect(getByTestId("comments-panel")).toBeInTheDocument();
-      });
-    });
-
-    it("selection change updates selection state when synced", async () => {
-      const { getByTestId, queryByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("trigger-selection")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("trigger-selection"));
-
-      expect(queryByTestId("comments-panel")).not.toBeInTheDocument();
-    });
-  });
-
-  describe("Auto-save", () => {
-    it("does not create version when content has not changed", async () => {
-      mockYtext.toString.mockReturnValue("# Hello World");
-
-      render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(mockDocumentsGet).toHaveBeenCalled();
-      });
-
-      vi.useFakeTimers();
-      act(() => {
-        vi.advanceTimersByTime(31_000);
-      });
-      vi.useRealTimers();
-
-      expect(mockVersionsCreate).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("Export error handling", () => {
-    it("handles URL.createObjectURL error gracefully in export MD", async () => {
-      const createObjectURLSpy = vi
-        .spyOn(URL, "createObjectURL")
-        .mockImplementation(() => {
-          throw new Error("createObjectURL failed");
-        });
-
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("export-md-btn")).toBeInTheDocument();
-      });
-
-      fireEvent.click(getByTestId("export-md-btn"));
-
-      expect(mockAddToast).toHaveBeenCalledWith("Failed to export Markdown", "error");
-
-      createObjectURLSpy.mockRestore();
-    });
-
-    it("handles window.open returning null in export PDF", async () => {
-      const mockOpen = vi.fn().mockReturnValue(null);
-      Object.defineProperty(window, "open", {
-        value: mockOpen,
-        writable: true,
-      });
-
-      const { getByTestId } = render(<EditorPage />);
-
-      await waitFor(() => {
-        expect(getByTestId("export-pdf-btn")).toBeInTheDocument();
-      });
-
-      expect(() => fireEvent.click(getByTestId("export-pdf-btn"))).not.toThrow();
-
-      Object.defineProperty(window, "open", {
-        value: global.open,
-        writable: true,
-      });
-    });
-  });
-
 });
