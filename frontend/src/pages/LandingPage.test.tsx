@@ -11,12 +11,16 @@ describe("LandingPage", () => {
     expect(getByText("Supercharged")).toBeInTheDocument();
   });
 
-  it("renders Google sign-in buttons linking to /api/auth/google/login", () => {
-    render(<LandingPage />);
+  it("renders Google sign-in in navbar and SSOLoginFlow in hero/footer", () => {
+    const { getAllByPlaceholderText, getAllByTestId } = render(<LandingPage />);
     const signInLinks = document.querySelectorAll(
       'a[href="/api/auth/google/login"]',
     );
     expect(signInLinks.length).toBeGreaterThanOrEqual(1);
+    const emailInputs = getAllByPlaceholderText("Enter your work email");
+    expect(emailInputs.length).toBe(2);
+    const continueBtns = getAllByTestId("sso-continue-btn");
+    expect(continueBtns.length).toBe(2);
   });
 
   it("renders View API Docs link to /api-docs", () => {
@@ -135,8 +139,10 @@ describe("LandingPage", () => {
   });
 
   it("renders the final CTA section with sign-in option", () => {
-    const { getByText } = render(<LandingPage />);
+    const { getByText, getAllByPlaceholderText } = render(<LandingPage />);
     expect(getByText("Start collaborating now")).toBeInTheDocument();
+    const emailInputs = getAllByPlaceholderText("Enter your work email");
+    expect(emailInputs.length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders the sticky top bar with CollabMark logo", () => {
