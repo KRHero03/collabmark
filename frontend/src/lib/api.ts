@@ -104,6 +104,11 @@ export interface ApiKeyCreated {
 export const authApi = {
   getMe: () => api.get<UserProfile>("/users/me"),
   logout: () => api.post("/auth/logout"),
+  detectSSO: (email: string) =>
+    api.post<{ sso: boolean; org_id?: string; org_name?: string; protocol?: string }>(
+      "/auth/sso/detect",
+      { email },
+    ),
 };
 
 export const documentsApi = {

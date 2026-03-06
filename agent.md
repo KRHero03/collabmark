@@ -7,7 +7,7 @@ It tracks progress, conventions, architectural decisions, and coding standards.
 
 CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 - Real-time multi-user editing via CRDTs (Yjs/pycrdt)
-- Google OAuth sign-in
+- Google OAuth sign-in + SSO (SAML 2.0 / OIDC) for organizations
 - API key access for programmatic use
 - Google Docs-style document sharing (general access + email-based collaborators)
 - Version history with diff view and restore capability
@@ -131,7 +131,28 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - **Version Restore**: Restore button in VersionHistory replaces Yjs content and creates a restore snapshot with attribution
   - **Recently Viewed (All Docs)**: Updated to record and display ALL viewed documents including owner's own, sorted by recency
 
-**Total: ~150+ backend tests, 258 frontend tests (20 test files), all passing**
+- **SSO Phase 1**: Organization Models and Membership
+  - Backend: `Organization`, `OrgMembership`, `OrgSSOConfig` models (new files)
+  - Modified: `User` (added `org_id`, `auth_provider`), `Document_` (added `org_id`), `Folder` (added `org_id`)
+  - New: `org_service.py` (CRUD, membership management), `orgs.py` routes (9 endpoints)
+  - New auth dependencies: `get_super_admin_user`, `get_org_admin_user`
+  - Auto-propagation of `org_id` on document/folder creation
+  - Frontend: `orgsApi` added to `api.ts` with full type definitions
+  - 41 backend org tests, 11 frontend api tests
+
+- **SSO Phase 2**: SSO Authentication (SAML 2.0 + OIDC)
+  - Backend: `sso_common.py` (SSOCallbackResult, detect_org_by_email_domain, find_or_create_sso_user)
+  - Backend: `sso_saml.py` (build_saml_settings, create_saml_auth_request, process_saml_response via python3-saml)
+  - Backend: `sso_oidc.py` (create_oidc_client, get_oidc_discovery, initiate_oidc_login, process_oidc_callback via authlib)
+  - Backend: 5 new routes in `auth.py`: `POST /sso/detect`, `GET /sso/saml/login/{org_id}`, `POST /sso/saml/callback`, `GET /sso/oidc/login/{org_id}`, `GET /sso/oidc/callback`
+  - SAML flow: RelayState carries org_id, ACS validates assertion, extracts email/name/avatar
+  - OIDC flow: Session-stored state for CSRF, discovery-based endpoint resolution, token exchange + userinfo
+  - Frontend: `SSOLoginFlow` component (email detection, SSO redirect, Google fallback)
+  - Frontend: Updated `LandingPage` (hero + final CTA use SSOLoginFlow) and `LoginPage`
+  - Frontend: `authApi.detectSSO()` method
+  - 48 backend SSO tests, 10 frontend SSOLoginFlow tests
+
+**Total: 552 backend tests, 806 frontend tests (46 test files), all passing. Backend coverage: 92%, Frontend coverage: 93.77%**
 
 ## Tech Stack
 
@@ -157,7 +178,7 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 collabmark/
   backend/           # Python FastAPI application
     app/
-      auth/          # OAuth, JWT, API key auth
+      auth/          # OAuth, JWT, API key, SSO (SAML/OIDC) auth
       models/        # Beanie document models
         user.py, document.py, api_key.py, share_link.py,
         document_version.py, document_view.py, comment.py,
@@ -210,6 +231,11 @@ collabmark/
 - `GET /api/auth/google/login` -- redirect to Google OAuth
 - `GET /api/auth/google/callback` -- OAuth callback, set JWT cookie
 - `POST /api/auth/logout` -- clear session
+- `POST /api/auth/sso/detect` -- detect SSO org by email domain
+- `GET /api/auth/sso/saml/login/{org_id}` -- redirect to SAML IdP
+- `POST /api/auth/sso/saml/callback` -- SAML ACS (assertion consumer service)
+- `GET /api/auth/sso/oidc/login/{org_id}` -- redirect to OIDC IdP
+- `GET /api/auth/sso/oidc/callback` -- OIDC authorization code callback
 
 ### Users
 - `GET /api/users/me` -- current user profile
@@ -327,6 +353,15 @@ collabmark/
 - All tests must pass before committing
 
 ## Architectural Decisions
+
+### SSO via SAML 2.0 + OIDC (Dual Protocol)
+Both protocols supported per-org via OrgSSOConfig. Email-domain-based IdP detection
+(`POST /api/auth/sso/detect`) checks `Organization.verified_domains` and routes to
+the correct protocol. SAML uses python3-saml (OneLogin) for AuthnRequest/Response.
+OIDC uses authlib for discovery, authorization, and token exchange. Shared
+`SSOCallbackResult` dataclass normalizes both flows before `find_or_create_sso_user`.
+Google OAuth remains as the default for personal (non-org) users. SSO users get
+`auth_provider="saml"|"oidc"` and `org_id` set on their User document.
 
 ### CRDT over OT
 CRDTs allow decentralized conflict resolution without a central arbiter.
