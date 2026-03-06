@@ -454,7 +454,7 @@ describe("ApiDocsPage", () => {
       await waitFor(() => {
         expect(screen.getByText("Request Body (JSON)")).toBeInTheDocument();
       });
-      const textarea = screen.getByDisplayValue(/My Document/);
+      const textarea = screen.getByDisplayValue(/My Document/) as HTMLTextAreaElement;
       expect(textarea.value).toContain("My Document");
     });
 

@@ -800,7 +800,7 @@ describe("HomePage", () => {
       },
     ];
 
-    const { getByText, getByTestId, getByRole } = render(<HomePage />);
+    const { getByText, getByRole } = render(<HomePage />);
     fireEvent.click(getByText("Trash"));
     await waitFor(() => expect(getByText("Trashed Doc")).toBeInTheDocument());
     fireEvent.contextMenu(getByText("Trashed Doc"));
@@ -870,7 +870,7 @@ describe("HomePage", () => {
       },
     ];
 
-    const { getByText, getByTestId, getByRole } = render(<HomePage />);
+    const { getByText, getByRole } = render(<HomePage />);
     fireEvent.click(getByText("Trash"));
     await waitFor(() => expect(getByText("Trashed Folder")).toBeInTheDocument());
     fireEvent.contextMenu(getByText("Trashed Folder"));
@@ -1997,7 +1997,7 @@ describe("HomePage", () => {
       },
     ];
 
-    const { getByText, getByTestId, getByRole } = render(<HomePage />);
+    const { getByText, getByTestId } = render(<HomePage />);
     fireEvent.click(getByText("Trash"));
     fireEvent.click(getByText("Empty Trash"));
     await waitFor(() => expect(getByTestId("confirm-dialog")).toBeInTheDocument());

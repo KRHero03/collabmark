@@ -18,9 +18,9 @@ vi.mock("yjs", async () => {
   return {
     ...actual,
     createRelativePositionFromTypeIndex: (...args: unknown[]) =>
-      mockCreateRelativePositionFromTypeIndex(...args),
+      (mockCreateRelativePositionFromTypeIndex as Function)(...args),
     encodeRelativePosition: (...args: unknown[]) =>
-      mockEncodeRelativePosition(...args),
+      (mockEncodeRelativePosition as Function)(...args),
   };
 });
 
@@ -70,7 +70,8 @@ vi.mock("../hooks/useCommentPositions", () => ({ useCommentPositions: () => new 
 // Mock pdfExport
 const mockDetectNeedsLandscape = vi.fn(() => false);
 vi.mock("../lib/pdfExport", () => ({
-  detectNeedsLandscape: (el: unknown) => mockDetectNeedsLandscape(el),
+  detectNeedsLandscape: (...args: unknown[]) =>
+    (mockDetectNeedsLandscape as Function)(...args),
 }));
 
 // Mock useYjsProvider - key mock
@@ -1076,7 +1077,7 @@ describe("EditorPage", () => {
       expect(() => fireEvent.click(getByTestId("export-pdf-btn"))).not.toThrow();
 
       Object.defineProperty(window, "open", {
-        value: global.open,
+        value: globalThis.open,
         writable: true,
       });
     });
