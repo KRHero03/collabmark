@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { Loader2, Plus, Pencil, Users, ChevronDown, ChevronRight, X, Check } from "lucide-react";
+import { Link } from "react-router";
+import { Loader2, Plus, Pencil, Users, ChevronDown, ChevronRight, X, Check, Settings } from "lucide-react";
 import { type Organization, type OrgMember, orgsApi } from "../lib/api";
 import { useToast } from "../hooks/useToast";
 import { formatDateShort } from "../lib/dateUtils";
@@ -467,6 +468,14 @@ export function SuperAdminPage() {
                                   >
                                     <Users className="h-4 w-4" />
                                   </button>
+                                  <Link
+                                    to={`/org/${org.id}/settings`}
+                                    className="rounded p-1.5 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] hover:text-[var(--color-text)]"
+                                    title="Organization Settings"
+                                    data-testid={`org-settings-link-${org.id}`}
+                                  >
+                                    <Settings className="h-4 w-4" />
+                                  </Link>
                                 </div>
                               </td>
                             </>
@@ -651,6 +660,13 @@ export function SuperAdminPage() {
                                 <ChevronRight className="h-4 w-4" />
                               )}
                             </button>
+                            <Link
+                              to={`/org/${org.id}/settings`}
+                              className="rounded p-1.5 text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
+                              title="Organization Settings"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </Link>
                           </div>
                         </div>
                         {expandedOrgId === org.id && (

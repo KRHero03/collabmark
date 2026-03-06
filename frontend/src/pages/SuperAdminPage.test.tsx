@@ -30,6 +30,14 @@ vi.mock("../components/Home/ToastContainer", () => ({
   ToastContainer: () => <div data-testid="toast-container" />,
 }));
 
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <SuperAdminPage />
+    </MemoryRouter>,
+  );
+}
+
 const mockOrgs = [
   {
     id: "org-1",
@@ -72,7 +80,7 @@ describe("SuperAdminPage", () => {
   });
 
   it("renders the dashboard title and create button", async () => {
-    const { getByText, getByTestId } = render(<SuperAdminPage />);
+    const { getByText, getByTestId } = renderPage();
 
     await waitFor(() => {
       expect(mockList).toHaveBeenCalled();
@@ -87,7 +95,7 @@ describe("SuperAdminPage", () => {
   it("shows generic loading spinner while orgs are fetching (no admin UI visible)", () => {
     mockList.mockImplementation(() => new Promise(() => {}));
 
-    const { queryByTestId, container } = render(<SuperAdminPage />);
+    const { queryByTestId, container } = renderPage();
 
     expect(queryByTestId("admin-dashboard")).not.toBeInTheDocument();
     const spinner = container.querySelector(".animate-spin");
@@ -97,7 +105,7 @@ describe("SuperAdminPage", () => {
   it("renders org list after data loads", async () => {
     mockList.mockResolvedValue({ data: mockOrgs });
 
-    const { getAllByText, getAllByTestId } = render(<SuperAdminPage />);
+    const { getAllByText, getAllByTestId } = renderPage();
 
     await waitFor(() => {
       expect(mockList).toHaveBeenCalled();
@@ -121,7 +129,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({ data: mockOrgs });
     mockCreate.mockResolvedValue({ data: mockOrgs[0] });
 
-    const { getByTestId, getByText, getByPlaceholderText, queryByTestId } = render(<SuperAdminPage />);
+    const { getByTestId, getByText, getByPlaceholderText, queryByTestId } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -167,7 +175,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValue({ data: [] });
     mockCreate.mockRejectedValueOnce(new Error("Slug already exists"));
 
-    const { getByTestId, getByText, getByPlaceholderText } = render(<SuperAdminPage />);
+    const { getByTestId, getByText, getByPlaceholderText } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -196,7 +204,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValue({ data: mockOrgs });
     mockUpdate.mockResolvedValue({ data: { ...mockOrgs[0], name: "Acme Updated" } });
 
-    const { getAllByText, getAllByTestId } = render(<SuperAdminPage />);
+    const { getAllByText, getAllByTestId } = renderPage();
 
     await waitFor(() => {
       expect(getAllByText("Acme Inc").length).toBeGreaterThanOrEqual(1);
@@ -240,7 +248,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValue({ data: mockOrgs });
     mockListMembers.mockResolvedValue({ data: mockMembers });
 
-    const { getAllByText, getAllByTestId } = render(<SuperAdminPage />);
+    const { getAllByText, getAllByTestId } = renderPage();
 
     await waitFor(() => {
       expect(getAllByText("Acme Inc").length).toBeGreaterThanOrEqual(1);
@@ -271,7 +279,7 @@ describe("SuperAdminPage", () => {
   it("shows error state when API fails", async () => {
     mockList.mockRejectedValueOnce(new Error("Network error"));
 
-    render(<SuperAdminPage />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockAddToast).toHaveBeenCalledWith("Network error", "error");
@@ -281,7 +289,7 @@ describe("SuperAdminPage", () => {
   it("shows error state when API fails with non-Error object", async () => {
     mockList.mockRejectedValueOnce("Unknown error");
 
-    render(<SuperAdminPage />);
+    renderPage();
 
     await waitFor(() => {
       expect(mockAddToast).toHaveBeenCalledWith("Failed to load organizations", "error");
@@ -291,11 +299,7 @@ describe("SuperAdminPage", () => {
   it("renders NotFoundPage when API returns 403", async () => {
     mockList.mockRejectedValueOnce({ response: { status: 403 } });
 
-    const { getByText, getByTestId, queryByTestId } = render(
-      <MemoryRouter>
-        <SuperAdminPage />
-      </MemoryRouter>,
-    );
+    const { getByText, getByTestId, queryByTestId } = renderPage();
 
     await waitFor(() => {
       expect(getByText("404")).toBeInTheDocument();
@@ -310,7 +314,7 @@ describe("SuperAdminPage", () => {
   it("slug auto-generation from name", async () => {
     mockList.mockResolvedValue({ data: [] });
 
-    const { getByTestId, getByPlaceholderText } = render(<SuperAdminPage />);
+    const { getByTestId, getByPlaceholderText } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -330,7 +334,7 @@ describe("SuperAdminPage", () => {
   it("slug auto-updates when name changes and slug was auto-generated", async () => {
     mockList.mockResolvedValue({ data: [] });
 
-    const { getByTestId, getByPlaceholderText } = render(<SuperAdminPage />);
+    const { getByTestId, getByPlaceholderText } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -353,7 +357,7 @@ describe("SuperAdminPage", () => {
   it("slug does not auto-update when user has manually edited it", async () => {
     mockList.mockResolvedValue({ data: [] });
 
-    const { getByTestId, getByPlaceholderText } = render(<SuperAdminPage />);
+    const { getByTestId, getByPlaceholderText } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -378,7 +382,7 @@ describe("SuperAdminPage", () => {
   it("create form validates name and slug required", async () => {
     mockList.mockResolvedValue({ data: [] });
 
-    const { getByTestId, getByText } = render(<SuperAdminPage />);
+    const { getByTestId, getByText } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -401,7 +405,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValue({ data: [] });
     mockCreate.mockResolvedValue({ data: mockOrgs[0] });
 
-    const { getByTestId, getByText, getByPlaceholderText } = render(<SuperAdminPage />);
+    const { getByTestId, getByText, getByPlaceholderText } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -436,7 +440,7 @@ describe("SuperAdminPage", () => {
   it("shows empty state when no orgs", async () => {
     mockList.mockResolvedValue({ data: [] });
 
-    const { getByText } = render(<SuperAdminPage />);
+    const { getByText } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -446,7 +450,7 @@ describe("SuperAdminPage", () => {
   it("cancel create form closes without submitting", async () => {
     mockList.mockResolvedValue({ data: [] });
 
-    const { getByTestId, getByText, queryByTestId } = render(<SuperAdminPage />);
+    const { getByTestId, getByText, queryByTestId } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -469,7 +473,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValue({ data: [] });
     mockCreate.mockRejectedValueOnce(new Error("Failed to create organization"));
 
-    const { getByTestId, getByText, getByPlaceholderText } = render(<SuperAdminPage />);
+    const { getByTestId, getByText, getByPlaceholderText } = renderPage();
 
     await waitFor(() => expect(mockList).toHaveBeenCalled());
 
@@ -496,7 +500,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValue({ data: mockOrgs });
     mockUpdate.mockRejectedValueOnce(new Error("Update failed"));
 
-    const { getAllByText, getAllByTestId } = render(<SuperAdminPage />);
+    const { getAllByText, getAllByTestId } = renderPage();
 
     await waitFor(() => expect(getAllByText("Acme Inc").length).toBeGreaterThanOrEqual(1));
 
@@ -519,7 +523,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValue({ data: mockOrgs });
     mockListMembers.mockResolvedValue({ data: [] });
 
-    const { getAllByText, getAllByTestId } = render(<SuperAdminPage />);
+    const { getAllByText, getAllByTestId } = renderPage();
 
     await waitFor(() => expect(getAllByText("Acme Inc").length).toBeGreaterThanOrEqual(1));
 
@@ -540,7 +544,7 @@ describe("SuperAdminPage", () => {
     mockList.mockResolvedValue({ data: mockOrgs });
     mockListMembers.mockRejectedValueOnce(new Error("Failed to load members"));
 
-    const { getAllByText, getAllByTestId } = render(<SuperAdminPage />);
+    const { getAllByText, getAllByTestId } = renderPage();
 
     await waitFor(() => expect(getAllByText("Acme Inc").length).toBeGreaterThanOrEqual(1));
 

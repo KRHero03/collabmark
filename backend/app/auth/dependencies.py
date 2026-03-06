@@ -86,19 +86,23 @@ async def get_org_admin_user(
     org_id: str,
     user: User = Depends(get_current_user),
 ) -> User:
-    """Require the authenticated user to be an admin of the target organization.
+    """Require the user to be an org admin **or** a platform super admin.
 
     Args:
         org_id: Organization ID from the route path.
         user: The authenticated user from get_current_user.
 
     Returns:
-        The authenticated org admin User.
+        The authenticated org/super admin User.
 
     Raises:
-        HTTPException: 403 if the user is not an admin of the target org.
+        HTTPException: 403 if the user is neither an org admin nor a super admin.
     """
+    from app.config import settings
     from app.services.org_service import is_org_admin
+
+    if user.email in settings.super_admin_emails:
+        return user
 
     if not await is_org_admin(str(user.id), org_id):
         raise HTTPException(
