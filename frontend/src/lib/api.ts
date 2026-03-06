@@ -10,6 +10,8 @@ export interface UserProfile {
   email: string;
   name: string;
   avatar_url: string | null;
+  org_id?: string | null;
+  auth_provider?: string;
   created_at: string;
 }
 
@@ -23,6 +25,7 @@ export interface MarkdownDocument {
   owner_name: string;
   owner_email: string;
   owner_avatar_url: string | null;
+  org_id?: string | null;
   folder_id: string | null;
   general_access: GeneralAccess;
   is_deleted: boolean;
@@ -39,6 +42,7 @@ export interface FolderItem {
   owner_name: string;
   owner_email: string;
   owner_avatar_url: string | null;
+  org_id?: string | null;
   parent_id: string | null;
   general_access: GeneralAccess;
   is_deleted: boolean;
@@ -309,6 +313,60 @@ export const versionsApi = {
     api.get<VersionDetail>(`/documents/${docId}/versions/${versionNumber}`),
   create: (docId: string, data: { content: string; summary?: string }) =>
     api.post<VersionDetail>(`/documents/${docId}/versions`, data),
+};
+
+export interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  verified_domains: string[];
+  plan: string;
+  member_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrgMember {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  avatar_url: string | null;
+  role: "admin" | "member";
+  joined_at: string;
+}
+
+export interface OrgSSOConfig {
+  id: string;
+  org_id: string;
+  protocol: "saml" | "oidc";
+  enabled: boolean;
+  idp_entity_id: string | null;
+  idp_sso_url: string | null;
+  sp_entity_id: string | null;
+  sp_acs_url: string | null;
+  oidc_discovery_url: string | null;
+  oidc_client_id: string | null;
+  scim_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export const orgsApi = {
+  create: (data: { name: string; slug: string; verified_domains?: string[]; plan?: string }) =>
+    api.post<Organization>("/orgs", data),
+  list: () => api.get<Organization[]>("/orgs"),
+  get: (orgId: string) => api.get<Organization>(`/orgs/${orgId}`),
+  update: (orgId: string, data: { name?: string; slug?: string; verified_domains?: string[]; plan?: string }) =>
+    api.put<Organization>(`/orgs/${orgId}`, data),
+  listMembers: (orgId: string) => api.get<OrgMember[]>(`/orgs/${orgId}/members`),
+  addMember: (orgId: string, data: { user_id: string; role?: string }) =>
+    api.post<OrgMember>(`/orgs/${orgId}/members`, data),
+  removeMember: (orgId: string, userId: string) =>
+    api.delete(`/orgs/${orgId}/members/${userId}`),
+  getSSOConfig: (orgId: string) => api.get<OrgSSOConfig | null>(`/orgs/${orgId}/sso`),
+  updateSSOConfig: (orgId: string, data: Record<string, unknown>) =>
+    api.put<OrgSSOConfig>(`/orgs/${orgId}/sso`, data),
 };
 
 export default api;
