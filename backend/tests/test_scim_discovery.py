@@ -87,7 +87,7 @@ class TestResourceTypes:
         data = response.json()
         assert data["id"] == "User"
         assert data["name"] == "User"
-        assert data["endpoint"] == "/scim/v2/Users"
+        assert data["endpoint"] == "/Users"
         assert data["schema"] == USER_SCHEMA_URN
         assert data["meta"]["resourceType"] == "ResourceType"
         assert data["meta"]["location"] == "/scim/v2/ResourceTypes/User"
@@ -170,3 +170,31 @@ class TestSchemas:
             assert "multiValued" in attr
             assert "mutability" in attr
             assert "returned" in attr
+
+
+# ---------------------------------------------------------------------------
+# Catch-all for unknown SCIM paths
+# ---------------------------------------------------------------------------
+
+
+class TestScimCatchAll:
+    @pytest.mark.asyncio
+    async def test_unknown_path_returns_scim_404(self, async_client: AsyncClient):
+        response = await async_client.get("/scim/v2/NonExistent")
+        assert response.status_code == 404
+        data = response.json()
+        assert "urn:ietf:params:scim:api:messages:2.0:Error" in data["schemas"]
+        assert data["status"] == "404"
+
+    @pytest.mark.asyncio
+    async def test_unknown_path_has_scim_content_type(self, async_client: AsyncClient):
+        response = await async_client.get("/scim/v2/SomethingRandom")
+        assert response.status_code == 404
+        assert response.headers["content-type"] == SCIM_CONTENT_TYPE
+
+    @pytest.mark.asyncio
+    async def test_unknown_path_post_returns_scim_404(self, async_client: AsyncClient):
+        response = await async_client.post("/scim/v2/Bogus", json={})
+        assert response.status_code == 404
+        data = response.json()
+        assert data["status"] == "404"

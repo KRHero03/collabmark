@@ -269,7 +269,7 @@ _USER_RESOURCE_TYPE: dict[str, Any] = {
     "schemas": [SCIM_RESOURCE_TYPE_SCHEMA],
     "id": "User",
     "name": "User",
-    "endpoint": "/scim/v2/Users",
+    "endpoint": "/Users",
     "description": "User Account",
     "schema": SCIM_USER_SCHEMA_URN,
     "meta": {
@@ -469,3 +469,17 @@ async def scim_delete_user(
     org, _cfg = org_ctx
     org_id = str(org.id)
     await scim_service.delete_scim_user(org_id, user_id)
+
+
+# ========================================================================
+# Catch-all for unknown SCIM paths — returns SCIM 404 instead of SPA HTML
+# ========================================================================
+
+
+@router.api_route("/{scim_path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
+async def scim_catch_all(scim_path: str) -> JSONResponse:
+    """Return a SCIM-formatted 404 for any unrecognised path under /scim/v2/."""
+    return _scim_response(
+        SCIMError(404, f"Resource '/{scim_path}' not found").to_dict(),
+        status_code=404,
+    )
