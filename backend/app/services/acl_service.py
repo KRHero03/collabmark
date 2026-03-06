@@ -7,6 +7,8 @@ ACL Rules:
   - Editor: can view, edit, and create inside folders; cannot delete or share.
   - Viewer: read-only access.
   - Inheritance: permissions flow down parent->child via FolderAccess chains.
+  - Org Boundary: general_access (anyone_view/anyone_edit) is scoped to users
+    in the same organization when the entity belongs to an org.
 
 Performance: Folder and Document models carry a denormalized root_folder_id
 field, eliminating recursive parent-chain walks for root-owner resolution.
@@ -58,6 +60,18 @@ class AclEntry:
 NO_ACCESS = EffectivePermission(
     can_view=False, can_edit=False, can_delete=False, can_share=False, role="none"
 )
+
+
+def org_allows_general_access(entity_org_id: str | None, user_org_id: str | None) -> bool:
+    """Check whether general_access rules (anyone_view/anyone_edit) apply.
+
+    Returns True when the entity has no org (personal) or the user is in the
+    same org.  Returns False when the entity belongs to an org and the user
+    is either in a different org or is a personal (non-org) user.
+    """
+    if entity_org_id is None:
+        return True
+    return entity_org_id == user_org_id
 
 
 # ---------------------------------------------------------------------------
@@ -135,8 +149,14 @@ async def all_children_owned_by(folder_id: str, user_id: str) -> bool:
 # Low-level access resolution (view/edit only, no delete logic)
 # ---------------------------------------------------------------------------
 
-async def _get_inherited_permission(folder_id: str, user_id: str) -> Permission | None:
-    """Walk up the folder chain looking for an explicit FolderAccess or general_access."""
+async def _get_inherited_permission(
+    folder_id: str, user_id: str, user_org_id: str | None = None
+) -> Permission | None:
+    """Walk up the folder chain looking for an explicit FolderAccess or general_access.
+
+    Org boundary is enforced on general_access: if a folder belongs to an org,
+    only users in the same org benefit from anyone_view/anyone_edit.
+    """
     visited: set[str] = set()
     current_id: str | None = folder_id
 
@@ -156,10 +176,11 @@ async def _get_inherited_permission(folder_id: str, user_id: str) -> Permission 
         if access is not None:
             return access.permission
 
-        if folder.general_access == GeneralAccess.ANYONE_EDIT:
-            return Permission.EDIT
-        if folder.general_access == GeneralAccess.ANYONE_VIEW:
-            return Permission.VIEW
+        if org_allows_general_access(getattr(folder, "org_id", None), user_org_id):
+            if folder.general_access == GeneralAccess.ANYONE_EDIT:
+                return Permission.EDIT
+            if folder.general_access == GeneralAccess.ANYONE_VIEW:
+                return Permission.VIEW
 
         current_id = folder.parent_id
 
@@ -170,8 +191,14 @@ async def get_base_permission(
     entity_type: Literal["document", "folder"],
     entity_id: str,
     user_id: str,
+    user_org_id: str | None = None,
 ) -> Permission | None:
-    """Resolve the base view/edit permission (ignoring delete/share logic)."""
+    """Resolve the base view/edit permission (ignoring delete/share logic).
+
+    When ``user_org_id`` is provided, general_access checks are scoped to the
+    same org (entities belonging to an org are invisible to outsiders via
+    general_access).
+    """
     if entity_type == "document":
         try:
             doc = await Document_.get(PydanticObjectId(entity_id))
@@ -191,14 +218,15 @@ async def get_base_permission(
             return da.permission
 
         if doc.folder_id is not None:
-            perm = await _get_inherited_permission(doc.folder_id, user_id)
+            perm = await _get_inherited_permission(doc.folder_id, user_id, user_org_id)
             if perm is not None:
                 return perm
 
-        if doc.general_access == GeneralAccess.ANYONE_EDIT:
-            return Permission.EDIT
-        if doc.general_access == GeneralAccess.ANYONE_VIEW:
-            return Permission.VIEW
+        if org_allows_general_access(getattr(doc, "org_id", None), user_org_id):
+            if doc.general_access == GeneralAccess.ANYONE_EDIT:
+                return Permission.EDIT
+            if doc.general_access == GeneralAccess.ANYONE_VIEW:
+                return Permission.VIEW
 
         return None
 
@@ -221,12 +249,13 @@ async def get_base_permission(
         return fa.permission
 
     if folder.parent_id is not None:
-        return await _get_inherited_permission(folder.parent_id, user_id)
+        return await _get_inherited_permission(folder.parent_id, user_id, user_org_id)
 
-    if folder.general_access == GeneralAccess.ANYONE_EDIT:
-        return Permission.EDIT
-    if folder.general_access == GeneralAccess.ANYONE_VIEW:
-        return Permission.VIEW
+    if org_allows_general_access(getattr(folder, "org_id", None), user_org_id):
+        if folder.general_access == GeneralAccess.ANYONE_EDIT:
+            return Permission.EDIT
+        if folder.general_access == GeneralAccess.ANYONE_VIEW:
+            return Permission.VIEW
 
     return None
 
@@ -302,7 +331,7 @@ async def resolve_effective_permission(
         )
 
     # 4/5. Not owner — check inherited/explicit permission
-    base_perm = await get_base_permission(entity_type, entity_id, user_id)
+    base_perm = await get_base_permission(entity_type, entity_id, user_id, user.org_id)
 
     if base_perm == Permission.EDIT:
         return EffectivePermission(

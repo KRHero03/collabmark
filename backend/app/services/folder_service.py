@@ -190,10 +190,10 @@ async def hard_delete_folder(folder_id: str, user: User) -> None:
 async def get_folder_permission(folder_id: str, user: User) -> Permission | None:
     """Get the effective permission a user has on a folder, or None.
 
-    Uses acl_service._get_inherited_permission for consistent chain resolution.
+    Uses acl_service.get_base_permission with org boundary enforcement.
     """
     from app.services.acl_service import get_base_permission
-    return await get_base_permission("folder", folder_id, str(user.id))
+    return await get_base_permission("folder", folder_id, str(user.id), user.org_id)
 
 
 async def list_folder_contents(
@@ -276,6 +276,12 @@ async def add_folder_collaborator(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot add yourself as a collaborator",
+        )
+
+    if folder.org_id is not None and target_user.org_id != folder.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot share with users outside your organization",
         )
 
     existing = await FolderAccess.find_one(

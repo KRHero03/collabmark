@@ -204,6 +204,7 @@ async def get_user_permission(doc_id: str, user: User) -> Permission | None:
     """Check if a user has access to a document.
 
     Priority: owner (EDIT) > explicit DocumentAccess > folder chain inheritance > general_access > None.
+    Org boundary is enforced on general_access checks.
 
     Args:
         doc_id: The document ID.
@@ -213,7 +214,7 @@ async def get_user_permission(doc_id: str, user: User) -> Permission | None:
         Permission level, or None if no access.
     """
     from app.services.acl_service import get_base_permission
-    return await get_base_permission("document", doc_id, str(user.id))
+    return await get_base_permission("document", doc_id, str(user.id), user.org_id)
 
 
 async def update_general_access(
@@ -281,6 +282,12 @@ async def add_collaborator(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cannot add yourself as a collaborator",
+        )
+
+    if doc.org_id is not None and target_user.org_id != doc.org_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cannot share with users outside your organization",
         )
 
     existing = await DocumentAccess.find_one(

@@ -23,6 +23,7 @@ interface ShareDialogProps {
   ownerName: string;
   ownerAvatarUrl?: string | null;
   onGeneralAccessChange: (ga: GeneralAccess) => void;
+  orgName?: string | null;
 }
 
 export function ShareDialog({
@@ -35,6 +36,7 @@ export function ShareDialog({
   ownerName,
   ownerAvatarUrl,
   onGeneralAccessChange,
+  orgName,
 }: ShareDialogProps) {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [email, setEmail] = useState("");
@@ -127,10 +129,11 @@ export function ShareDialog({
 
   if (!open) return null;
 
+  const scope = orgName ? `Anyone in ${orgName}` : "Anyone";
   const gaLabel: Record<GeneralAccess, string> = {
     restricted: "Restricted",
-    anyone_view: "Anyone with the link can view",
-    anyone_edit: "Anyone with the link can edit",
+    anyone_view: `${scope} with the link can view`,
+    anyone_edit: `${scope} with the link can edit`,
   };
 
   return (
@@ -285,10 +288,10 @@ export function ShareDialog({
             >
               <option value="restricted">Restricted</option>
               <option value="anyone_view">
-                Anyone with the link can view
+                {scope} with the link can view
               </option>
               <option value="anyone_edit">
-                Anyone with the link can edit
+                {scope} with the link can edit
               </option>
             </select>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">

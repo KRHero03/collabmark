@@ -266,11 +266,13 @@ async def _assert_access(
                 )
             return
 
-    ga = doc.general_access
-    if ga == GeneralAccess.ANYONE_EDIT:
-        return
-    if ga == GeneralAccess.ANYONE_VIEW and min_permission == Permission.VIEW:
-        return
+    from app.services.acl_service import org_allows_general_access
+    if org_allows_general_access(getattr(doc, "org_id", None), user.org_id):
+        ga = doc.general_access
+        if ga == GeneralAccess.ANYONE_EDIT:
+            return
+        if ga == GeneralAccess.ANYONE_VIEW and min_permission == Permission.VIEW:
+            return
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

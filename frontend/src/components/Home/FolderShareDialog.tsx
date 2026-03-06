@@ -13,6 +13,7 @@ interface FolderShareDialogProps {
   ownerName: string;
   ownerAvatarUrl?: string | null;
   onGeneralAccessChange: (ga: GeneralAccess) => void;
+  orgName?: string | null;
 }
 
 export function FolderShareDialog({
@@ -25,6 +26,7 @@ export function FolderShareDialog({
   ownerName,
   ownerAvatarUrl,
   onGeneralAccessChange,
+  orgName,
 }: FolderShareDialogProps) {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([]);
   const [email, setEmail] = useState("");
@@ -117,10 +119,11 @@ export function FolderShareDialog({
 
   if (!open) return null;
 
+  const scope = orgName ? `Anyone in ${orgName}` : "Anyone";
   const gaLabel: Record<GeneralAccess, string> = {
     restricted: "Restricted",
-    anyone_view: "Anyone with the link can view",
-    anyone_edit: "Anyone with the link can edit",
+    anyone_view: `${scope} with the link can view`,
+    anyone_edit: `${scope} with the link can edit`,
   };
 
   return (
@@ -269,10 +272,10 @@ export function FolderShareDialog({
             >
               <option value="restricted">Restricted</option>
               <option value="anyone_view">
-                Anyone with the link can view
+                {scope} with the link can view
               </option>
               <option value="anyone_edit">
-                Anyone with the link can edit
+                {scope} with the link can edit
               </option>
             </select>
             <p className="mt-1 text-xs text-[var(--color-text-muted)]">

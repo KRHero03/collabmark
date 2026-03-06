@@ -152,7 +152,19 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - Frontend: `authApi.detectSSO()` method
   - 48 backend SSO tests, 10 frontend SSOLoginFlow tests
 
-**Total: 552 backend tests, 806 frontend tests (46 test files), all passing. Backend coverage: 92%, Frontend coverage: 93.77%**
+- **SSO Phase 3**: Org-Scoped ACLs and Sharing
+  - `org_allows_general_access()` utility in acl_service: returns False when entity belongs to an org and user is in a different org (or personal)
+  - `get_base_permission()` and `_get_inherited_permission()` accept `user_org_id` for org-scoped general_access checks
+  - `resolve_effective_permission()` passes `user.org_id` through to base permission resolver
+  - `document_service._assert_access()` enforces org boundary before evaluating general_access
+  - `share_service.add_collaborator()` blocks cross-org sharing (403 "Cannot share with users outside your organization")
+  - `folder_service.add_folder_collaborator()` blocks cross-org folder sharing (same error)
+  - `share_service.get_user_permission()` and `folder_service.get_folder_permission()` pass org context through
+  - Frontend: ShareDialog and FolderShareDialog accept optional `orgName` prop; labels change from "Anyone with the link" to "Anyone in [OrgName] with the link"
+  - 30 new backend tests covering: org boundary utility, ACL enforcement on docs/folders, folder inheritance chains, cross-org sharing denial, same-org sharing allowed, personal user backward compatibility
+  - Backward compatible: personal users (org_id=None) keep all existing sharing behavior
+
+**Total: 613 backend tests, 806 frontend tests (46 test files), all passing. Backend coverage: 92%, Frontend coverage: 93.77%**
 
 ## Tech Stack
 
