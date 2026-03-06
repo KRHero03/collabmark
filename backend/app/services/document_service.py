@@ -178,7 +178,7 @@ async def list_trash(user: User) -> list[Document_]:
             Document_.owner_id == str(user.id),
             Document_.is_deleted == True,
         )
-        .sort("-deleted_at")
+        .sort(["-deleted_at", "-_id"])
         .to_list()
     )
 

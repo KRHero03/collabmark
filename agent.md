@@ -197,33 +197,24 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - 18 SuperAdminPage frontend tests, 28 OrgSettingsPage frontend tests
 
 - **SSO Phase 5**: SCIM 2.0 Provisioning
-  - Backend: `scim_auth.py` with SHA-256 bearer token authentication (per-org token lookup)
-  - Backend: `scim_service.py` with full SCIM user lifecycle (create, list, get, update/PATCH, deactivate)
-  - Backend: `scim.py` routes at `/scim/v2/Users` (POST, GET, GET/:id, PATCH/:id, DELETE/:id)
-  - Backend: SCIM schema mapping (`urn:ietf:params:scim:schemas:core:2.0:User`) supporting userName, displayName, name, emails, photos, active
-  - Backend: SCIM filter support (`userName eq "..."`) and pagination (`startIndex`, `count`)
-  - Backend: Token management routes in `orgs.py`: `POST /api/orgs/{org_id}/scim/token` (generate) and `DELETE /api/orgs/{org_id}/scim/token` (revoke)
-  - Backend: `OrgSSOConfigUpdate` extended with `scim_enabled` field
-  - Backend: SCIM DELETE deactivates user (removes org membership) but preserves User document for ownership
-  - Frontend: SCIM section in `OrgSettingsPage` SSO tab (endpoint URL, generate/revoke token, active status)
-  - Frontend: `orgsApi.generateScimToken()` and `orgsApi.revokeScimToken()` API methods
-  - 82 new backend tests (13 auth, 34 service, 35 route), 11 new frontend tests
-  - All responses use `application/scim+json` content type per RFC 7644
+  - Backend: SCIM auth, service, and routes at `/scim/v2/Users`
+  - Backend: Token management in `orgs.py` (generate/revoke)
+  - Frontend: SCIM section in OrgSettingsPage SSO tab
+  - 82 new backend tests (auth, service, route), 11 new frontend tests
 
-- **Code Quality & Tooling Phase**: Lint, Format, Build Integration
-  - Backend: ruff (linter + formatter) with comprehensive rule set (pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, bugbear, simplify, bandit security, print, pie, return, type-checking, pathlib)
-  - Backend: pyproject.toml with ruff config and pytest config (asyncio_mode, warning suppression)
-  - Backend: All lint issues fixed (imports sorted, contextlib.suppress, raise-from-except, unused vars, ambiguous names)
-  - Frontend: ESLint 9 flat config (TypeScript, react-hooks, react-refresh, prettier integration)
-  - Frontend: Prettier config (120 print width, double quotes, trailing commas, LF line endings)
-  - Frontend: All ESLint errors fixed (Spinner moved outside render, eqeqeq, Function type casts, react-refresh suppressed for utility-exporting files)
-  - Frontend: Vitest 4.0.18 (latest stable) with coverage via @vitest/coverage-v8
-  - Frontend: vite.config.ts uses `defineConfig` from `vitest/config` for proper type support
-  - Unified Makefile at project root: `make lint`, `make format`, `make test`, `make build`, `make ci` (full pipeline)
-  - Backend: pytest-xdist installed for parallel test option, pytest-cov for coverage
-  - Backend: ruff added to requirements.txt
+- **Code Quality & Tooling**: Lint, Format, Build Integration
+  - Backend: ruff (linter + formatter), pytest-xdist, pytest-cov
+  - Frontend: ESLint 9 flat config, Prettier, Vitest 4
+  - Unified Makefile: `make lint`, `make format`, `make test`, `make build`, `make ci`
 
-**Total: 723 backend tests, 871 frontend tests (49 test files), all passing.**
+- **404 Page & Access Control**
+  - `NotFoundPage.tsx`: themed 404 page with gradient text, Go Home button, dark mode
+  - SuperAdminPage & OrgSettingsPage: render NotFoundPage on 403 (no info leakage)
+  - `App.tsx`: catch-all route for unknown URLs
+  - LandingPage: removed Google login button from navbar, replaced with "Sign In" anchor
+  - Backend: deterministic trash sort (secondary `_id` tiebreaker)
+
+**Total: 723 backend tests, 878 frontend tests (49 test files), all passing.**
 
 ## Tech Stack
 
@@ -239,10 +230,8 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 | Auth        | Google OAuth2 (authlib), JWT (python-jose), API keys |
 | Diffing     | diff (jsdiff) for version history diff view       |
 | Message Bus | Redis (future: pub/sub for WS horizontal scaling) |
-| Lint BE     | ruff (lint + format), pyproject.toml config       |
-| Lint FE     | ESLint 9 + Prettier 3                             |
-| Testing BE  | pytest, pytest-asyncio, pytest-xdist, pytest-cov, httpx, mongomock-motor |
-| Testing FE  | Vitest 4, React Testing Library, jsdom, @vitest/coverage-v8 |
+| Testing BE  | pytest, pytest-asyncio, httpx, mongomock-motor    |
+| Testing FE  | Vitest, React Testing Library, jsdom              |
 | Deployment  | Docker, Railway (with MongoDB & Redis add-ons), Gunicorn |
 
 ## Project Structure
@@ -251,7 +240,7 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 collabmark/
   backend/           # Python FastAPI application
     app/
-      auth/          # OAuth, JWT, API key, SSO (SAML/OIDC), SCIM auth
+      auth/          # OAuth, JWT, API key, SSO (SAML/OIDC) auth
       models/        # Beanie document models
         user.py, document.py, api_key.py, share_link.py,
         document_version.py, document_view.py, comment.py,
@@ -259,16 +248,12 @@ collabmark/
       routes/        # REST API endpoints
         auth.py, documents.py, keys.py, sharing.py,
         versions.py, comments.py, export.py, users.py,
-        folders.py, orgs.py, scim.py, ws.py
+        folders.py, ws.py
       services/      # Business logic layer
         document_service.py, share_service.py, version_service.py,
-        comment_service.py, folder_service.py, org_service.py,
-        scim_service.py, acl_service.py, crdt_store.py
-      utils/         # Shared utility functions
-        owner_resolver.py  # Centralized user owner info resolution
+        comment_service.py, folder_service.py, crdt_store.py
       ws/            # WebSocket handler (pycrdt rooms)
-    pyproject.toml   # Ruff + pytest config
-    tests/           # Backend test suite (641 tests)
+    tests/           # Backend test suite (150+ tests)
   frontend/          # React SPA (Vite + TypeScript)
     src/
       components/    # Reusable UI components
@@ -294,13 +279,12 @@ collabmark/
       lib/           # API client, utilities
         api.ts       # Axios client with all API methods
         dateUtils.ts # Local time formatting utilities
-  Makefile           # Unified lint/format/test/build/ci commands
   Dockerfile         # Multi-stage (build frontend + bundle with backend)
   docker-compose.yml # MongoDB + Redis for local dev
   docker-compose.prod.yml # Production compose
   railway.toml       # Railway deployment config
   Procfile           # Heroku/Railway process file
-  AGENT.md           # THIS FILE -- agent reference
+  agent.md           # THIS FILE -- agent reference
 ```
 
 ## API Endpoints
@@ -391,15 +375,6 @@ collabmark/
 - `DELETE /api/orgs/{org_id}/members/{user_id}` -- remove member (org admin)
 - `GET /api/orgs/{org_id}/sso` -- get SSO config (org admin)
 - `PUT /api/orgs/{org_id}/sso` -- create/update SSO config (org admin)
-- `POST /api/orgs/{org_id}/scim/token` -- generate SCIM bearer token (org admin)
-- `DELETE /api/orgs/{org_id}/scim/token` -- revoke SCIM bearer token (org admin)
-
-### SCIM 2.0 Provisioning (bearer token auth)
-- `POST /scim/v2/Users` -- provision a new user in the org
-- `GET /scim/v2/Users` -- list/filter users (supports `filter`, `startIndex`, `count`)
-- `GET /scim/v2/Users/{user_id}` -- get user by ID
-- `PATCH /scim/v2/Users/{user_id}` -- update user attributes (RFC 7644 PATCH or direct)
-- `DELETE /scim/v2/Users/{user_id}` -- deactivate user (remove org membership)
 
 ### Frontend Pages
 - `/` -- Home page (Files browser, shared docs, recently viewed, trash)
@@ -427,16 +402,9 @@ collabmark/
 - Never use generic truthy assertions (e.g., avoid `assert response.json()`)
 - Include edge cases: empty inputs, boundary values, auth failures, not-found, concurrent ops
 - Backend: pytest + pytest-asyncio + httpx ASGI transport + mongomock-motor
-- Frontend: Vitest 4 + React Testing Library + jsdom + @testing-library/user-event
+- Frontend: Vitest + React Testing Library + jsdom + @testing-library/user-event
 - Test files mirror source structure: `test_<module>.py` / `<Component>.test.tsx`
 - Frontend: do NOT import `screen` directly from @testing-library/react (CI issue); destructure from `render()` return instead
-
-### Lint & Format Standards
-- **Backend**: `ruff check` for linting, `ruff format` for formatting (config in `pyproject.toml`)
-- **Frontend**: `eslint` for linting, `prettier` for formatting (config in `eslint.config.js` + `.prettierrc`)
-- Run `make lint` to check both; `make lint-fix` to auto-fix; `make format` to format all code
-- Run `make ci` for the full pipeline: lint + format-check + test + build
-- All code must pass `make lint` before committing
 
 ### Backend Conventions
 - Models in `app/models/` are Beanie Documents with `Settings.name` for collection
@@ -472,15 +440,6 @@ OIDC uses authlib for discovery, authorization, and token exchange. Shared
 `SSOCallbackResult` dataclass normalizes both flows before `find_or_create_sso_user`.
 Google OAuth remains as the default for personal (non-org) users. SSO users get
 `auth_provider="saml"|"oidc"` and `org_id` set on their User document.
-
-### SCIM 2.0 Provisioning
-Enterprise IdPs (Okta, Azure AD, Keycloak) use SCIM to auto-provision and
-deprovision users. Routes live at `/scim/v2/Users` with bearer token auth.
-Tokens are SHA-256 hashed before storage in `OrgSSOConfig.scim_bearer_token`;
-the org is resolved by matching the hash (no org_id in the URL). Supports
-RFC 7644 PATCH operations and Azure AD-style direct attribute replacement.
-SCIM DELETE deactivates (removes membership) rather than hard-deleting users
-to preserve document ownership. SCIM-provisioned users get `auth_provider="scim"`.
 
 ### CRDT over OT
 CRDTs allow decentralized conflict resolution without a central arbiter.

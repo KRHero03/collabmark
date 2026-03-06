@@ -9,6 +9,7 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { ApiDocsPage } from "./pages/ApiDocsPage";
 import { SuperAdminPage } from "./pages/SuperAdminPage";
 import { OrgSettingsPage } from "./pages/OrgSettingsPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -95,6 +96,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
   );

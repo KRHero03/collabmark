@@ -13,7 +13,6 @@ import {
   Shield,
   Globe,
 } from "lucide-react";
-import { GoogleLoginButton } from "../components/Auth/GoogleLoginButton";
 import { SSOLoginFlow } from "../components/Auth/SSOLoginFlow";
 
 const FEATURES = [
@@ -128,7 +127,12 @@ export function LandingPage() {
           <FileText className="h-6 w-6 text-[var(--color-primary)]" />
           <span>CollabMark</span>
         </div>
-        <GoogleLoginButton />
+        <a
+          href="#get-started"
+          className="rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white transition hover:opacity-90"
+        >
+          Sign In
+        </a>
       </nav>
 
       {/* --- Hero Section --- */}
@@ -163,6 +167,7 @@ export function LandingPage() {
             all in a beautiful Markdown editor.
           </p>
           <div
+            id="get-started"
             className="animate-fade-in-up flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
             style={{ animationDelay: "0.5s" }}
           >

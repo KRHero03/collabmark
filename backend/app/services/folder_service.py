@@ -181,7 +181,7 @@ async def list_trash_folders(user: User) -> list[Folder]:
             Folder.owner_id == str(user.id),
             Folder.is_deleted == True,
         )
-        .sort("-deleted_at")
+        .sort(["-deleted_at", "-_id"])
         .to_list()
     )
 

@@ -720,6 +720,20 @@ describe("OrgSettingsPage", () => {
 
       mockParams.orgId = "org-123";
     });
+
+    it("renders NotFoundPage when API returns 403", async () => {
+      mockOrgsApi.get.mockRejectedValue({ response: { status: 403 } });
+
+      const { getByText, getByTestId, queryByTestId } = renderPage();
+
+      await waitFor(() => {
+        expect(getByText("404")).toBeInTheDocument();
+        expect(getByText("Page not found")).toBeInTheDocument();
+        expect(getByTestId("go-home-link")).toBeInTheDocument();
+      });
+
+      expect(queryByTestId("org-settings")).not.toBeInTheDocument();
+    });
   });
 
   describe("15. SSO tab: SCIM provisioning section", () => {

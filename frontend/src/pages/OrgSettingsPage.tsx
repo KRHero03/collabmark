@@ -20,6 +20,7 @@ import { UserAvatar } from "../components/Layout/UserAvatar";
 import { Navbar } from "../components/Layout/Navbar";
 import { useAuth } from "../hooks/useAuth";
 import { formatDateShort } from "../lib/dateUtils";
+import { NotFoundPage } from "./NotFoundPage";
 
 type Tab = "general" | "members" | "sso";
 
@@ -32,6 +33,7 @@ export function OrgSettingsPage() {
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [ssoConfig, setSsoConfig] = useState<OrgSSOConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const [toast, setToast] = useState<{
@@ -112,7 +114,14 @@ export function OrgSettingsPage() {
         }
       }),
     ])
-      .catch(() => showToast("error", "Failed to load organization data"))
+      .catch((err: unknown) => {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 403) {
+          setAccessDenied(true);
+          return;
+        }
+        showToast("error", "Failed to load organization data");
+      })
       .finally(() => setLoading(false));
   }, [orgId]);
 
@@ -256,6 +265,10 @@ export function OrgSettingsPage() {
     setScimCopied(kind);
     setTimeout(() => setScimCopied(null), 2000);
   };
+
+  if (accessDenied) {
+    return <NotFoundPage />;
+  }
 
   if (!orgId) {
     return (

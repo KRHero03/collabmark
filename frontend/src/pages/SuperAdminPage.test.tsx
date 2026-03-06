@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, fireEvent, waitFor, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { SuperAdminPage } from "./SuperAdminPage";
 
 const mockList = vi.fn();
@@ -286,6 +287,25 @@ describe("SuperAdminPage", () => {
     await waitFor(() => {
       expect(mockAddToast).toHaveBeenCalledWith("Failed to load organizations", "error");
     });
+  });
+
+  it("renders NotFoundPage when API returns 403", async () => {
+    mockList.mockRejectedValueOnce({ response: { status: 403 } });
+
+    const { getByText, getByTestId, queryByTestId } = render(
+      <MemoryRouter>
+        <SuperAdminPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(getByText("404")).toBeInTheDocument();
+      expect(getByText("Page not found")).toBeInTheDocument();
+      expect(getByTestId("go-home-link")).toBeInTheDocument();
+    });
+
+    expect(queryByTestId("admin-dashboard")).not.toBeInTheDocument();
+    expect(mockAddToast).not.toHaveBeenCalled();
   });
 
   it("slug auto-generation from name", async () => {

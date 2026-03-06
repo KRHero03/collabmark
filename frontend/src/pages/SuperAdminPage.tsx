@@ -4,6 +4,7 @@ import { type Organization, type OrgMember, orgsApi } from "../lib/api";
 import { useToast } from "../hooks/useToast";
 import { formatDateShort } from "../lib/dateUtils";
 import { ToastContainer } from "../components/Home/ToastContainer";
+import { NotFoundPage } from "./NotFoundPage";
 
 const PLAN_OPTIONS = ["free", "pro", "enterprise"] as const;
 
@@ -18,6 +19,7 @@ function slugFromName(name: string): string {
 export function SuperAdminPage() {
   const [orgs, setOrgs] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingOrgId, setEditingOrgId] = useState<string | null>(null);
   const [expandedOrgId, setExpandedOrgId] = useState<string | null>(null);
@@ -44,6 +46,11 @@ export function SuperAdminPage() {
       const { data } = await orgsApi.list();
       setOrgs(data);
     } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        setAccessDenied(true);
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Failed to load organizations";
       addToast(msg, "error");
     } finally {
@@ -160,6 +167,10 @@ export function SuperAdminPage() {
       loadMembers(orgId);
     }
   };
+
+  if (accessDenied) {
+    return <NotFoundPage />;
+  }
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)] dark:bg-[var(--color-bg)]" data-testid="admin-dashboard">

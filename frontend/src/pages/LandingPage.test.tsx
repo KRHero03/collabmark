@@ -11,10 +11,13 @@ describe("LandingPage", () => {
     expect(getByText("Supercharged")).toBeInTheDocument();
   });
 
-  it("renders Google sign-in in navbar and SSOLoginFlow in hero/footer", () => {
-    const { getAllByPlaceholderText, getAllByTestId } = render(<LandingPage />);
-    const signInLinks = document.querySelectorAll('a[href="/api/auth/google/login"]');
-    expect(signInLinks.length).toBeGreaterThanOrEqual(1);
+  it("renders 'Sign In' link in navbar (no Google button) and SSOLoginFlow in hero/footer", () => {
+    const { getByText, getAllByPlaceholderText, getAllByTestId } = render(<LandingPage />);
+    expect(getByText("Sign In")).toBeInTheDocument();
+    expect(getByText("Sign In").closest("a")).toHaveAttribute("href", "#get-started");
+    const googleBtns = document.querySelectorAll('a[href="/api/auth/google/login"]');
+    const navGoogleBtns = Array.from(googleBtns).filter((el) => el.closest("nav") !== null);
+    expect(navGoogleBtns.length).toBe(0);
     const emailInputs = getAllByPlaceholderText("Enter your work email");
     expect(emailInputs.length).toBe(2);
     const continueBtns = getAllByTestId("sso-continue-btn");
