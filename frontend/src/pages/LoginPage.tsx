@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { FileText } from "lucide-react";
-import { SSOLoginFlow } from "../components/Auth/SSOLoginFlow";
+import { GoogleLoginButton } from "../components/Auth/GoogleLoginButton";
 
 export function LoginPage() {
   useEffect(() => {
@@ -19,7 +19,7 @@ export function LoginPage() {
           </p>
         </div>
         <div className="flex justify-center">
-          <SSOLoginFlow />
+          <GoogleLoginButton />
         </div>
       </div>
     </div>

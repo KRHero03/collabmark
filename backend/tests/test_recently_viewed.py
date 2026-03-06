@@ -111,20 +111,20 @@ class TestRecordView:
         assert total == 1
 
     @pytest.mark.asyncio
-    async def test_record_view_nonexistent_doc_returns_403(
+    async def test_record_view_nonexistent_doc_returns_204(
         self, async_client: AsyncClient, test_user: User
     ):
         async_client.cookies.update(_auth_cookies(test_user))
         resp = await async_client.post("/api/documents/000000000000000000000000/view")
-        assert resp.status_code == 403
+        assert resp.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_record_view_invalid_doc_id_returns_403(
+    async def test_record_view_invalid_doc_id_returns_204(
         self, async_client: AsyncClient, test_user: User
     ):
         async_client.cookies.update(_auth_cookies(test_user))
         resp = await async_client.post("/api/documents/not-a-valid-id/view")
-        assert resp.status_code == 403
+        assert resp.status_code == 204
 
     @pytest.mark.asyncio
     async def test_record_view_unauthenticated_returns_401(

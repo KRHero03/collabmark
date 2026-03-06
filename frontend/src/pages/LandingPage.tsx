@@ -14,7 +14,6 @@ import {
   Globe,
 } from "lucide-react";
 import { GoogleLoginButton } from "../components/Auth/GoogleLoginButton";
-import { SSOLoginFlow } from "../components/Auth/SSOLoginFlow";
 
 const FEATURES = [
   {
@@ -169,7 +168,7 @@ export function LandingPage() {
             className="animate-fade-in-up flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
             style={{ animationDelay: "0.5s" }}
           >
-            <SSOLoginFlow />
+            <GoogleLoginButton />
             <a
               href="/api-docs"
               className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-border)] px-8 py-4 text-base font-semibold transition hover:bg-[var(--color-hover)]"
@@ -374,9 +373,7 @@ export function LandingPage() {
             Free to use. No credit card required. Sign in and create your first
             document in seconds.
           </p>
-          <div className="flex justify-center">
-            <SSOLoginFlow />
-          </div>
+          <GoogleLoginButton />
         </div>
       </section>
 

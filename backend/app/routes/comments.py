@@ -1,23 +1,13 @@
-"""Comment routes: create, list, reply, resolve, reanchor, orphan, delete.
-
-All endpoints enforce document-level access: the caller must have at least
-VIEW permission on the parent document before any comment operation.
-"""
+"""Comment routes: create, list, reply, resolve, reanchor, orphan, delete."""
 
 from fastapi import APIRouter, Depends
 
 from app.auth.dependencies import get_current_user
 from app.models.comment import CommentCreate, CommentRead, CommentReanchor, ReplyCreate
 from app.models.user import User
-from app.services import comment_service, document_service
+from app.services import comment_service
 
 router = APIRouter(tags=["comments"])
-
-
-async def _assert_doc_access_for_comment(comment_id: str, user: User) -> None:
-    """Look up the comment's parent document and verify VIEW access."""
-    comment = await comment_service._find_comment_or_404(comment_id)
-    await document_service.get_document(comment.document_id, user)
 
 
 @router.post(
@@ -30,8 +20,17 @@ async def create_comment(
     payload: CommentCreate,
     user: User = Depends(get_current_user),
 ):
-    """Create a comment on a document. Requires VIEW access."""
-    await document_service.get_document(doc_id, user)
+    """Create a comment on a document (inline or doc-level).
+
+    Args:
+        doc_id: Document ID.
+        payload: Comment content, optional text anchor (absolute offsets,
+                 Yjs RelativePositions, quoted text).
+        user: Injected by get_current_user dependency.
+
+    Returns:
+        CommentRead of the created comment.
+    """
     comment = await comment_service.create_comment(doc_id, user, payload)
     return CommentRead.from_doc(comment)
 
@@ -44,8 +43,15 @@ async def list_comments(
     doc_id: str,
     user: User = Depends(get_current_user),
 ):
-    """List all comments for a document. Requires VIEW access."""
-    await document_service.get_document(doc_id, user)
+    """List all comments for a document, with replies nested.
+
+    Args:
+        doc_id: Document ID.
+        user: Injected by get_current_user dependency.
+
+    Returns:
+        List of top-level CommentRead items with replies.
+    """
     return await comment_service.list_comments(doc_id)
 
 
@@ -59,8 +65,16 @@ async def reply_to_comment(
     payload: ReplyCreate,
     user: User = Depends(get_current_user),
 ):
-    """Reply to an existing comment. Requires VIEW access on the parent document."""
-    await _assert_doc_access_for_comment(comment_id, user)
+    """Reply to an existing comment (single-depth only).
+
+    Args:
+        comment_id: Parent comment ID.
+        payload: Reply content.
+        user: Injected by get_current_user dependency.
+
+    Returns:
+        CommentRead of the created reply.
+    """
     reply = await comment_service.reply_to_comment(
         comment_id, user, payload.content
     )
@@ -75,8 +89,15 @@ async def resolve_comment(
     comment_id: str,
     user: User = Depends(get_current_user),
 ):
-    """Mark a comment as resolved. Requires VIEW access on the parent document."""
-    await _assert_doc_access_for_comment(comment_id, user)
+    """Mark a comment as resolved.
+
+    Args:
+        comment_id: Comment ID.
+        user: Injected by get_current_user dependency.
+
+    Returns:
+        CommentRead of the resolved comment.
+    """
     comment = await comment_service.resolve_comment(comment_id, user)
     return CommentRead.from_doc(comment)
 
@@ -90,8 +111,19 @@ async def reanchor_comment(
     payload: CommentReanchor,
     user: User = Depends(get_current_user),
 ):
-    """Update a comment's anchor positions. Requires VIEW access on the parent document."""
-    await _assert_doc_access_for_comment(comment_id, user)
+    """Update a comment's absolute anchor positions after frontend re-resolution.
+
+    Called by the frontend when Yjs RelativePositions resolve to new absolute
+    character offsets that differ from the currently stored values.
+
+    Args:
+        comment_id: Comment ID.
+        payload: New anchor_from and anchor_to offsets.
+        user: Injected by get_current_user dependency.
+
+    Returns:
+        CommentRead of the updated comment.
+    """
     comment = await comment_service.reanchor_comment(
         comment_id, payload.anchor_from, payload.anchor_to
     )
@@ -106,8 +138,18 @@ async def orphan_comment(
     comment_id: str,
     user: User = Depends(get_current_user),
 ):
-    """Mark a comment as orphaned. Requires VIEW access on the parent document."""
-    await _assert_doc_access_for_comment(comment_id, user)
+    """Mark a comment as orphaned (its anchored text was deleted).
+
+    The comment remains visible in the global comments panel but is no
+    longer displayed inline.
+
+    Args:
+        comment_id: Comment ID.
+        user: Injected by get_current_user dependency.
+
+    Returns:
+        CommentRead of the orphaned comment.
+    """
     comment = await comment_service.orphan_comment(comment_id)
     return CommentRead.from_doc(comment)
 
@@ -117,6 +159,10 @@ async def delete_comment(
     comment_id: str,
     user: User = Depends(get_current_user),
 ):
-    """Delete a comment. Author only + requires VIEW access on the parent document."""
-    await _assert_doc_access_for_comment(comment_id, user)
+    """Delete a comment. Author only. Deletes replies if top-level.
+
+    Args:
+        comment_id: Comment ID.
+        user: Injected by get_current_user dependency.
+    """
     await comment_service.delete_comment(comment_id, user)

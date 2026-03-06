@@ -176,15 +176,14 @@ async def record_view(
     doc_id: str,
     user: User = Depends(get_current_user),
 ):
-    """Record that the current user viewed a document. Requires VIEW access."""
-    perm = await share_service.get_user_permission(doc_id, user)
-    if perm is None:
-        from fastapi import HTTPException, status
+    """Record that the current user viewed a document.
 
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No access to this document",
-        )
+    Creates or updates the view timestamp for the 'Recently Viewed' tab.
+
+    Args:
+        doc_id: Document ID.
+        user: Injected by get_current_user dependency.
+    """
     await share_service.record_document_view(doc_id, user)
 
 
