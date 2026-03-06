@@ -196,13 +196,14 @@ _USER_SCHEMA_ATTRIBUTES = [
         "subAttributes": [
             {
                 "name": "value",
-                "type": "reference",
+                "type": "string",
                 "multiValued": False,
                 "required": False,
                 "caseExact": False,
                 "mutability": "readWrite",
                 "returned": "default",
                 "uniqueness": "none",
+                "description": "URL of the photo.",
             },
             {
                 "name": "type",
