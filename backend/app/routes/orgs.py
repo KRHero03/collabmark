@@ -1,15 +1,18 @@
-"""Organization management routes: CRUD, membership, and SSO configuration.
+"""Organization management routes: CRUD, membership, SSO, and SCIM token management.
 
 Super admin routes require the user's email to be in SUPER_ADMIN_EMAILS.
 Org admin routes require the user to be an admin of the target organization.
 Member routes only require the user to belong to the target organization.
 """
 
+import secrets
+
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 
 from app.auth.dependencies import get_current_user, get_org_admin_user, get_super_admin_user
+from app.auth.scim_auth import hash_scim_token
 from app.models.org_sso_config import OrgSSOConfig, OrgSSOConfigRead, OrgSSOConfigUpdate
 from app.models.organization import (
     AddMemberPayload,
@@ -258,3 +261,63 @@ async def update_sso_config(
         await cfg.save()
 
     return OrgSSOConfigRead.from_doc(cfg)
+
+
+# ---------------------------------------------------------------------------
+# SCIM token management (org admin)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{org_id}/scim/token", status_code=201)
+async def generate_scim_token(
+    org_id: str,
+    user: User = Depends(get_org_admin_user),
+):
+    """Generate a new SCIM bearer token for the organization.
+
+    The plaintext token is returned exactly once.  Only the SHA-256 hash
+    is stored in the database.  Generating a new token invalidates any
+    previous token.
+
+    Returns:
+        JSON with ``token`` (plaintext, one-time display) and ``scim_enabled``.
+    """
+    await org_service.get_org(org_id)
+
+    cfg = await OrgSSOConfig.find_one(OrgSSOConfig.org_id == org_id)
+    if cfg is None:
+        cfg = OrgSSOConfig(org_id=org_id)
+
+    plaintext = secrets.token_urlsafe(48)
+    cfg.scim_bearer_token = hash_scim_token(plaintext)
+    cfg.scim_enabled = True
+    cfg.touch()
+
+    if cfg.id is None:
+        await cfg.insert()
+    else:
+        await cfg.save()
+
+    return {"token": plaintext, "scim_enabled": True}
+
+
+@router.delete("/{org_id}/scim/token", status_code=204)
+async def revoke_scim_token(
+    org_id: str,
+    user: User = Depends(get_org_admin_user),
+):
+    """Revoke the SCIM bearer token and disable SCIM provisioning.
+
+    Clears the stored token hash and sets ``scim_enabled=False``.
+    """
+    cfg = await OrgSSOConfig.find_one(OrgSSOConfig.org_id == org_id)
+    if cfg is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="SSO configuration not found",
+        )
+
+    cfg.scim_bearer_token = None
+    cfg.scim_enabled = False
+    cfg.touch()
+    await cfg.save()

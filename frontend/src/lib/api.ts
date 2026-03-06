@@ -351,6 +351,8 @@ export const orgsApi = {
   removeMember: (orgId: string, userId: string) => api.delete(`/orgs/${orgId}/members/${userId}`),
   getSSOConfig: (orgId: string) => api.get<OrgSSOConfig | null>(`/orgs/${orgId}/sso`),
   updateSSOConfig: (orgId: string, data: Record<string, unknown>) => api.put<OrgSSOConfig>(`/orgs/${orgId}/sso`, data),
+  generateScimToken: (orgId: string) => api.post<{ token: string; scim_enabled: boolean }>(`/orgs/${orgId}/scim/token`),
+  revokeScimToken: (orgId: string) => api.delete(`/orgs/${orgId}/scim/token`),
 };
 
 export default api;

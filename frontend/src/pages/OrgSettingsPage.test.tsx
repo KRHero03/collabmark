@@ -15,6 +15,8 @@ const { mockOrgsApi, mockUseAuth, mockParams } = vi.hoisted(() => {
       updateMemberRole: vi.fn(),
       removeMember: vi.fn(),
       updateSSOConfig: vi.fn(),
+      generateScimToken: vi.fn(),
+      revokeScimToken: vi.fn(),
     },
     mockUseAuth: vi.fn(),
     mockParams: params,
@@ -717,6 +719,203 @@ describe("OrgSettingsPage", () => {
       });
 
       mockParams.orgId = "org-123";
+    });
+  });
+
+  describe("15. SSO tab: SCIM provisioning section", () => {
+    it("renders SCIM section in SSO tab", async () => {
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+
+      expect(getByTestId("scim-section")).toBeInTheDocument();
+      expect(getByText("SCIM Provisioning")).toBeInTheDocument();
+      expect(getByTestId("scim-endpoint-url")).toBeInTheDocument();
+    });
+
+    it("shows Inactive status when SCIM is disabled", async () => {
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+
+      expect(getByTestId("scim-status")).toBeInTheDocument();
+      expect(getByText("Inactive")).toBeInTheDocument();
+    });
+
+    it("shows Active status when SCIM is enabled", async () => {
+      mockOrgsApi.getSSOConfig.mockResolvedValue({
+        data: { ...mockSSOConfig, scim_enabled: true },
+      });
+
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+
+      expect(getByText("Active")).toBeInTheDocument();
+    });
+
+    it("shows SCIM endpoint URL with current origin", async () => {
+      const { getByTestId } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+
+      const urlInput = getByTestId("scim-endpoint-url") as HTMLInputElement;
+      expect(urlInput.value).toContain("/scim/v2/Users");
+    });
+
+    it("shows Generate Token button when SCIM is inactive", async () => {
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+
+      expect(getByTestId("generate-scim-token")).toBeInTheDocument();
+      expect(getByText("Generate Token")).toBeInTheDocument();
+    });
+
+    it("shows Regenerate Token and Revoke buttons when SCIM is active", async () => {
+      mockOrgsApi.getSSOConfig.mockResolvedValue({
+        data: { ...mockSSOConfig, scim_enabled: true },
+      });
+
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+
+      expect(getByText("Regenerate Token")).toBeInTheDocument();
+      expect(getByTestId("revoke-scim-token")).toBeInTheDocument();
+    });
+  });
+
+  describe("16. SSO tab: SCIM generate token", () => {
+    it("generates token and shows it once", async () => {
+      mockOrgsApi.generateScimToken.mockResolvedValue({
+        data: { token: "scim-secret-token-abc123", scim_enabled: true },
+      });
+
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+      fireEvent.click(getByTestId("generate-scim-token"));
+
+      await waitFor(() => {
+        expect(mockOrgsApi.generateScimToken).toHaveBeenCalledWith("org-123");
+      });
+
+      expect(getByText("SCIM token generated")).toBeInTheDocument();
+      expect(getByTestId("scim-token-display")).toBeInTheDocument();
+      expect(getByText("scim-secret-token-abc123")).toBeInTheDocument();
+    });
+
+    it("shows error toast when generation fails", async () => {
+      mockOrgsApi.generateScimToken.mockRejectedValue(new Error("Failed"));
+
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+      fireEvent.click(getByTestId("generate-scim-token"));
+
+      await waitFor(() => {
+        expect(getByText("Failed to generate SCIM token")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("17. SSO tab: SCIM revoke token", () => {
+    it("revokes token and updates status", async () => {
+      mockOrgsApi.getSSOConfig.mockResolvedValue({
+        data: { ...mockSSOConfig, scim_enabled: true },
+      });
+      mockOrgsApi.revokeScimToken.mockResolvedValue(undefined);
+
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+      fireEvent.click(getByTestId("revoke-scim-token"));
+
+      await waitFor(() => {
+        expect(mockOrgsApi.revokeScimToken).toHaveBeenCalledWith("org-123");
+      });
+
+      expect(getByText("SCIM token revoked")).toBeInTheDocument();
+      expect(getByText("Inactive")).toBeInTheDocument();
+    });
+
+    it("shows error toast when revoke fails", async () => {
+      mockOrgsApi.getSSOConfig.mockResolvedValue({
+        data: { ...mockSSOConfig, scim_enabled: true },
+      });
+      mockOrgsApi.revokeScimToken.mockRejectedValue(new Error("Failed"));
+
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+      fireEvent.click(getByTestId("revoke-scim-token"));
+
+      await waitFor(() => {
+        expect(getByText("Failed to revoke SCIM token")).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("18. SSO tab: SCIM copy buttons", () => {
+    it("copies SCIM endpoint URL", async () => {
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText: writeTextMock } });
+
+      const { getByTestId, getByText } = renderPage();
+
+      await waitFor(() => {
+        expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
+      });
+
+      fireEvent.click(getByTestId("tab-sso"));
+      fireEvent.click(getByTestId("copy-scim-url"));
+
+      expect(writeTextMock).toHaveBeenCalledWith(expect.stringContaining("/scim/v2/Users"));
+
+      await waitFor(() => {
+        expect(getByText("Copied!")).toBeInTheDocument();
+      });
     });
   });
 });

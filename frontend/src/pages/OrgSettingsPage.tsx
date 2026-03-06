@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router";
 import {
   CheckCircle,
+  ClipboardCopy,
   Key,
   Loader2,
   Mail,
+  RefreshCw,
   Save,
   Settings,
   Shield,
@@ -64,6 +66,13 @@ export function OrgSettingsPage() {
   const [oidcClientSecret, setOidcClientSecret] = useState("");
   const [savingSso, setSavingSso] = useState(false);
 
+  // SCIM
+  const [scimEnabled, setScimEnabled] = useState(false);
+  const [scimToken, setScimToken] = useState<string | null>(null);
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [revokingToken, setRevokingToken] = useState(false);
+  const [scimCopied, setScimCopied] = useState<"url" | "token" | null>(null);
+
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
@@ -99,6 +108,7 @@ export function OrgSettingsPage() {
           setSpAcsUrl(data.sp_acs_url || "");
           setOidcDiscoveryUrl(data.oidc_discovery_url || "");
           setOidcClientId(data.oidc_client_id || "");
+          setScimEnabled(data.scim_enabled);
         }
       }),
     ])
@@ -203,6 +213,48 @@ export function OrgSettingsPage() {
     } finally {
       setSavingSso(false);
     }
+  };
+
+  const handleGenerateScimToken = async () => {
+    if (!orgId || generatingToken) return;
+    setGeneratingToken(true);
+    try {
+      const { data } = await orgsApi.generateScimToken(orgId);
+      setScimToken(data.token);
+      setScimEnabled(true);
+      if (ssoConfig) {
+        setSsoConfig({ ...ssoConfig, scim_enabled: true });
+      }
+      showToast("success", "SCIM token generated");
+    } catch {
+      showToast("error", "Failed to generate SCIM token");
+    } finally {
+      setGeneratingToken(false);
+    }
+  };
+
+  const handleRevokeScimToken = async () => {
+    if (!orgId || revokingToken) return;
+    setRevokingToken(true);
+    try {
+      await orgsApi.revokeScimToken(orgId);
+      setScimToken(null);
+      setScimEnabled(false);
+      if (ssoConfig) {
+        setSsoConfig({ ...ssoConfig, scim_enabled: false });
+      }
+      showToast("success", "SCIM token revoked");
+    } catch {
+      showToast("error", "Failed to revoke SCIM token");
+    } finally {
+      setRevokingToken(false);
+    }
+  };
+
+  const handleCopyScim = (text: string, kind: "url" | "token") => {
+    navigator.clipboard.writeText(text);
+    setScimCopied(kind);
+    setTimeout(() => setScimCopied(null), 2000);
   };
 
   if (!orgId) {
@@ -606,6 +658,109 @@ export function OrgSettingsPage() {
                   Save Configuration
                 </button>
               </form>
+
+              <hr className="border-[var(--color-border)]" />
+
+              <div data-testid="scim-section">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[var(--color-text)]">SCIM Provisioning</h3>
+                    <p className="mt-1 text-sm text-[var(--color-text-muted)]">
+                      Automatically sync users from your identity provider
+                    </p>
+                  </div>
+                  <span
+                    data-testid="scim-status"
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                      scimEnabled
+                        ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400"
+                    }`}
+                  >
+                    {scimEnabled ? (
+                      <>
+                        <CheckCircle className="h-3.5 w-3.5" />
+                        Active
+                      </>
+                    ) : (
+                      "Inactive"
+                    )}
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-[var(--color-text)]">SCIM Endpoint URL</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        data-testid="scim-endpoint-url"
+                        value={`${window.location.origin}/scim/v2/Users`}
+                        className="flex-1 rounded-md border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 font-mono text-sm text-[var(--color-text-muted)]"
+                      />
+                      <button
+                        data-testid="copy-scim-url"
+                        onClick={() => handleCopyScim(`${window.location.origin}/scim/v2/Users`, "url")}
+                        className="inline-flex items-center gap-1 rounded-md border border-[var(--color-border)] px-3 py-2 text-sm text-[var(--color-text-muted)] hover:bg-[var(--color-bg)] hover:text-[var(--color-text)]"
+                      >
+                        <ClipboardCopy className="h-4 w-4" />
+                        {scimCopied === "url" ? "Copied!" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {scimToken && (
+                    <div
+                      data-testid="scim-token-display"
+                      className="rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-700 dark:bg-amber-900/20"
+                    >
+                      <p className="mb-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+                        Copy this token now -- it will not be shown again.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <code className="flex-1 rounded bg-white px-3 py-2 font-mono text-sm text-amber-900 dark:bg-gray-900 dark:text-amber-200">
+                          {scimToken}
+                        </code>
+                        <button
+                          data-testid="copy-scim-token"
+                          onClick={() => handleCopyScim(scimToken, "token")}
+                          className="inline-flex items-center gap-1 rounded-md border border-amber-400 px-3 py-2 text-sm text-amber-800 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-200 dark:hover:bg-amber-900/40"
+                        >
+                          <ClipboardCopy className="h-4 w-4" />
+                          {scimCopied === "token" ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <button
+                      data-testid="generate-scim-token"
+                      onClick={handleGenerateScimToken}
+                      disabled={generatingToken}
+                      className="inline-flex items-center gap-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                    >
+                      {generatingToken ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      {scimEnabled ? "Regenerate Token" : "Generate Token"}
+                    </button>
+                    {scimEnabled && (
+                      <button
+                        data-testid="revoke-scim-token"
+                        onClick={handleRevokeScimToken}
+                        disabled={revokingToken}
+                        className="inline-flex items-center gap-2 rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        {revokingToken ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        Revoke Token
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -168,6 +168,7 @@ vi.mock("../components/Editor/EditorToolbar", () => ({
     onExportMd?: () => void;
     onExportPdf?: () => void;
     readOnly?: boolean;
+    presentationMode?: boolean;
   }) => (
     <div data-testid="editor-toolbar">
       <input
@@ -190,9 +191,14 @@ vi.mock("../components/Editor/EditorToolbar", () => ({
           Comments
         </button>
       )}
-      {props.onPresentation && (
+      {props.onPresentation && !props.presentationMode && (
         <button data-testid="presentation-btn" onClick={props.onPresentation}>
           Present
+        </button>
+      )}
+      {props.presentationMode && props.onPresentation && (
+        <button data-testid="exit-presentation-btn" onClick={props.onPresentation}>
+          Exit Presentation
         </button>
       )}
       {props.onExportMd && (

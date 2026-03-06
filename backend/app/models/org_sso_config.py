@@ -107,3 +107,4 @@ class OrgSSOConfigUpdate(BaseModel):
     oidc_discovery_url: Optional[str] = None
     oidc_client_id: Optional[str] = None
     oidc_client_secret: Optional[str] = None
+    scim_enabled: Optional[bool] = None

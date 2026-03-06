@@ -196,6 +196,20 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - 13 new backend org tests (invite, role change, my org endpoint)
   - 18 SuperAdminPage frontend tests, 28 OrgSettingsPage frontend tests
 
+- **SSO Phase 5**: SCIM 2.0 Provisioning
+  - Backend: `scim_auth.py` with SHA-256 bearer token authentication (per-org token lookup)
+  - Backend: `scim_service.py` with full SCIM user lifecycle (create, list, get, update/PATCH, deactivate)
+  - Backend: `scim.py` routes at `/scim/v2/Users` (POST, GET, GET/:id, PATCH/:id, DELETE/:id)
+  - Backend: SCIM schema mapping (`urn:ietf:params:scim:schemas:core:2.0:User`) supporting userName, displayName, name, emails, photos, active
+  - Backend: SCIM filter support (`userName eq "..."`) and pagination (`startIndex`, `count`)
+  - Backend: Token management routes in `orgs.py`: `POST /api/orgs/{org_id}/scim/token` (generate) and `DELETE /api/orgs/{org_id}/scim/token` (revoke)
+  - Backend: `OrgSSOConfigUpdate` extended with `scim_enabled` field
+  - Backend: SCIM DELETE deactivates user (removes org membership) but preserves User document for ownership
+  - Frontend: SCIM section in `OrgSettingsPage` SSO tab (endpoint URL, generate/revoke token, active status)
+  - Frontend: `orgsApi.generateScimToken()` and `orgsApi.revokeScimToken()` API methods
+  - 82 new backend tests (13 auth, 34 service, 35 route), 11 new frontend tests
+  - All responses use `application/scim+json` content type per RFC 7644
+
 - **Code Quality & Tooling Phase**: Lint, Format, Build Integration
   - Backend: ruff (linter + formatter) with comprehensive rule set (pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, bugbear, simplify, bandit security, print, pie, return, type-checking, pathlib)
   - Backend: pyproject.toml with ruff config and pytest config (asyncio_mode, warning suppression)
@@ -209,7 +223,7 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - Backend: pytest-xdist installed for parallel test option, pytest-cov for coverage
   - Backend: ruff added to requirements.txt
 
-**Total: 641 backend tests, 860 frontend tests (48 test files), all passing.**
+**Total: 723 backend tests, 871 frontend tests (49 test files), all passing.**
 
 ## Tech Stack
 
@@ -237,7 +251,7 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 collabmark/
   backend/           # Python FastAPI application
     app/
-      auth/          # OAuth, JWT, API key, SSO (SAML/OIDC) auth
+      auth/          # OAuth, JWT, API key, SSO (SAML/OIDC), SCIM auth
       models/        # Beanie document models
         user.py, document.py, api_key.py, share_link.py,
         document_version.py, document_view.py, comment.py,
@@ -245,10 +259,11 @@ collabmark/
       routes/        # REST API endpoints
         auth.py, documents.py, keys.py, sharing.py,
         versions.py, comments.py, export.py, users.py,
-        folders.py, ws.py
+        folders.py, orgs.py, scim.py, ws.py
       services/      # Business logic layer
         document_service.py, share_service.py, version_service.py,
-        comment_service.py, folder_service.py, org_service.py, acl_service.py, crdt_store.py
+        comment_service.py, folder_service.py, org_service.py,
+        scim_service.py, acl_service.py, crdt_store.py
       utils/         # Shared utility functions
         owner_resolver.py  # Centralized user owner info resolution
       ws/            # WebSocket handler (pycrdt rooms)
@@ -376,6 +391,15 @@ collabmark/
 - `DELETE /api/orgs/{org_id}/members/{user_id}` -- remove member (org admin)
 - `GET /api/orgs/{org_id}/sso` -- get SSO config (org admin)
 - `PUT /api/orgs/{org_id}/sso` -- create/update SSO config (org admin)
+- `POST /api/orgs/{org_id}/scim/token` -- generate SCIM bearer token (org admin)
+- `DELETE /api/orgs/{org_id}/scim/token` -- revoke SCIM bearer token (org admin)
+
+### SCIM 2.0 Provisioning (bearer token auth)
+- `POST /scim/v2/Users` -- provision a new user in the org
+- `GET /scim/v2/Users` -- list/filter users (supports `filter`, `startIndex`, `count`)
+- `GET /scim/v2/Users/{user_id}` -- get user by ID
+- `PATCH /scim/v2/Users/{user_id}` -- update user attributes (RFC 7644 PATCH or direct)
+- `DELETE /scim/v2/Users/{user_id}` -- deactivate user (remove org membership)
 
 ### Frontend Pages
 - `/` -- Home page (Files browser, shared docs, recently viewed, trash)
@@ -448,6 +472,15 @@ OIDC uses authlib for discovery, authorization, and token exchange. Shared
 `SSOCallbackResult` dataclass normalizes both flows before `find_or_create_sso_user`.
 Google OAuth remains as the default for personal (non-org) users. SSO users get
 `auth_provider="saml"|"oidc"` and `org_id` set on their User document.
+
+### SCIM 2.0 Provisioning
+Enterprise IdPs (Okta, Azure AD, Keycloak) use SCIM to auto-provision and
+deprovision users. Routes live at `/scim/v2/Users` with bearer token auth.
+Tokens are SHA-256 hashed before storage in `OrgSSOConfig.scim_bearer_token`;
+the org is resolved by matching the hash (no org_id in the URL). Supports
+RFC 7644 PATCH operations and Azure AD-style direct attribute replacement.
+SCIM DELETE deactivates (removes membership) rather than hard-deleting users
+to preserve document ownership. SCIM-provisioned users get `auth_provider="scim"`.
 
 ### CRDT over OT
 CRDTs allow decentralized conflict resolution without a central arbiter.

@@ -83,6 +83,7 @@ export function EditorToolbar({
         </div>
         <button
           onClick={onPresentation}
+          data-testid="exit-presentation-btn"
           className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-black/5 dark:hover:bg-white/10"
         >
           <Minimize2 className="h-4 w-4" />

@@ -537,13 +537,6 @@ ${previewEl.innerHTML}
       {presentationMode ? (
         <div className="relative flex-1 overflow-auto">
           <div className="relative mx-auto max-w-4xl px-8 py-10">
-            <button
-              onClick={() => setPresentationMode(false)}
-              className="absolute right-4 top-4 rounded-md bg-gray-200 px-3 py-1 text-sm hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600"
-              data-testid="exit-presentation-btn"
-            >
-              Exit
-            </button>
             {previewStale && (
               <button
                 onClick={flushPreview}

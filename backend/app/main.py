@@ -28,7 +28,7 @@ from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization, OrgMembership
 from app.models.share_link import DocumentAccess, ShareLink
 from app.models.user import User
-from app.routes import auth, comments, documents, folders, keys, orgs, sharing, users, versions, ws
+from app.routes import auth, comments, documents, folders, keys, orgs, scim, sharing, users, versions, ws
 from app.services.crdt_store import MongoYStore
 from app.ws.handler import start_websocket_server, stop_websocket_server
 
@@ -97,6 +97,7 @@ app.include_router(folders.router)
 app.include_router(keys.router)
 app.include_router(comments.router)
 app.include_router(orgs.router)
+app.include_router(scim.router)
 app.include_router(ws.router)
 
 
