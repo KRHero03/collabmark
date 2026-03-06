@@ -54,6 +54,7 @@ async def create_document(owner: User, payload: DocumentCreate) -> Document_:
         owner_id=str(owner.id),
         folder_id=payload.folder_id,
         root_folder_id=root_folder_id,
+        org_id=owner.org_id,
     )
     await doc.insert()
     return doc

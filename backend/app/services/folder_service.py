@@ -42,6 +42,7 @@ async def create_folder(owner: User, payload: FolderCreate) -> Folder:
         owner_id=str(owner.id),
         parent_id=payload.parent_id,
         root_folder_id=root_folder_id,
+        org_id=owner.org_id,
     )
     await folder.insert()
 
