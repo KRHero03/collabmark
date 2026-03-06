@@ -271,23 +271,13 @@ export function OrgSettingsPage() {
   }
 
   if (!orgId) {
-    return (
-      <div className="min-h-screen bg-[var(--color-bg)]">
-        <Navbar />
-        <main className="mx-auto max-w-4xl px-6 py-8">
-          <p className="text-[var(--color-text-muted)]">Organization not found.</p>
-        </main>
-      </div>
-    );
+    return <NotFoundPage />;
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--color-bg)]">
-        <Navbar />
-        <main className="flex min-h-[60vh] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-[var(--color-primary)]" />
-        </main>
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-text-muted)]" />
       </div>
     );
   }

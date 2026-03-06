@@ -706,16 +706,18 @@ describe("OrgSettingsPage", () => {
       });
     });
 
-    it("shows Organization not found when orgId is missing", async () => {
+    it("shows NotFoundPage when orgId is missing", async () => {
       mockParams.orgId = undefined;
-      const { getByText } = render(
+      const { getByText, getByTestId } = render(
         <MemoryRouter>
           <OrgSettingsPage />
         </MemoryRouter>,
       );
 
       await waitFor(() => {
-        expect(getByText("Organization not found.")).toBeInTheDocument();
+        expect(getByText("404")).toBeInTheDocument();
+        expect(getByText("Page not found")).toBeInTheDocument();
+        expect(getByTestId("go-home-link")).toBeInTheDocument();
       });
 
       mockParams.orgId = "org-123";

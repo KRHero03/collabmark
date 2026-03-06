@@ -29,6 +29,7 @@ import { documentsApi, sharingApi, versionsApi, type GeneralAccess, type Permiss
 import { useYjsProvider } from "../hooks/useYjsProvider";
 import { useAuth } from "../hooks/useAuth";
 import { useComments } from "../hooks/useComments";
+import { NotFoundPage } from "./NotFoundPage";
 import { useCommentAnchors } from "../hooks/useCommentAnchors";
 import { useCommentPositions } from "../hooks/useCommentPositions";
 import { useToast } from "../hooks/useToast";
@@ -497,13 +498,7 @@ ${previewEl.innerHTML}
   }
 
   if (loadError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="rounded-lg border border-red-200 bg-red-50 px-6 py-4 text-red-800" data-testid="load-error">
-          {loadError}
-        </div>
-      </div>
-    );
+    return <NotFoundPage />;
   }
 
   return (

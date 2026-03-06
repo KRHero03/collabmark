@@ -172,6 +172,14 @@ export function SuperAdminPage() {
     return <NotFoundPage />;
   }
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg)]">
+        <Loader2 className="h-8 w-8 animate-spin text-[var(--color-text-muted)]" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[var(--color-bg)] dark:bg-[var(--color-bg)]" data-testid="admin-dashboard">
       <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">

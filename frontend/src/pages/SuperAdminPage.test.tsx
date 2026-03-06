@@ -84,13 +84,12 @@ describe("SuperAdminPage", () => {
     expect(getByText("Create Organization")).toBeInTheDocument();
   });
 
-  it("shows loading state while orgs are fetching", () => {
+  it("shows generic loading spinner while orgs are fetching (no admin UI visible)", () => {
     mockList.mockImplementation(() => new Promise(() => {}));
 
-    const { getByTestId, container } = render(<SuperAdminPage />);
+    const { queryByTestId, container } = render(<SuperAdminPage />);
 
-    expect(getByTestId("admin-dashboard")).toBeInTheDocument();
-    expect(getByTestId("org-list")).toBeInTheDocument();
+    expect(queryByTestId("admin-dashboard")).not.toBeInTheDocument();
     const spinner = container.querySelector(".animate-spin");
     expect(spinner).toBeInTheDocument();
   });

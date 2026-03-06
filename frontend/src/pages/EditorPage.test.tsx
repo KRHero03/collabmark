@@ -668,33 +668,35 @@ describe("EditorPage", () => {
   });
 
   describe("Document not found (404)", () => {
-    it("shows error when documentsApi.get rejects with 404", async () => {
+    it("shows NotFoundPage when documentsApi.get rejects with 404", async () => {
       const err = new Error("Not found") as Error & { response?: { status?: number } };
       err.response = { status: 404 };
       mockDocumentsGet.mockRejectedValue(err);
       mockSharingGetPermission.mockRejectedValue(err);
 
-      const { getByTestId } = render(<EditorPage />);
+      const { getByText, getByTestId } = render(<EditorPage />);
 
       await waitFor(() => {
-        expect(getByTestId("load-error")).toBeInTheDocument();
-        expect(getByTestId("load-error")).toHaveTextContent("Document not found");
+        expect(getByText("404")).toBeInTheDocument();
+        expect(getByText("Page not found")).toBeInTheDocument();
+        expect(getByTestId("go-home-link")).toBeInTheDocument();
       });
     });
   });
 
   describe("Permission denied (403)", () => {
-    it("shows error when documentsApi.get rejects with 403", async () => {
+    it("shows NotFoundPage when documentsApi.get rejects with 403", async () => {
       const err = new Error("Forbidden") as Error & { response?: { status?: number } };
       err.response = { status: 403 };
       mockDocumentsGet.mockRejectedValue(err);
       mockSharingGetPermission.mockRejectedValue(err);
 
-      const { getByTestId } = render(<EditorPage />);
+      const { getByText, getByTestId } = render(<EditorPage />);
 
       await waitFor(() => {
-        expect(getByTestId("load-error")).toBeInTheDocument();
-        expect(getByTestId("load-error")).toHaveTextContent("Permission denied");
+        expect(getByText("404")).toBeInTheDocument();
+        expect(getByText("Page not found")).toBeInTheDocument();
+        expect(getByTestId("go-home-link")).toBeInTheDocument();
       });
     });
 
@@ -958,15 +960,16 @@ describe("EditorPage", () => {
   });
 
   describe("Generic load error", () => {
-    it("shows generic error when API rejects without 404/403", async () => {
+    it("shows NotFoundPage when API rejects without 404/403", async () => {
       mockDocumentsGet.mockRejectedValue(new Error("Network error"));
       mockSharingGetPermission.mockRejectedValue(new Error("Network error"));
 
-      const { getByTestId } = render(<EditorPage />);
+      const { getByText, getByTestId } = render(<EditorPage />);
 
       await waitFor(() => {
-        expect(getByTestId("load-error")).toBeInTheDocument();
-        expect(getByTestId("load-error")).toHaveTextContent("Failed to load document");
+        expect(getByText("404")).toBeInTheDocument();
+        expect(getByText("Page not found")).toBeInTheDocument();
+        expect(getByTestId("go-home-link")).toBeInTheDocument();
       });
     });
   });
