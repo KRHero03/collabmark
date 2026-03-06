@@ -6,7 +6,7 @@ import pytest
 from app.auth.scim_auth import get_scim_org, hash_scim_token
 from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization
-from fastapi import HTTPException
+from app.services.scim_service import SCIMError
 
 
 def _mock_request(token: str | None = None) -> MagicMock:
@@ -41,7 +41,7 @@ class TestGetScimOrg:
     @pytest.mark.asyncio
     async def test_missing_auth_header_returns_401(self):
         req = _mock_request(token=None)
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await get_scim_org(req)
         assert exc_info.value.status_code == 401
         assert "authorization" in exc_info.value.detail.lower()
@@ -50,7 +50,7 @@ class TestGetScimOrg:
     async def test_malformed_auth_header_returns_401(self):
         req = MagicMock()
         req.headers = {"Authorization": "Basic dXNlcjpwYXNz"}
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await get_scim_org(req)
         assert exc_info.value.status_code == 401
 
@@ -58,7 +58,7 @@ class TestGetScimOrg:
     async def test_empty_bearer_token_returns_401(self):
         req = MagicMock()
         req.headers = {"Authorization": "Bearer "}
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await get_scim_org(req)
         assert exc_info.value.status_code == 401
         assert "empty" in exc_info.value.detail.lower()
@@ -66,7 +66,7 @@ class TestGetScimOrg:
     @pytest.mark.asyncio
     async def test_invalid_token_returns_401(self):
         req = _mock_request("completely-invalid-token")
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await get_scim_org(req)
         assert exc_info.value.status_code == 401
         assert "invalid" in exc_info.value.detail.lower()
@@ -84,7 +84,7 @@ class TestGetScimOrg:
         await cfg.insert()
 
         req = _mock_request(token)
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await get_scim_org(req)
         assert exc_info.value.status_code == 403
         assert "disabled" in exc_info.value.detail.lower()
@@ -124,7 +124,7 @@ class TestGetScimOrg:
         await cfg.save()
 
         req = _mock_request(token)
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await get_scim_org(req)
         assert exc_info.value.status_code == 401
 
@@ -139,7 +139,7 @@ class TestGetScimOrg:
         await cfg.insert()
 
         req = _mock_request("orphan-token")
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await get_scim_org(req)
         assert exc_info.value.status_code == 401
         assert "not found" in exc_info.value.detail.lower()
@@ -157,6 +157,6 @@ class TestGetScimOrg:
         await cfg.insert()
 
         req = _mock_request("wrong-token")
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await get_scim_org(req)
         assert exc_info.value.status_code == 401

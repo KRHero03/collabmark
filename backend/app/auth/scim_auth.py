@@ -10,10 +10,11 @@ import hashlib
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
-from fastapi import HTTPException, Request, status
+from fastapi import Request
 
 from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization
+from app.services.scim_service import SCIMError
 
 
 def hash_scim_token(token: str) -> str:
@@ -34,44 +35,29 @@ async def get_scim_org(request: Request) -> tuple[Organization, OrgSSOConfig]:
     Extracts the ``Authorization: Bearer <token>`` header, hashes the token,
     and looks up the matching ``OrgSSOConfig`` with ``scim_enabled=True``.
 
-    Args:
-        request: The incoming HTTP request.
-
     Returns:
         A tuple of (Organization, OrgSSOConfig) for the authenticated org.
 
     Raises:
-        HTTPException: 401 if the token is missing or invalid.
-        HTTPException: 403 if SCIM is disabled for the matched org.
+        SCIMError: 401 if the token is missing or invalid.
+        SCIMError: 403 if SCIM is disabled for the matched org.
     """
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or malformed Authorization header",
-        )
+        raise SCIMError(401, "Missing or malformed Authorization header")
 
     token = auth_header[len("Bearer ") :]
     if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Bearer token is empty",
-        )
+        raise SCIMError(401, "Bearer token is empty")
 
     token_hash = hash_scim_token(token)
 
     cfg = await OrgSSOConfig.find_one(OrgSSOConfig.scim_bearer_token == token_hash)
     if cfg is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid SCIM bearer token",
-        )
+        raise SCIMError(401, "Invalid SCIM bearer token")
 
     if not cfg.scim_enabled:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="SCIM provisioning is disabled for this organization",
-        )
+        raise SCIMError(403, "SCIM provisioning is disabled for this organization")
 
     try:
         org = await Organization.get(PydanticObjectId(cfg.org_id))
@@ -79,9 +65,6 @@ async def get_scim_org(request: Request) -> tuple[Organization, OrgSSOConfig]:
         org = None
 
     if org is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Organization not found for SCIM token",
-        )
+        raise SCIMError(401, "Organization not found for SCIM token")
 
     return org, cfg

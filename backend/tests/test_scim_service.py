@@ -4,7 +4,7 @@ import pytest
 from app.models.organization import Organization, OrgMembership, OrgRole
 from app.models.user import User
 from app.services import scim_service
-from fastapi import HTTPException
+from app.services.scim_service import SCIMError
 
 
 @pytest.fixture
@@ -12,6 +12,11 @@ async def scim_org() -> Organization:
     org = Organization(name="SCIM Test Org", slug="scim-test-org")
     await org.insert()
     return org
+
+
+# ---------------------------------------------------------------------------
+# scim_to_user_fields
+# ---------------------------------------------------------------------------
 
 
 class TestScimToUserFields:
@@ -72,7 +77,7 @@ class TestScimToUserFields:
 
     def test_missing_email_raises_400(self):
         resource = {"displayName": "No Email"}
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             scim_service.scim_to_user_fields(resource)
         assert exc_info.value.status_code == 400
 
@@ -84,6 +89,21 @@ class TestScimToUserFields:
         }
         fields = scim_service.scim_to_user_fields(resource)
         assert fields["email"] == "fallback@acme.com"
+
+    def test_extracts_external_id(self):
+        resource = {"userName": "ext@acme.com", "displayName": "Ext", "externalId": "ext-123"}
+        fields = scim_service.scim_to_user_fields(resource)
+        assert fields["external_id"] == "ext-123"
+
+    def test_no_external_id_when_absent(self):
+        resource = {"userName": "noext@acme.com", "displayName": "NoExt"}
+        fields = scim_service.scim_to_user_fields(resource)
+        assert "external_id" not in fields
+
+
+# ---------------------------------------------------------------------------
+# user_to_scim
+# ---------------------------------------------------------------------------
 
 
 class TestUserToScim:
@@ -119,6 +139,75 @@ class TestUserToScim:
         resource = scim_service.user_to_scim(user, str(scim_org.id))
         assert resource["active"] is False
 
+    @pytest.mark.asyncio
+    async def test_external_id_in_response(self, scim_org):
+        user = User(
+            email="extid@acme.com",
+            name="ExtId User",
+            org_id=str(scim_org.id),
+            auth_provider="scim",
+            external_id="ext-456",
+        )
+        await user.insert()
+        resource = scim_service.user_to_scim(user, str(scim_org.id))
+        assert resource["externalId"] == "ext-456"
+
+    @pytest.mark.asyncio
+    async def test_no_external_id_when_none(self, scim_org):
+        user = User(
+            email="noextid@acme.com",
+            name="NoExtId",
+            org_id=str(scim_org.id),
+            auth_provider="scim",
+        )
+        await user.insert()
+        resource = scim_service.user_to_scim(user, str(scim_org.id))
+        assert "externalId" not in resource
+
+
+# ---------------------------------------------------------------------------
+# filter_scim_attributes
+# ---------------------------------------------------------------------------
+
+
+class TestFilterScimAttributes:
+    def test_returns_all_when_no_params(self):
+        resource = {"schemas": ["x"], "id": "1", "userName": "a@b.com", "displayName": "A"}
+        assert scim_service.filter_scim_attributes(resource) == resource
+
+    def test_attributes_includes_requested_plus_always(self):
+        resource = {"schemas": ["x"], "id": "1", "userName": "a@b.com", "displayName": "A", "active": True}
+        result = scim_service.filter_scim_attributes(resource, attributes="userName")
+        assert "schemas" in result
+        assert "id" in result
+        assert "userName" in result
+        assert "displayName" not in result
+        assert "active" not in result
+
+    def test_excluded_attributes_removes_requested(self):
+        resource = {"schemas": ["x"], "id": "1", "userName": "a@b.com", "displayName": "A"}
+        result = scim_service.filter_scim_attributes(resource, excluded_attributes="displayName")
+        assert "schemas" in result
+        assert "id" in result
+        assert "userName" in result
+        assert "displayName" not in result
+
+    def test_excluded_cannot_remove_always_returned(self):
+        resource = {"schemas": ["x"], "id": "1", "userName": "a@b.com"}
+        result = scim_service.filter_scim_attributes(resource, excluded_attributes="schemas,id")
+        assert "schemas" in result
+        assert "id" in result
+
+    def test_attributes_overrides_excluded(self):
+        resource = {"schemas": ["x"], "id": "1", "userName": "a@b.com", "displayName": "A"}
+        result = scim_service.filter_scim_attributes(resource, attributes="userName", excluded_attributes="userName")
+        assert "userName" in result
+
+
+# ---------------------------------------------------------------------------
+# create_scim_user
+# ---------------------------------------------------------------------------
+
 
 class TestCreateScimUser:
     @pytest.mark.asyncio
@@ -139,13 +228,20 @@ class TestCreateScimUser:
         assert membership.role == OrgRole.MEMBER
 
     @pytest.mark.asyncio
+    async def test_creates_user_with_external_id(self, scim_org):
+        resource = {"userName": "ext-new@acme.com", "displayName": "Ext New", "externalId": "idp-789"}
+        user = await scim_service.create_scim_user(str(scim_org.id), resource)
+        assert user.external_id == "idp-789"
+
+    @pytest.mark.asyncio
     async def test_duplicate_email_in_same_org_returns_409(self, scim_org):
         resource = {"userName": "dup@acme.com", "displayName": "Dup User"}
         await scim_service.create_scim_user(str(scim_org.id), resource)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await scim_service.create_scim_user(str(scim_org.id), resource)
         assert exc_info.value.status_code == 409
+        assert exc_info.value.scim_type == "uniqueness"
         assert "already exists" in exc_info.value.detail.lower()
 
     @pytest.mark.asyncio
@@ -156,16 +252,21 @@ class TestCreateScimUser:
         resource = {"userName": "cross@acme.com", "displayName": "Cross User"}
         await scim_service.create_scim_user(str(scim_org.id), resource)
 
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await scim_service.create_scim_user(str(other_org.id), resource)
         assert exc_info.value.status_code == 409
 
     @pytest.mark.asyncio
     async def test_missing_email_returns_400(self, scim_org):
         resource = {"displayName": "No Email User"}
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await scim_service.create_scim_user(str(scim_org.id), resource)
         assert exc_info.value.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# list_scim_users
+# ---------------------------------------------------------------------------
 
 
 class TestListScimUsers:
@@ -237,6 +338,93 @@ class TestListScimUsers:
         assert result["totalResults"] == 1
         assert result["Resources"][0]["userName"] == "my-org-user@acme.com"
 
+    @pytest.mark.asyncio
+    async def test_list_with_attributes_filter(self, scim_org):
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "attr@acme.com", "displayName": "Attr"})
+        result = await scim_service.list_scim_users(str(scim_org.id), attributes="userName")
+        r = result["Resources"][0]
+        assert "userName" in r
+        assert "schemas" in r
+        assert "id" in r
+        assert "displayName" not in r
+
+    @pytest.mark.asyncio
+    async def test_list_with_excluded_attributes(self, scim_org):
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "excl@acme.com", "displayName": "Excl"})
+        result = await scim_service.list_scim_users(str(scim_org.id), excluded_attributes="displayName,photos")
+        r = result["Resources"][0]
+        assert "userName" in r
+        assert "displayName" not in r
+        assert "photos" not in r
+
+
+# ---------------------------------------------------------------------------
+# Filter operators (ne, co, sw, ew, pr)
+# ---------------------------------------------------------------------------
+
+
+class TestFilterOperators:
+    @pytest.mark.asyncio
+    async def test_ne_filter(self, scim_org):
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "ne1@acme.com", "displayName": "NE1"})
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "ne2@acme.com", "displayName": "NE2"})
+        result = await scim_service.list_scim_users(str(scim_org.id), filter_str='userName ne "ne1@acme.com"')
+        assert result["totalResults"] == 1
+        assert result["Resources"][0]["userName"] == "ne2@acme.com"
+
+    @pytest.mark.asyncio
+    async def test_co_filter(self, scim_org):
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "alice-co@acme.com", "displayName": "Alice"})
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "bob-co@acme.com", "displayName": "Bob"})
+        result = await scim_service.list_scim_users(str(scim_org.id), filter_str='userName co "alice"')
+        assert result["totalResults"] == 1
+        assert result["Resources"][0]["userName"] == "alice-co@acme.com"
+
+    @pytest.mark.asyncio
+    async def test_sw_filter(self, scim_org):
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "sw-test@acme.com", "displayName": "SW"})
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "other-sw@acme.com", "displayName": "Other"})
+        result = await scim_service.list_scim_users(str(scim_org.id), filter_str='userName sw "sw-"')
+        assert result["totalResults"] == 1
+
+    @pytest.mark.asyncio
+    async def test_ew_filter(self, scim_org):
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "test@ends.com", "displayName": "Ends"})
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "test@other.com", "displayName": "Other"})
+        result = await scim_service.list_scim_users(str(scim_org.id), filter_str='userName ew "ends.com"')
+        assert result["totalResults"] == 1
+        assert result["Resources"][0]["userName"] == "test@ends.com"
+
+    @pytest.mark.asyncio
+    async def test_pr_filter(self, scim_org):
+        await scim_service.create_scim_user(
+            str(scim_org.id),
+            {"userName": "has-ext@acme.com", "displayName": "HasExt", "externalId": "ext-pr"},
+        )
+        await scim_service.create_scim_user(str(scim_org.id), {"userName": "no-ext@acme.com", "displayName": "NoExt"})
+        result = await scim_service.list_scim_users(str(scim_org.id), filter_str="externalId pr")
+        assert result["totalResults"] == 1
+        assert result["Resources"][0]["userName"] == "has-ext@acme.com"
+
+    @pytest.mark.asyncio
+    async def test_unsupported_operator_raises_invalid_filter(self, scim_org):
+        with pytest.raises(SCIMError) as exc_info:
+            await scim_service.list_scim_users(str(scim_org.id), filter_str='userName gt "abc"')
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.scim_type == "invalidFilter"
+
+    @pytest.mark.asyncio
+    async def test_malformed_filter_raises_invalid_filter(self, scim_org):
+        with pytest.raises(SCIMError) as exc_info:
+            await scim_service.list_scim_users(str(scim_org.id), filter_str="garbage input")
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.scim_type == "invalidFilter"
+
+
+# ---------------------------------------------------------------------------
+# get_scim_user
+# ---------------------------------------------------------------------------
+
 
 class TestGetScimUser:
     @pytest.mark.asyncio
@@ -249,13 +437,13 @@ class TestGetScimUser:
 
     @pytest.mark.asyncio
     async def test_not_found_returns_404(self, scim_org):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await scim_service.get_scim_user(str(scim_org.id), "000000000000000000000000")
         assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
     async def test_invalid_id_returns_404(self, scim_org):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await scim_service.get_scim_user(str(scim_org.id), "bad-id")
         assert exc_info.value.status_code == 404
 
@@ -266,9 +454,71 @@ class TestGetScimUser:
         created = await scim_service.create_scim_user(
             str(other_org.id), {"userName": "wrong-org@acme.com", "displayName": "Wrong Org"}
         )
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await scim_service.get_scim_user(str(scim_org.id), str(created.id))
         assert exc_info.value.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# replace_scim_user (PUT)
+# ---------------------------------------------------------------------------
+
+
+class TestReplaceScimUser:
+    @pytest.mark.asyncio
+    async def test_replaces_all_fields(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id),
+            {"userName": "put-original@acme.com", "displayName": "Original", "externalId": "ext-orig"},
+        )
+        replaced = await scim_service.replace_scim_user(
+            str(scim_org.id),
+            str(created.id),
+            {"userName": "put-replaced@acme.com", "displayName": "Replaced", "externalId": "ext-new"},
+        )
+        assert replaced.email == "put-replaced@acme.com"
+        assert replaced.name == "Replaced"
+        assert replaced.external_id == "ext-new"
+
+    @pytest.mark.asyncio
+    async def test_omitted_readwrite_attrs_are_cleared(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id),
+            {"userName": "put-clear@acme.com", "displayName": "Clear", "externalId": "ext-clear"},
+        )
+        replaced = await scim_service.replace_scim_user(
+            str(scim_org.id),
+            str(created.id),
+            {"userName": "put-clear@acme.com", "displayName": "Still"},
+        )
+        assert replaced.external_id is None
+
+    @pytest.mark.asyncio
+    async def test_put_nonexistent_returns_404(self, scim_org):
+        with pytest.raises(SCIMError) as exc_info:
+            await scim_service.replace_scim_user(
+                str(scim_org.id),
+                "000000000000000000000000",
+                {"userName": "ghost@acme.com", "displayName": "Ghost"},
+            )
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_put_preserves_org_id(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id), {"userName": "put-org@acme.com", "displayName": "Org"}
+        )
+        replaced = await scim_service.replace_scim_user(
+            str(scim_org.id),
+            str(created.id),
+            {"userName": "put-org-new@acme.com", "displayName": "OrgNew"},
+        )
+        assert replaced.org_id == str(scim_org.id)
+
+
+# ---------------------------------------------------------------------------
+# update_scim_user (PATCH)
+# ---------------------------------------------------------------------------
 
 
 class TestUpdateScimUser:
@@ -331,13 +581,115 @@ class TestUpdateScimUser:
 
     @pytest.mark.asyncio
     async def test_update_nonexistent_user_returns_404(self, scim_org):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await scim_service.update_scim_user(
                 str(scim_org.id),
                 "000000000000000000000000",
                 {"displayName": "Ghost"},
             )
         assert exc_info.value.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_patch_replace_external_id(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id), {"userName": "patch-ext@acme.com", "displayName": "PatchExt"}
+        )
+        updated = await scim_service.update_scim_user(
+            str(scim_org.id),
+            str(created.id),
+            {"Operations": [{"op": "replace", "path": "externalId", "value": "ext-patched"}]},
+        )
+        assert updated.external_id == "ext-patched"
+
+
+# ---------------------------------------------------------------------------
+# PATCH add and remove operations
+# ---------------------------------------------------------------------------
+
+
+class TestPatchAddRemove:
+    @pytest.mark.asyncio
+    async def test_add_sets_single_valued_attribute(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id), {"userName": "add-test@acme.com", "displayName": "AddTest"}
+        )
+        updated = await scim_service.update_scim_user(
+            str(scim_org.id),
+            str(created.id),
+            {"Operations": [{"op": "add", "path": "externalId", "value": "add-ext"}]},
+        )
+        assert updated.external_id == "add-ext"
+
+    @pytest.mark.asyncio
+    async def test_add_without_path_applies_value_dict(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id), {"userName": "add-nopath@acme.com", "displayName": "AddNoPath"}
+        )
+        updated = await scim_service.update_scim_user(
+            str(scim_org.id),
+            str(created.id),
+            {"Operations": [{"op": "add", "value": {"displayName": "NewName", "externalId": "new-ext"}}]},
+        )
+        assert updated.name == "NewName"
+        assert updated.external_id == "new-ext"
+
+    @pytest.mark.asyncio
+    async def test_remove_clears_optional_attribute(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id),
+            {"userName": "rm-test@acme.com", "displayName": "RmTest", "externalId": "rm-ext"},
+        )
+        updated = await scim_service.update_scim_user(
+            str(scim_org.id),
+            str(created.id),
+            {"Operations": [{"op": "remove", "path": "externalId"}]},
+        )
+        assert updated.external_id is None
+
+    @pytest.mark.asyncio
+    async def test_remove_required_attribute_raises_mutability(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id), {"userName": "rm-req@acme.com", "displayName": "RmReq"}
+        )
+        with pytest.raises(SCIMError) as exc_info:
+            await scim_service.update_scim_user(
+                str(scim_org.id),
+                str(created.id),
+                {"Operations": [{"op": "remove", "path": "userName"}]},
+            )
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.scim_type == "mutability"
+
+    @pytest.mark.asyncio
+    async def test_remove_without_path_raises_no_target(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id), {"userName": "rm-nopath@acme.com", "displayName": "RmNoPath"}
+        )
+        with pytest.raises(SCIMError) as exc_info:
+            await scim_service.update_scim_user(
+                str(scim_org.id),
+                str(created.id),
+                {"Operations": [{"op": "remove"}]},
+            )
+        assert exc_info.value.status_code == 400
+        assert exc_info.value.scim_type == "noTarget"
+
+    @pytest.mark.asyncio
+    async def test_remove_display_name_clears_to_empty(self, scim_org):
+        created = await scim_service.create_scim_user(
+            str(scim_org.id), {"userName": "rm-dn@acme.com", "displayName": "ToRemove"}
+        )
+        updated = await scim_service.update_scim_user(
+            str(scim_org.id),
+            str(created.id),
+            {"Operations": [{"op": "remove", "path": "displayName"}]},
+        )
+        assert updated.name == ""
+
+
+# ---------------------------------------------------------------------------
+# delete_scim_user
+# ---------------------------------------------------------------------------
 
 
 class TestDeleteScimUser:
@@ -359,7 +711,7 @@ class TestDeleteScimUser:
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent_user_returns_404(self, scim_org):
-        with pytest.raises(HTTPException) as exc_info:
+        with pytest.raises(SCIMError) as exc_info:
             await scim_service.delete_scim_user(str(scim_org.id), "000000000000000000000000")
         assert exc_info.value.status_code == 404
 
@@ -376,31 +728,27 @@ class TestDeleteScimUser:
         assert user.email == "preserved@acme.com"
 
 
-class TestParseScimFilter:
-    def test_parses_username_eq_filter(self):
-        result = scim_service._parse_scim_filter('userName eq "alice@acme.com"')
-        assert result == ("userName", "alice@acme.com")
-
-    def test_parses_case_insensitive_eq(self):
-        result = scim_service._parse_scim_filter('userName EQ "bob@acme.com"')
-        assert result == ("userName", "bob@acme.com")
-
-    def test_returns_none_for_unsupported_operator(self):
-        result = scim_service._parse_scim_filter('userName co "acme"')
-        assert result is None
-
-    def test_returns_none_for_malformed_filter(self):
-        result = scim_service._parse_scim_filter("garbage input")
-        assert result is None
-
-    def test_returns_none_for_empty_string(self):
-        result = scim_service._parse_scim_filter("")
-        assert result is None
+# ---------------------------------------------------------------------------
+# SCIMError
+# ---------------------------------------------------------------------------
 
 
-class TestScimError:
-    def test_builds_error_dict(self):
-        err = scim_service.scim_error(409, "User already exists")
-        assert err["schemas"] == [scim_service.SCIM_ERROR_SCHEMA]
-        assert err["status"] == "409"
-        assert err["detail"] == "User already exists"
+class TestSCIMError:
+    def test_builds_error_dict_without_scim_type(self):
+        err = SCIMError(404, "Not found")
+        d = err.to_dict()
+        assert d["schemas"] == [scim_service.SCIM_ERROR_SCHEMA]
+        assert d["status"] == "404"
+        assert d["detail"] == "Not found"
+        assert "scimType" not in d
+
+    def test_builds_error_dict_with_scim_type(self):
+        err = SCIMError(409, "User already exists", scim_type="uniqueness")
+        d = err.to_dict()
+        assert d["scimType"] == "uniqueness"
+        assert d["status"] == "409"
+
+    def test_is_exception(self):
+        err = SCIMError(400, "bad")
+        assert isinstance(err, Exception)
+        assert str(err) == "bad"

@@ -98,6 +98,7 @@ app.include_router(keys.router)
 app.include_router(comments.router)
 app.include_router(orgs.router)
 app.include_router(scim.router)
+scim.register_scim_error_handler(app)
 app.include_router(ws.router)
 
 
