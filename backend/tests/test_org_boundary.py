@@ -9,21 +9,18 @@ Covers:
 """
 
 import pytest
-import pytest_asyncio
-from unittest.mock import patch, AsyncMock
-
-from app.models.document import Document_, GeneralAccess
-from app.models.folder import Folder, FolderAccess
+from app.models.document import Document_
+from app.models.folder import Folder
+from app.models.organization import Organization
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
-from app.models.organization import Organization, OrgMembership, OrgRole
-from app.services import acl_service, share_service, folder_service
+from app.services import acl_service, folder_service, share_service
 from app.services.acl_service import org_allows_general_access
-
 
 # ---------------------------------------------------------------------------
 # Unit tests for org_allows_general_access
 # ---------------------------------------------------------------------------
+
 
 class TestOrgAllowsGeneralAccess:
     def test_both_none_returns_true(self):
@@ -45,6 +42,7 @@ class TestOrgAllowsGeneralAccess:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 async def _create_org(slug: str) -> Organization:
     org = Organization(name=f"Org {slug}", slug=slug, verified_domains=[f"{slug}.com"])
@@ -78,7 +76,9 @@ async def _create_doc(owner: User, ga: str = "restricted", org_id: str | None = 
     return doc
 
 
-async def _create_folder(owner: User, ga: str = "restricted", org_id: str | None = None, parent_id: str | None = None) -> Folder:
+async def _create_folder(
+    owner: User, ga: str = "restricted", org_id: str | None = None, parent_id: str | None = None
+) -> Folder:
     folder = Folder(
         name="Test Folder",
         owner_id=str(owner.id),
@@ -95,6 +95,7 @@ async def _create_folder(owner: User, ga: str = "restricted", org_id: str | None
 # ---------------------------------------------------------------------------
 # ACL service: general_access scoped to same org
 # ---------------------------------------------------------------------------
+
 
 class TestAclServiceOrgBoundary:
     @pytest.mark.asyncio
@@ -192,6 +193,7 @@ class TestAclServiceOrgBoundary:
 # ACL service: folders with org boundary
 # ---------------------------------------------------------------------------
 
+
 class TestAclServiceFolderOrgBoundary:
     @pytest.mark.asyncio
     async def test_org_folder_anyone_view_same_org(self):
@@ -252,6 +254,7 @@ class TestAclServiceFolderOrgBoundary:
 # Cross-org sharing blocked
 # ---------------------------------------------------------------------------
 
+
 class TestCrossOrgSharingBlocked:
     @pytest.mark.asyncio
     async def test_add_doc_collaborator_cross_org_raises_403(self):
@@ -262,10 +265,9 @@ class TestCrossOrgSharingBlocked:
         doc = await _create_doc(owner, ga="restricted", org_id=str(org_a.id))
 
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
-            await share_service.add_collaborator(
-                str(doc.id), owner, outsider.email, Permission.VIEW
-            )
+            await share_service.add_collaborator(str(doc.id), owner, outsider.email, Permission.VIEW)
         assert exc_info.value.status_code == 403
         assert "outside your organization" in exc_info.value.detail
 
@@ -277,9 +279,7 @@ class TestCrossOrgSharingBlocked:
         recipient = await _create_user("r@sc.com", org_id=str(org.id))
         doc = await _create_doc(owner, ga="restricted", org_id=None)
 
-        access = await share_service.add_collaborator(
-            str(doc.id), owner, recipient.email, Permission.VIEW
-        )
+        access = await share_service.add_collaborator(str(doc.id), owner, recipient.email, Permission.VIEW)
         assert access.permission == Permission.VIEW
 
     @pytest.mark.asyncio
@@ -289,9 +289,7 @@ class TestCrossOrgSharingBlocked:
         peer = await _create_user("peer@sd.com", org_id=str(org.id))
         doc = await _create_doc(owner, ga="restricted", org_id=str(org.id))
 
-        access = await share_service.add_collaborator(
-            str(doc.id), owner, peer.email, Permission.EDIT
-        )
+        access = await share_service.add_collaborator(str(doc.id), owner, peer.email, Permission.EDIT)
         assert access.permission == Permission.EDIT
 
     @pytest.mark.asyncio
@@ -303,10 +301,9 @@ class TestCrossOrgSharingBlocked:
         folder = await _create_folder(owner, ga="restricted", org_id=str(org_a.id))
 
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
-            await folder_service.add_folder_collaborator(
-                str(folder.id), owner, outsider.email, Permission.VIEW
-            )
+            await folder_service.add_folder_collaborator(str(folder.id), owner, outsider.email, Permission.VIEW)
         assert exc_info.value.status_code == 403
         assert "outside your organization" in exc_info.value.detail
 
@@ -317,9 +314,7 @@ class TestCrossOrgSharingBlocked:
         peer = await _create_user("peer@fsc.com", org_id=str(org.id))
         folder = await _create_folder(owner, ga="restricted", org_id=str(org.id))
 
-        access = await folder_service.add_folder_collaborator(
-            str(folder.id), owner, peer.email, Permission.VIEW
-        )
+        access = await folder_service.add_folder_collaborator(str(folder.id), owner, peer.email, Permission.VIEW)
         assert access.permission == Permission.VIEW
 
     @pytest.mark.asyncio
@@ -329,15 +324,14 @@ class TestCrossOrgSharingBlocked:
         recipient = await _create_user("r@fsd.com", org_id=str(org.id))
         folder = await _create_folder(owner, ga="restricted", org_id=None)
 
-        access = await folder_service.add_folder_collaborator(
-            str(folder.id), owner, recipient.email, Permission.EDIT
-        )
+        access = await folder_service.add_folder_collaborator(str(folder.id), owner, recipient.email, Permission.EDIT)
         assert access.permission == Permission.EDIT
 
 
 # ---------------------------------------------------------------------------
 # resolve_effective_permission with org boundary
 # ---------------------------------------------------------------------------
+
 
 class TestResolveEffectivePermissionOrgBoundary:
     @pytest.mark.asyncio
@@ -390,6 +384,7 @@ class TestResolveEffectivePermissionOrgBoundary:
 # ---------------------------------------------------------------------------
 # document_service._assert_access with org boundary
 # ---------------------------------------------------------------------------
+
 
 class TestDocumentServiceOrgBoundary:
     @pytest.mark.asyncio

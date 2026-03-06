@@ -17,15 +17,7 @@ function getInitials(name: string): string {
     .join("");
 }
 
-function Avatar({
-  user,
-  size = 32,
-  className = "",
-}: {
-  user: PresenceUser;
-  size?: number;
-  className?: string;
-}) {
+function Avatar({ user, size = 32, className = "" }: { user: PresenceUser; size?: number; className?: string }) {
   const [imgFailed, setImgFailed] = useState(false);
 
   if (user.avatarUrl && !imgFailed) {
@@ -74,15 +66,10 @@ export function PresenceAvatars({ users, currentUserName, currentUserAvatar }: P
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const remotePeers = currentUserName
-    ? users.filter((u) => u.name !== currentUserName)
-    : users;
+  const remotePeers = currentUserName ? users.filter((u) => u.name !== currentUserName) : users;
 
   const allUsers: PresenceUser[] = currentUserName
-    ? [
-        { name: `${currentUserName} (you)`, avatarUrl: currentUserAvatar ?? null, color: "#3b82f6" },
-        ...remotePeers,
-      ]
+    ? [{ name: `${currentUserName} (you)`, avatarUrl: currentUserAvatar ?? null, color: "#3b82f6" }, ...remotePeers]
     : remotePeers;
 
   const totalCount = allUsers.length;
@@ -101,12 +88,7 @@ export function PresenceAvatars({ users, currentUserName, currentUserAvatar }: P
         aria-label={`${totalCount} active user${totalCount !== 1 ? "s" : ""}`}
       >
         {visible.map((u) => (
-          <Avatar
-            key={u.name}
-            user={u}
-            size={28}
-            className=""
-          />
+          <Avatar key={u.name} user={u} size={28} className="" />
         ))}
         {overflow > 0 && (
           <span className="relative z-10 inline-flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gray-200 text-[10px] font-bold text-gray-700 dark:border-gray-900 dark:bg-gray-700 dark:text-gray-200">
@@ -129,14 +111,9 @@ export function PresenceAvatars({ users, currentUserName, currentUserAvatar }: P
             </span>
           </div>
           {allUsers.map((u) => (
-            <div
-              key={u.name}
-              className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 dark:hover:bg-white/10"
-            >
+            <div key={u.name} className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 dark:hover:bg-white/10">
               <Avatar user={u} size={24} />
-              <span className="min-w-0 truncate text-sm text-[var(--color-text)]">
-                {u.name}
-              </span>
+              <span className="min-w-0 truncate text-sm text-[var(--color-text)]">{u.name}</span>
               <span
                 className="ml-auto h-2 w-2 flex-shrink-0 rounded-full"
                 style={{ backgroundColor: "#22c55e" }}

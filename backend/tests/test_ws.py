@@ -5,12 +5,11 @@ unauthenticated) for the WebSocket endpoint, and verifies the
 FastAPIWebsocketAdapter interface.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+import pytest
+from app.ws.handler import CollabWebsocketServer, FastAPIWebsocketAdapter
 from fastapi import WebSocketDisconnect
-
-from app.ws.handler import FastAPIWebsocketAdapter, CollabWebsocketServer
 
 
 class TestFastAPIWebsocketAdapter:
@@ -85,8 +84,8 @@ class TestCollabWebsocketServer:
     @pytest.mark.asyncio
     async def test_get_room_creates_room_with_store(self):
         """get_room() should create a YRoom with a MongoYStore attached."""
-        from mongomock_motor import AsyncMongoMockClient
         from app.services.crdt_store import MongoYStore
+        from mongomock_motor import AsyncMongoMockClient
 
         client = AsyncMongoMockClient()
         MongoYStore.set_database(client["test_ws_server"])
@@ -103,8 +102,8 @@ class TestCollabWebsocketServer:
     @pytest.mark.asyncio
     async def test_get_room_returns_same_room_for_same_name(self):
         """Calling get_room twice with the same name should return the same instance."""
-        from mongomock_motor import AsyncMongoMockClient
         from app.services.crdt_store import MongoYStore
+        from mongomock_motor import AsyncMongoMockClient
 
         client = AsyncMongoMockClient()
         MongoYStore.set_database(client["test_ws_server2"])
@@ -119,8 +118,8 @@ class TestCollabWebsocketServer:
     @pytest.mark.asyncio
     async def test_different_room_names_create_different_rooms(self):
         """Different document IDs should produce different rooms."""
-        from mongomock_motor import AsyncMongoMockClient
         from app.services.crdt_store import MongoYStore
+        from mongomock_motor import AsyncMongoMockClient
 
         client = AsyncMongoMockClient()
         MongoYStore.set_database(client["test_ws_server3"])

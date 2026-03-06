@@ -12,9 +12,7 @@ from app.models.user import User
 logger = logging.getLogger(__name__)
 
 
-async def create_comment(
-    doc_id: str, user: User, payload: CommentCreate
-) -> Comment:
+async def create_comment(doc_id: str, user: User, payload: CommentCreate) -> Comment:
     """Create a new comment (inline or doc-level) on a document.
 
     Args:
@@ -42,9 +40,7 @@ async def create_comment(
     return comment
 
 
-async def reply_to_comment(
-    comment_id: str, user: User, content: str
-) -> Comment:
+async def reply_to_comment(comment_id: str, user: User, content: str) -> Comment:
     """Reply to an existing comment (single-depth only).
 
     Args:
@@ -88,25 +84,24 @@ async def list_comments(doc_id: str) -> list[CommentRead]:
         List of top-level CommentRead items with replies populated.
         Orphaned comments are included (frontend filters by is_orphaned).
     """
-    all_comments = await Comment.find(
-        Comment.document_id == doc_id,
-    ).sort("created_at").to_list()
+    all_comments = (
+        await Comment.find(
+            Comment.document_id == doc_id,
+        )
+        .sort("created_at")
+        .to_list()
+    )
 
     top_level = []
     replies_map: dict[str, list[CommentRead]] = {}
 
     for c in all_comments:
         if c.parent_id:
-            replies_map.setdefault(c.parent_id, []).append(
-                CommentRead.from_doc(c)
-            )
+            replies_map.setdefault(c.parent_id, []).append(CommentRead.from_doc(c))
         else:
             top_level.append(c)
 
-    return [
-        CommentRead.from_doc(c, replies=replies_map.get(str(c.id), []))
-        for c in top_level
-    ]
+    return [CommentRead.from_doc(c, replies=replies_map.get(str(c.id), [])) for c in top_level]
 
 
 async def resolve_comment(comment_id: str, user: User) -> Comment:
@@ -128,9 +123,7 @@ async def resolve_comment(comment_id: str, user: User) -> Comment:
     return comment
 
 
-async def reanchor_comment(
-    comment_id: str, anchor_from: int, anchor_to: int
-) -> Comment:
+async def reanchor_comment(comment_id: str, anchor_from: int, anchor_to: int) -> Comment:
     """Update a comment's absolute anchor offsets after frontend re-resolution.
 
     Called by the frontend when Yjs RelativePositions are resolved to new

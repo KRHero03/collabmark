@@ -26,9 +26,7 @@ export function usePresence(awareness: Awareness | null): PresenceUser[] {
 
     awareness.getStates().forEach((state, clientId) => {
       if (clientId === localId) return;
-      const u = state.user as
-        | { name?: string; avatarUrl?: string | null; color?: string }
-        | undefined;
+      const u = state.user as { name?: string; avatarUrl?: string | null; color?: string } | undefined;
       if (!u?.name) return;
 
       if (!seen.has(u.name)) {

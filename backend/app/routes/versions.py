@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
 from app.models.document_version import (
@@ -18,8 +18,8 @@ router = APIRouter(prefix="/api/documents", tags=["versions"])
 class SnapshotCreate(BaseModel):
     """Payload for manually creating a version snapshot."""
 
-    content: str
-    summary: str = ""
+    content: str = Field(..., max_length=10_000_000)
+    summary: str = Field(default="", max_length=500)
 
 
 @router.post(
@@ -38,9 +38,7 @@ async def create_version(
     (deduplication). Otherwise returns 201 with the new version.
     """
     await document_service.get_document(doc_id, user)
-    version = await version_service.save_snapshot(
-        doc_id, user, payload.content, payload.summary
-    )
+    version = await version_service.save_snapshot(doc_id, user, payload.content, payload.summary)
     if version is None:
         return JSONResponse(status_code=204, content=None)
     return DocumentVersionRead.from_doc(version)

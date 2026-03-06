@@ -5,12 +5,11 @@ a different user who has NO permission.  The expected result is always 403.
 """
 
 import pytest
-from httpx import AsyncClient
-
 from app.auth.jwt import create_access_token
 from app.models.comment import Comment
 from app.models.document import Document_
 from app.models.user import User
+from httpx import AsyncClient
 
 
 def _cookies(user: User) -> dict[str, str]:
@@ -44,6 +43,7 @@ async def _make_comment(doc: Document_, author: User) -> Comment:
 
 
 # ---- Unauthenticated access (no JWT cookie at all) ----
+
 
 class TestUnauthenticatedAccess:
     """All protected endpoints must return 401 when no credentials are provided."""
@@ -118,13 +118,12 @@ class TestUnauthenticatedAccess:
 
 # ---- Unauthorized (foreign user) access on VERSIONS ----
 
+
 class TestVersionsUnauthorizedAccess:
     """A user with no access to a document must get 403 on all version endpoints."""
 
     @pytest.mark.asyncio
-    async def test_create_version_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_create_version_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-v1", "stranger-v@test.com", "Stranger")
         doc = await _make_doc(test_user)
 
@@ -136,9 +135,7 @@ class TestVersionsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_list_versions_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_list_versions_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-v2", "stranger-vl@test.com", "Stranger")
         doc = await _make_doc(test_user)
 
@@ -147,9 +144,7 @@ class TestVersionsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_get_version_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_get_version_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-v3", "stranger-vg@test.com", "Stranger")
         doc = await _make_doc(test_user)
 
@@ -166,9 +161,7 @@ class TestVersionsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_owner_can_access_versions(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_owner_can_access_versions(self, async_client: AsyncClient, test_user: User):
         """Sanity check: the document owner CAN access all version endpoints."""
         doc = await _make_doc(test_user)
         async_client.cookies.update(_cookies(test_user))
@@ -190,13 +183,12 @@ class TestVersionsUnauthorizedAccess:
 
 # ---- Unauthorized (foreign user) access on COMMENTS ----
 
+
 class TestCommentsUnauthorizedAccess:
     """A user with no access to a document must get 403 on all comment endpoints."""
 
     @pytest.mark.asyncio
-    async def test_create_comment_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_create_comment_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-c1", "stranger-c1@test.com", "Stranger")
         doc = await _make_doc(test_user)
 
@@ -208,9 +200,7 @@ class TestCommentsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_list_comments_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_list_comments_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-c2", "stranger-c2@test.com", "Stranger")
         doc = await _make_doc(test_user)
 
@@ -219,9 +209,7 @@ class TestCommentsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_reply_to_comment_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_reply_to_comment_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-c3", "stranger-c3@test.com", "Stranger")
         doc = await _make_doc(test_user)
         comment = await _make_comment(doc, test_user)
@@ -234,9 +222,7 @@ class TestCommentsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_resolve_comment_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_resolve_comment_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-c4", "stranger-c4@test.com", "Stranger")
         doc = await _make_doc(test_user)
         comment = await _make_comment(doc, test_user)
@@ -246,9 +232,7 @@ class TestCommentsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_reanchor_comment_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_reanchor_comment_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-c5", "stranger-c5@test.com", "Stranger")
         doc = await _make_doc(test_user)
         comment = await _make_comment(doc, test_user)
@@ -261,9 +245,7 @@ class TestCommentsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_orphan_comment_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_orphan_comment_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-c6", "stranger-c6@test.com", "Stranger")
         doc = await _make_doc(test_user)
         comment = await _make_comment(doc, test_user)
@@ -273,9 +255,7 @@ class TestCommentsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_delete_comment_forbidden_no_doc_access(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_delete_comment_forbidden_no_doc_access(self, async_client: AsyncClient, test_user: User):
         """Even the comment author can't delete if they lost document access."""
         stranger = await _make_user("stranger-c7", "stranger-c7@test.com", "Stranger")
         doc = await _make_doc(test_user)
@@ -287,9 +267,7 @@ class TestCommentsUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_owner_can_access_comments(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_owner_can_access_comments(self, async_client: AsyncClient, test_user: User):
         """Sanity check: the document owner CAN use all comment endpoints."""
         doc = await _make_doc(test_user)
         async_client.cookies.update(_cookies(test_user))
@@ -319,13 +297,12 @@ class TestCommentsUnauthorizedAccess:
 
 # ---- Unauthorized access on RECORD VIEW ----
 
+
 class TestRecordViewUnauthorizedAccess:
     """Recording a document view requires VIEW access."""
 
     @pytest.mark.asyncio
-    async def test_record_view_forbidden(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_record_view_forbidden(self, async_client: AsyncClient, test_user: User):
         stranger = await _make_user("stranger-rv", "stranger-rv@test.com", "Stranger")
         doc = await _make_doc(test_user)
 
@@ -334,17 +311,13 @@ class TestRecordViewUnauthorizedAccess:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_record_view_nonexistent_doc(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_record_view_nonexistent_doc(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_cookies(test_user))
         resp = await async_client.post("/api/documents/000000000000000000000000/view")
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_owner_can_record_view(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_owner_can_record_view(self, async_client: AsyncClient, test_user: User):
         """Sanity check: the document owner CAN record views."""
         doc = await _make_doc(test_user)
         async_client.cookies.update(_cookies(test_user))
@@ -354,13 +327,12 @@ class TestRecordViewUnauthorizedAccess:
 
 # ---- Cross-endpoint enumeration: wrong doc_id for versions/comments ----
 
+
 class TestCrossDocumentEnumeration:
     """Ensure a user cannot use version/comment endpoints with a doc they don't own."""
 
     @pytest.mark.asyncio
-    async def test_version_create_on_other_users_doc(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_version_create_on_other_users_doc(self, async_client: AsyncClient, test_user: User):
         other = await _make_user("other-enum1", "other-e1@test.com", "Other")
         doc = await _make_doc(test_user)
 
@@ -372,9 +344,7 @@ class TestCrossDocumentEnumeration:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_comment_create_on_other_users_doc(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_comment_create_on_other_users_doc(self, async_client: AsyncClient, test_user: User):
         other = await _make_user("other-enum2", "other-e2@test.com", "Other")
         doc = await _make_doc(test_user)
 
@@ -386,25 +356,19 @@ class TestCrossDocumentEnumeration:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_nonexistent_doc_returns_404_for_versions(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_nonexistent_doc_returns_404_for_versions(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_cookies(test_user))
         resp = await async_client.get("/api/documents/000000000000000000000000/versions")
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_nonexistent_doc_returns_404_for_comments(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_nonexistent_doc_returns_404_for_comments(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_cookies(test_user))
         resp = await async_client.get("/api/documents/000000000000000000000000/comments")
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_malformed_doc_id_returns_404(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_malformed_doc_id_returns_404(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_cookies(test_user))
         resp = await async_client.get("/api/documents/not-a-valid-id/versions")
         assert resp.status_code == 404

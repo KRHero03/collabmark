@@ -12,7 +12,7 @@ When the anchored text is fully deleted the comment is marked orphaned
 (is_orphaned=True) and remains visible in the global comments panel.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from beanie import Document, Indexed
@@ -48,8 +48,8 @@ class Comment(Document):
     is_orphaned: bool = False
     orphaned_at: Optional[datetime] = None
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "comments"
@@ -58,14 +58,14 @@ class Comment(Document):
         """Mark the comment as resolved."""
         self.is_resolved = True
         self.resolved_by = user_id
-        self.resolved_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
+        self.resolved_at = datetime.now(UTC)
+        self.updated_at = datetime.now(UTC)
 
     def orphan(self) -> None:
         """Mark the comment as orphaned (anchored text was deleted)."""
         self.is_orphaned = True
-        self.orphaned_at = datetime.now(timezone.utc)
-        self.updated_at = datetime.now(timezone.utc)
+        self.orphaned_at = datetime.now(UTC)
+        self.updated_at = datetime.now(UTC)
 
     def reanchor(self, anchor_from: int, anchor_to: int) -> None:
         """Update absolute anchor offsets after the frontend re-resolves positions.
@@ -76,13 +76,13 @@ class Comment(Document):
         """
         self.anchor_from = anchor_from
         self.anchor_to = anchor_to
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
 
 class CommentCreate(BaseModel):
     """Payload for creating a new comment."""
 
-    content: str
+    content: str = Field(..., max_length=50_000)
     anchor_from: Optional[int] = None
     anchor_to: Optional[int] = None
     anchor_from_relative: Optional[str] = None
@@ -100,7 +100,7 @@ class CommentReanchor(BaseModel):
 class ReplyCreate(BaseModel):
     """Payload for replying to a comment."""
 
-    content: str
+    content: str = Field(..., max_length=50_000)
 
 
 class CommentRead(BaseModel):

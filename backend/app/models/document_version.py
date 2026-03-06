@@ -1,10 +1,10 @@
 """Document version model for storing CRDT snapshots with author attribution."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from beanie import Document, Indexed
-from pymongo import IndexModel, ASCENDING
 from pydantic import BaseModel, Field
+from pymongo import ASCENDING, IndexModel
 
 
 class DocumentVersion(Document):
@@ -20,7 +20,7 @@ class DocumentVersion(Document):
     author_id: str
     author_name: str
     summary: str = ""
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "document_versions"

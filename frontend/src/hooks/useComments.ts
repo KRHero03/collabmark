@@ -49,20 +49,14 @@ export const useComments = create<CommentsState>((set, get) => ({
   replyToComment: async (commentId, content) => {
     const { data: reply } = await commentsApi.reply(commentId, { content });
     set({
-      comments: get().comments.map((c) =>
-        c.id === commentId
-          ? { ...c, replies: [...c.replies, reply] }
-          : c
-      ),
+      comments: get().comments.map((c) => (c.id === commentId ? { ...c, replies: [...c.replies, reply] } : c)),
     });
   },
 
   resolveComment: async (commentId) => {
     const { data: resolved } = await commentsApi.resolve(commentId);
     set({
-      comments: get().comments.map((c) =>
-        c.id === commentId ? { ...resolved, replies: c.replies } : c
-      ),
+      comments: get().comments.map((c) => (c.id === commentId ? { ...resolved, replies: c.replies } : c)),
     });
   },
 
@@ -72,18 +66,14 @@ export const useComments = create<CommentsState>((set, get) => ({
       anchor_to: anchorTo,
     });
     set({
-      comments: get().comments.map((c) =>
-        c.id === commentId ? { ...updated, replies: c.replies } : c
-      ),
+      comments: get().comments.map((c) => (c.id === commentId ? { ...updated, replies: c.replies } : c)),
     });
   },
 
   orphanComment: async (commentId) => {
     const { data: orphaned } = await commentsApi.orphan(commentId);
     set({
-      comments: get().comments.map((c) =>
-        c.id === commentId ? { ...orphaned, replies: c.replies } : c
-      ),
+      comments: get().comments.map((c) => (c.id === commentId ? { ...orphaned, replies: c.replies } : c)),
     });
   },
 

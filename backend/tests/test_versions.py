@@ -1,11 +1,10 @@
 """Tests for version history: create snapshots, list, retrieve versions."""
 
 import pytest
-from httpx import AsyncClient
-
 from app.auth.jwt import create_access_token
 from app.models.document import Document_
 from app.models.user import User
+from httpx import AsyncClient
 
 
 def _auth_cookies(user: User) -> dict[str, str]:
@@ -21,9 +20,7 @@ async def _make_doc(owner: User, title: str = "Versioned Doc") -> Document_:
 
 class TestCreateVersion:
     @pytest.mark.asyncio
-    async def test_create_version(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_create_version(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -39,9 +36,7 @@ class TestCreateVersion:
         assert data["summary"] == "First save"
 
     @pytest.mark.asyncio
-    async def test_version_numbers_increment(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_version_numbers_increment(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -64,9 +59,7 @@ class TestCreateVersion:
         assert resp3.json()["version_number"] == 3
 
     @pytest.mark.asyncio
-    async def test_auto_summary_when_empty(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_auto_summary_when_empty(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -79,9 +72,7 @@ class TestCreateVersion:
 
 class TestListVersions:
     @pytest.mark.asyncio
-    async def test_list_versions_descending(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_list_versions_descending(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -100,9 +91,7 @@ class TestListVersions:
         assert versions[2]["version_number"] == 1
 
     @pytest.mark.asyncio
-    async def test_list_excludes_content(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_list_excludes_content(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -118,9 +107,7 @@ class TestListVersions:
         assert "author_name" in item
 
     @pytest.mark.asyncio
-    async def test_empty_version_list(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_empty_version_list(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -131,9 +118,7 @@ class TestListVersions:
 
 class TestGetVersion:
     @pytest.mark.asyncio
-    async def test_get_specific_version(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_get_specific_version(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -155,9 +140,7 @@ class TestGetVersion:
         assert resp2.json()["content"] == "v2-content"
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_version(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_get_nonexistent_version(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -167,9 +150,7 @@ class TestGetVersion:
 
 class TestVersionDeduplication:
     @pytest.mark.asyncio
-    async def test_duplicate_content_returns_204(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_duplicate_content_returns_204(self, async_client: AsyncClient, test_user: User):
         """Submitting identical content as the latest version returns 204."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -187,9 +168,7 @@ class TestVersionDeduplication:
         assert resp2.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_duplicate_does_not_increment_version(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_duplicate_does_not_increment_version(self, async_client: AsyncClient, test_user: User):
         """After dedup, the next different content still gets next version number."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -216,9 +195,7 @@ class TestVersionDeduplication:
         assert len(list_resp.json()) == 2
 
     @pytest.mark.asyncio
-    async def test_different_content_not_deduped(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_different_content_not_deduped(self, async_client: AsyncClient, test_user: User):
         """Different content always creates a new version."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -237,9 +214,7 @@ class TestVersionDeduplication:
         assert resp2.json()["version_number"] == 2
 
     @pytest.mark.asyncio
-    async def test_empty_content_dedup(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_empty_content_dedup(self, async_client: AsyncClient, test_user: User):
         """Empty content is also properly deduplicated."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -257,9 +232,7 @@ class TestVersionDeduplication:
         assert resp2.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_whitespace_difference_not_deduped(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_whitespace_difference_not_deduped(self, async_client: AsyncClient, test_user: User):
         """Content differing only by whitespace is treated as different."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -278,9 +251,7 @@ class TestVersionDeduplication:
 
 class TestAutoVersionOnSave:
     @pytest.mark.asyncio
-    async def test_update_content_creates_version(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_update_content_creates_version(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -295,9 +266,7 @@ class TestAutoVersionOnSave:
         assert versions[0]["version_number"] == 1
 
     @pytest.mark.asyncio
-    async def test_title_only_update_no_version(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_title_only_update_no_version(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 

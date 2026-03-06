@@ -41,13 +41,7 @@ function PermIcon({ granted }: { granted: boolean }) {
 
 function AvatarBubble({ name, url }: { name: string; url: string | null }) {
   if (url) {
-    return (
-      <img
-        src={url}
-        alt={name}
-        className="h-8 w-8 rounded-full object-cover"
-      />
-    );
+    return <img src={url} alt={name} className="h-8 w-8 rounded-full object-cover" />;
   }
   const initials = name
     .split(" ")
@@ -62,13 +56,7 @@ function AvatarBubble({ name, url }: { name: string; url: string | null }) {
   );
 }
 
-export function AclPanel({
-  entityType,
-  entityId,
-  entityName,
-  open,
-  onClose,
-}: AclPanelProps) {
+export function AclPanel({ entityType, entityId, entityName, open, onClose }: AclPanelProps) {
   const [entries, setEntries] = useState<AclEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,9 +66,7 @@ export function AclPanel({
     setLoading(true);
     setError(null);
 
-    const fetch = entityType === "document"
-      ? aclApi.getDocumentAcl(entityId)
-      : aclApi.getFolderAcl(entityId);
+    const fetch = entityType === "document" ? aclApi.getDocumentAcl(entityId) : aclApi.getFolderAcl(entityId);
 
     fetch
       .then((res) => setEntries(res.data))
@@ -91,10 +77,7 @@ export function AclPanel({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
         className="w-[calc(100%-2rem)] max-w-2xl rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -104,12 +87,8 @@ export function AclPanel({
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-[var(--color-primary)]" />
             <div>
-              <h2 className="text-lg font-semibold text-[var(--color-text)]">
-                Permissions
-              </h2>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                {entityName}
-              </p>
+              <h2 className="text-lg font-semibold text-[var(--color-text)]">Permissions</h2>
+              <p className="text-xs text-[var(--color-text-muted)]">{entityName}</p>
             </div>
           </div>
           <button
@@ -122,18 +101,10 @@ export function AclPanel({
 
         {/* Body */}
         <div className="max-h-[60vh] overflow-y-auto px-5 py-4">
-          {loading && (
-            <p className="py-8 text-center text-sm text-[var(--color-text-muted)]">
-              Loading permissions...
-            </p>
-          )}
-          {error && (
-            <p className="py-8 text-center text-sm text-red-500">{error}</p>
-          )}
+          {loading && <p className="py-8 text-center text-sm text-[var(--color-text-muted)]">Loading permissions...</p>}
+          {error && <p className="py-8 text-center text-sm text-red-500">{error}</p>}
           {!loading && !error && entries.length === 0 && (
-            <p className="py-8 text-center text-sm text-[var(--color-text-muted)]">
-              No permission entries found.
-            </p>
+            <p className="py-8 text-center text-sm text-[var(--color-text-muted)]">No permission entries found.</p>
           )}
           {!loading && !error && entries.length > 0 && (
             <table className="w-full text-sm">
@@ -149,23 +120,13 @@ export function AclPanel({
               </thead>
               <tbody>
                 {entries.map((entry) => (
-                  <tr
-                    key={entry.user_id}
-                    className="border-b border-[var(--color-border)] last:border-0"
-                  >
+                  <tr key={entry.user_id} className="border-b border-[var(--color-border)] last:border-0">
                     <td className="py-3 pr-3">
                       <div className="flex items-center gap-2">
-                        <AvatarBubble
-                          name={entry.user_name}
-                          url={entry.avatar_url}
-                        />
+                        <AvatarBubble name={entry.user_name} url={entry.avatar_url} />
                         <div className="min-w-0">
-                          <p className="truncate font-medium text-[var(--color-text)]">
-                            {entry.user_name}
-                          </p>
-                          <p className="truncate text-xs text-[var(--color-text-muted)]">
-                            {entry.user_email}
-                          </p>
+                          <p className="truncate font-medium text-[var(--color-text)]">{entry.user_name}</p>
+                          <p className="truncate text-xs text-[var(--color-text-muted)]">{entry.user_email}</p>
                           {entry.inherited_from_name && (
                             <p className="truncate text-xs italic text-[var(--color-text-muted)]">
                               via {entry.inherited_from_name}
@@ -187,9 +148,7 @@ export function AclPanel({
                       <PermIcon granted={entry.can_share} />
                     </td>
                     <td className="pl-2">
-                      <span
-                        className={`text-xs font-medium ${ROLE_COLORS[entry.role] || ""}`}
-                      >
+                      <span className={`text-xs font-medium ${ROLE_COLORS[entry.role] || ""}`}>
                         {ROLE_LABELS[entry.role] || entry.role}
                       </span>
                     </td>

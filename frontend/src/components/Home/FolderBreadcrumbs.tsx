@@ -6,10 +6,7 @@ interface FolderBreadcrumbsProps {
   onNavigate: (folderId: string | null) => void;
 }
 
-export function FolderBreadcrumbs({
-  breadcrumbs,
-  onNavigate,
-}: FolderBreadcrumbsProps) {
+export function FolderBreadcrumbs({ breadcrumbs, onNavigate }: FolderBreadcrumbsProps) {
   return (
     <nav className="mb-4 flex items-center gap-1 text-sm" aria-label="Breadcrumb">
       <button

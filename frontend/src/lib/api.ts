@@ -105,10 +105,7 @@ export const authApi = {
   getMe: () => api.get<UserProfile>("/users/me"),
   logout: () => api.post("/auth/logout"),
   detectSSO: (email: string) =>
-    api.post<{ sso: boolean; org_id?: string; org_name?: string; protocol?: string }>(
-      "/auth/sso/detect",
-      { email },
-    ),
+    api.post<{ sso: boolean; org_id?: string; org_name?: string; protocol?: string }>("/auth/sso/detect", { email }),
 };
 
 export const documentsApi = {
@@ -119,15 +116,13 @@ export const documentsApi = {
   update: (id: string, data: { title?: string; content?: string; folder_id?: string | null }) =>
     api.put<MarkdownDocument>(`/documents/${id}`, data),
   delete: (id: string) => api.delete<MarkdownDocument>(`/documents/${id}`),
-  restore: (id: string) =>
-    api.post<MarkdownDocument>(`/documents/${id}/restore`),
+  restore: (id: string) => api.post<MarkdownDocument>(`/documents/${id}/restore`),
   listTrash: () => api.get<MarkdownDocument[]>("/documents/trash"),
   hardDelete: (id: string) => api.delete(`/documents/${id}/permanent`),
 };
 
 export const foldersApi = {
-  create: (data: { name?: string; parent_id?: string | null }) =>
-    api.post<FolderItem>("/folders", data),
+  create: (data: { name?: string; parent_id?: string | null }) => api.post<FolderItem>("/folders", data),
   get: (id: string) => api.get<FolderItem>(`/folders/${id}`),
   update: (id: string, data: { name?: string; parent_id?: string | null; general_access?: GeneralAccess }) =>
     api.put<FolderItem>(`/folders/${id}`, data),
@@ -137,8 +132,7 @@ export const foldersApi = {
   listTrash: () => api.get<FolderItem[]>("/folders/trash"),
   listShared: () => api.get<SharedFolder[]>("/folders/shared"),
   recordView: (folderId: string) => api.post(`/folders/${folderId}/view`),
-  listRecentlyViewed: () =>
-    api.get<RecentlyViewedFolder[]>("/folders/recent"),
+  listRecentlyViewed: () => api.get<RecentlyViewedFolder[]>("/folders/recent"),
   listContents: (folderId?: string | null) =>
     api.get<FolderContents>("/folders/contents", {
       params: folderId ? { folder_id: folderId } : {},
@@ -147,14 +141,10 @@ export const foldersApi = {
     api.get<Breadcrumb[]>("/folders/breadcrumbs", {
       params: { folder_id: folderId },
     }),
-  addCollaborator: (
-    folderId: string,
-    data: { email: string; permission: "view" | "edit" },
-  ) => api.post<Collaborator>(`/folders/${folderId}/collaborators`, data),
-  listCollaborators: (folderId: string) =>
-    api.get<Collaborator[]>(`/folders/${folderId}/collaborators`),
-  removeCollaborator: (folderId: string, userId: string) =>
-    api.delete(`/folders/${folderId}/collaborators/${userId}`),
+  addCollaborator: (folderId: string, data: { email: string; permission: "view" | "edit" }) =>
+    api.post<Collaborator>(`/folders/${folderId}/collaborators`, data),
+  listCollaborators: (folderId: string) => api.get<Collaborator[]>(`/folders/${folderId}/collaborators`),
+  removeCollaborator: (folderId: string, userId: string) => api.delete(`/folders/${folderId}/collaborators/${userId}`),
 };
 
 export interface Collaborator {
@@ -201,10 +191,8 @@ export interface EffectivePermission {
 }
 
 export const aclApi = {
-  getDocumentAcl: (docId: string) =>
-    api.get<AclEntry[]>(`/documents/${docId}/acl`),
-  getFolderAcl: (folderId: string) =>
-    api.get<AclEntry[]>(`/folders/${folderId}/acl`),
+  getDocumentAcl: (docId: string) => api.get<AclEntry[]>(`/documents/${docId}/acl`),
+  getFolderAcl: (folderId: string) => api.get<AclEntry[]>(`/folders/${folderId}/acl`),
 };
 
 export const keysApi = {
@@ -242,24 +230,18 @@ export interface RecentlyViewedDocument {
 }
 
 export const sharingApi = {
-  getMyPermission: (docId: string) =>
-    api.get<{ permission: Permission }>(`/documents/${docId}/permission`),
+  getMyPermission: (docId: string) => api.get<{ permission: Permission }>(`/documents/${docId}/permission`),
   updateGeneralAccess: (docId: string, generalAccess: GeneralAccess) =>
     api.put<MarkdownDocument>(`/documents/${docId}/access`, {
       general_access: generalAccess,
     }),
-  addCollaborator: (
-    docId: string,
-    data: { email: string; permission: "view" | "edit" },
-  ) => api.post<Collaborator>(`/documents/${docId}/collaborators`, data),
-  listCollaborators: (docId: string) =>
-    api.get<Collaborator[]>(`/documents/${docId}/collaborators`),
-  removeCollaborator: (docId: string, userId: string) =>
-    api.delete(`/documents/${docId}/collaborators/${userId}`),
+  addCollaborator: (docId: string, data: { email: string; permission: "view" | "edit" }) =>
+    api.post<Collaborator>(`/documents/${docId}/collaborators`, data),
+  listCollaborators: (docId: string) => api.get<Collaborator[]>(`/documents/${docId}/collaborators`),
+  removeCollaborator: (docId: string, userId: string) => api.delete(`/documents/${docId}/collaborators/${userId}`),
   listShared: () => api.get<SharedDocument[]>("/documents/shared"),
   recordView: (docId: string) => api.post(`/documents/${docId}/view`),
-  listRecentlyViewed: () =>
-    api.get<RecentlyViewedDocument[]>("/documents/recent"),
+  listRecentlyViewed: () => api.get<RecentlyViewedDocument[]>("/documents/recent"),
 };
 
 export interface CommentData {
@@ -296,24 +278,18 @@ export interface CommentCreatePayload {
 }
 
 export const commentsApi = {
-  list: (docId: string) =>
-    api.get<CommentData[]>(`/documents/${docId}/comments`),
-  create: (docId: string, data: CommentCreatePayload) =>
-    api.post<CommentData>(`/documents/${docId}/comments`, data),
-  reply: (commentId: string, data: { content: string }) =>
-    api.post<CommentData>(`/comments/${commentId}/reply`, data),
-  resolve: (commentId: string) =>
-    api.post<CommentData>(`/comments/${commentId}/resolve`),
+  list: (docId: string) => api.get<CommentData[]>(`/documents/${docId}/comments`),
+  create: (docId: string, data: CommentCreatePayload) => api.post<CommentData>(`/documents/${docId}/comments`, data),
+  reply: (commentId: string, data: { content: string }) => api.post<CommentData>(`/comments/${commentId}/reply`, data),
+  resolve: (commentId: string) => api.post<CommentData>(`/comments/${commentId}/resolve`),
   reanchor: (commentId: string, data: { anchor_from: number; anchor_to: number }) =>
     api.patch<CommentData>(`/comments/${commentId}/reanchor`, data),
-  orphan: (commentId: string) =>
-    api.patch<CommentData>(`/comments/${commentId}/orphan`),
+  orphan: (commentId: string) => api.patch<CommentData>(`/comments/${commentId}/orphan`),
   delete: (commentId: string) => api.delete(`/comments/${commentId}`),
 };
 
 export const versionsApi = {
-  list: (docId: string) =>
-    api.get<VersionListItem[]>(`/documents/${docId}/versions`),
+  list: (docId: string) => api.get<VersionListItem[]>(`/documents/${docId}/versions`),
   get: (docId: string, versionNumber: number) =>
     api.get<VersionDetail>(`/documents/${docId}/versions/${versionNumber}`),
   create: (docId: string, data: { content: string; summary?: string }) =>
@@ -362,16 +338,19 @@ export const orgsApi = {
     api.post<Organization>("/orgs", data),
   list: () => api.get<Organization[]>("/orgs"),
   get: (orgId: string) => api.get<Organization>(`/orgs/${orgId}`),
+  getMyOrg: () => api.get<Organization | null>("/orgs/my"),
   update: (orgId: string, data: { name?: string; slug?: string; verified_domains?: string[]; plan?: string }) =>
     api.put<Organization>(`/orgs/${orgId}`, data),
   listMembers: (orgId: string) => api.get<OrgMember[]>(`/orgs/${orgId}/members`),
   addMember: (orgId: string, data: { user_id: string; role?: string }) =>
     api.post<OrgMember>(`/orgs/${orgId}/members`, data),
-  removeMember: (orgId: string, userId: string) =>
-    api.delete(`/orgs/${orgId}/members/${userId}`),
+  inviteMember: (orgId: string, data: { email: string; role?: string }) =>
+    api.post<OrgMember>(`/orgs/${orgId}/members/invite`, data),
+  updateMemberRole: (orgId: string, userId: string, role: string) =>
+    api.patch<OrgMember>(`/orgs/${orgId}/members/${userId}/role`, { role }),
+  removeMember: (orgId: string, userId: string) => api.delete(`/orgs/${orgId}/members/${userId}`),
   getSSOConfig: (orgId: string) => api.get<OrgSSOConfig | null>(`/orgs/${orgId}/sso`),
-  updateSSOConfig: (orgId: string, data: Record<string, unknown>) =>
-    api.put<OrgSSOConfig>(`/orgs/${orgId}/sso`, data),
+  updateSSOConfig: (orgId: string, data: Record<string, unknown>) => api.put<OrgSSOConfig>(`/orgs/${orgId}/sso`, data),
 };
 
 export default api;

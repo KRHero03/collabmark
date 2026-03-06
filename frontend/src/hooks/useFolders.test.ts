@@ -215,9 +215,7 @@ describe("useFolders store", () => {
 
       await useFolders.getState().navigateToFolder("no-access");
 
-      expect(useFolders.getState().accessError).toBe(
-        "You don't have access to this folder anymore.",
-      );
+      expect(useFolders.getState().accessError).toBe("You don't have access to this folder anymore.");
       expect(useFolders.getState().loading).toBe(false);
     });
   });
@@ -250,9 +248,7 @@ describe("useFolders store", () => {
 
       await useFolders.getState().fetchContents("no-access");
 
-      expect(useFolders.getState().accessError).toBe(
-        "You don't have access to this folder anymore."
-      );
+      expect(useFolders.getState().accessError).toBe("You don't have access to this folder anymore.");
       expect(useFolders.getState().loading).toBe(false);
     });
 
@@ -260,9 +256,7 @@ describe("useFolders store", () => {
       const err = new Error("Server error");
       vi.mocked(foldersApi.listContents).mockRejectedValue(err);
 
-      await expect(
-        useFolders.getState().fetchContents("folder-1"),
-      ).rejects.toThrow("Server error");
+      await expect(useFolders.getState().fetchContents("folder-1")).rejects.toThrow("Server error");
       expect(useFolders.getState().loading).toBe(false);
     });
 
@@ -382,7 +376,9 @@ describe("useFolders store", () => {
 
     it("should set trashLoading during fetch", async () => {
       let resolve: (v: unknown) => void;
-      const p = new Promise((r) => { resolve = r; });
+      const p = new Promise((r) => {
+        resolve = r;
+      });
       vi.mocked(foldersApi.listTrash).mockReturnValue(p as never);
 
       const prom = useFolders.getState().fetchTrashFolders();

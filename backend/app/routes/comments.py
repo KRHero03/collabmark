@@ -61,9 +61,7 @@ async def reply_to_comment(
 ):
     """Reply to an existing comment. Requires VIEW access on the parent document."""
     await _assert_doc_access_for_comment(comment_id, user)
-    reply = await comment_service.reply_to_comment(
-        comment_id, user, payload.content
-    )
+    reply = await comment_service.reply_to_comment(comment_id, user, payload.content)
     return CommentRead.from_doc(reply)
 
 
@@ -92,9 +90,7 @@ async def reanchor_comment(
 ):
     """Update a comment's anchor positions. Requires VIEW access on the parent document."""
     await _assert_doc_access_for_comment(comment_id, user)
-    comment = await comment_service.reanchor_comment(
-        comment_id, payload.anchor_from, payload.anchor_to
-    )
+    comment = await comment_service.reanchor_comment(comment_id, payload.anchor_from, payload.anchor_to)
     return CommentRead.from_doc(comment)
 
 

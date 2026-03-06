@@ -1,7 +1,7 @@
 """Sharing business logic: share links, document access, permission checks, recently viewed."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
@@ -112,12 +112,8 @@ async def resolve_share_link(token: str) -> tuple[ShareLink, Document_]:
         )
 
     if link.expires_at:
-        now = datetime.now(timezone.utc)
-        expires_at = (
-            link.expires_at
-            if link.expires_at.tzinfo
-            else link.expires_at.replace(tzinfo=timezone.utc)
-        )
+        now = datetime.now(UTC)
+        expires_at = link.expires_at if link.expires_at.tzinfo else link.expires_at.replace(tzinfo=UTC)
         if expires_at < now:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -180,9 +176,13 @@ async def list_shared_documents(user: User) -> list[dict]:
     Returns:
         List of dicts with document data and permission level.
     """
-    accesses = await DocumentAccess.find(
-        DocumentAccess.user_id == str(user.id),
-    ).sort("-last_accessed_at").to_list()
+    accesses = (
+        await DocumentAccess.find(
+            DocumentAccess.user_id == str(user.id),
+        )
+        .sort("-last_accessed_at")
+        .to_list()
+    )
 
     results = []
     for access in accesses:
@@ -192,11 +192,13 @@ async def list_shared_documents(user: User) -> list[dict]:
             continue
         if doc is None or doc.is_deleted:
             continue
-        results.append({
-            "document": doc,
-            "permission": access.permission,
-            "last_accessed_at": access.last_accessed_at,
-        })
+        results.append(
+            {
+                "document": doc,
+                "permission": access.permission,
+                "last_accessed_at": access.last_accessed_at,
+            }
+        )
     return results
 
 
@@ -214,12 +216,11 @@ async def get_user_permission(doc_id: str, user: User) -> Permission | None:
         Permission level, or None if no access.
     """
     from app.services.acl_service import get_base_permission
+
     return await get_base_permission("document", doc_id, str(user.id), user.org_id)
 
 
-async def update_general_access(
-    doc_id: str, user: User, general_access: str
-) -> Document_:
+async def update_general_access(doc_id: str, user: User, general_access: str) -> Document_:
     """Update the document's general_access setting. Owner only.
 
     Args:
@@ -238,21 +239,19 @@ async def update_general_access(
 
     try:
         doc.general_access = GeneralAccess(general_access)
-    except ValueError:
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Invalid general_access value: {general_access}. "
             f"Must be one of: restricted, anyone_view, anyone_edit",
-        )
+        ) from exc
 
     doc.touch()
     await doc.save()
     return doc
 
 
-async def add_collaborator(
-    doc_id: str, owner: User, email: str, permission: Permission
-) -> DocumentAccess:
+async def add_collaborator(doc_id: str, owner: User, email: str, permission: Permission) -> DocumentAccess:
     """Add a collaborator by email. Creates or updates a DocumentAccess record.
 
     Args:
@@ -324,9 +323,13 @@ async def list_collaborators(doc_id: str, user: User) -> list[dict]:
     doc = await _find_doc_or_404(doc_id)
     _assert_owner(doc, user)
 
-    accesses = await DocumentAccess.find(
-        DocumentAccess.document_id == doc_id,
-    ).sort("-granted_at").to_list()
+    accesses = (
+        await DocumentAccess.find(
+            DocumentAccess.document_id == doc_id,
+        )
+        .sort("-granted_at")
+        .to_list()
+    )
 
     results = []
     for access in accesses:
@@ -336,15 +339,17 @@ async def list_collaborators(doc_id: str, user: User) -> list[dict]:
             continue
         if collab_user is None:
             continue
-        results.append({
-            "id": str(access.id),
-            "user_id": str(collab_user.id),
-            "email": collab_user.email,
-            "name": collab_user.name,
-            "avatar_url": collab_user.avatar_url,
-            "permission": access.permission,
-            "granted_at": access.granted_at,
-        })
+        results.append(
+            {
+                "id": str(access.id),
+                "user_id": str(collab_user.id),
+                "email": collab_user.email,
+                "name": collab_user.name,
+                "avatar_url": collab_user.avatar_url,
+                "permission": access.permission,
+                "granted_at": access.granted_at,
+            }
+        )
     return results
 
 
@@ -413,7 +418,7 @@ async def record_document_view(doc_id: str, user: User) -> None:
         DocumentView.document_id == doc_id,
     )
     if existing:
-        existing.viewed_at = datetime.now(timezone.utc)
+        existing.viewed_at = datetime.now(UTC)
         await existing.save()
     else:
         view = DocumentView(
@@ -434,9 +439,13 @@ async def list_recently_viewed(user: User) -> list[dict]:
     Returns:
         List of dicts with document data, permission, and view time.
     """
-    views = await DocumentView.find(
-        DocumentView.user_id == str(user.id),
-    ).sort("-viewed_at").to_list()
+    views = (
+        await DocumentView.find(
+            DocumentView.user_id == str(user.id),
+        )
+        .sort("-viewed_at")
+        .to_list()
+    )
 
     results = []
     for view in views:
@@ -456,13 +465,15 @@ async def list_recently_viewed(user: User) -> list[dict]:
         except (InvalidId, ValueError):
             owner = None
 
-        results.append({
-            "document": doc,
-            "permission": perm.value,
-            "viewed_at": view.viewed_at,
-            "owner_name": owner.name if owner else "Unknown",
-            "owner_email": owner.email if owner else "",
-        })
+        results.append(
+            {
+                "document": doc,
+                "permission": perm.value,
+                "viewed_at": view.viewed_at,
+                "owner_name": owner.name if owner else "Unknown",
+                "owner_email": owner.email if owner else "",
+            }
+        )
     return results
 
 

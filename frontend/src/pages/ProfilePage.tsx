@@ -17,7 +17,9 @@ export function ProfilePage() {
 
   useEffect(() => {
     document.title = "Profile - CollabMark";
-    return () => { document.title = "CollabMark"; };
+    return () => {
+      document.title = "CollabMark";
+    };
   }, []);
 
   const handleSave = async () => {
@@ -48,17 +50,13 @@ export function ProfilePage() {
             <UserAvatar url={user.avatar_url} name={user.name} size="lg" />
             <div>
               <p className="text-lg font-semibold">{user.name}</p>
-              <p className="text-sm text-[var(--color-text-muted)]">
-                {user.email}
-              </p>
+              <p className="text-sm text-[var(--color-text-muted)]">{user.email}</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="mb-1 block text-sm font-medium">
-                Display Name
-              </label>
+              <label className="mb-1 block text-sm font-medium">Display Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -76,12 +74,8 @@ export function ProfilePage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium">
-                Member Since
-              </label>
-              <p className="text-sm text-[var(--color-text-muted)]">
-                {formatDateLong(user.created_at)}
-              </p>
+              <label className="mb-1 block text-sm font-medium">Member Since</label>
+              <p className="text-sm text-[var(--color-text-muted)]">{formatDateLong(user.created_at)}</p>
             </div>
           </div>
 
@@ -93,9 +87,7 @@ export function ProfilePage() {
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
-            {saved && (
-              <span className="text-sm text-green-600">Saved!</span>
-            )}
+            {saved && <span className="text-sm text-green-600">Saved!</span>}
           </div>
         </section>
       </main>

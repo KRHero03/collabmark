@@ -49,14 +49,16 @@ describe("useDarkMode", () => {
 
   it("disconnects observer on unmount", () => {
     const disconnectSpy = vi.fn();
-    const OriginalMutationObserver = (globalThis as typeof globalThis & { MutationObserver: typeof MutationObserver }).MutationObserver;
+    const OriginalMutationObserver = (globalThis as typeof globalThis & { MutationObserver: typeof MutationObserver })
+      .MutationObserver;
 
     class MockMutationObserver {
       observe = vi.fn();
       disconnect = disconnectSpy;
       takeRecords = vi.fn(() => []);
     }
-    (globalThis as typeof globalThis & { MutationObserver: typeof MutationObserver }).MutationObserver = MockMutationObserver as unknown as typeof MutationObserver;
+    (globalThis as typeof globalThis & { MutationObserver: typeof MutationObserver }).MutationObserver =
+      MockMutationObserver as unknown as typeof MutationObserver;
 
     const { unmount } = renderHook(() => useDarkMode());
     expect(disconnectSpy).not.toHaveBeenCalled();
@@ -64,6 +66,7 @@ describe("useDarkMode", () => {
     unmount();
     expect(disconnectSpy).toHaveBeenCalledTimes(1);
 
-    (globalThis as typeof globalThis & { MutationObserver: typeof MutationObserver }).MutationObserver = OriginalMutationObserver;
+    (globalThis as typeof globalThis & { MutationObserver: typeof MutationObserver }).MutationObserver =
+      OriginalMutationObserver;
   });
 });

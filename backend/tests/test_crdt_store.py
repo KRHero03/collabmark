@@ -6,10 +6,9 @@ state snapshot.
 """
 
 import pytest
+from app.services.crdt_store import MongoYStore
 from mongomock_motor import AsyncMongoMockClient
 from pycrdt import Doc, Text
-
-from app.services.crdt_store import MongoYStore
 
 
 @pytest.fixture
@@ -56,9 +55,7 @@ class TestMongoYStoreWrite:
         assert record["room"] == "test-room-001"
 
     @pytest.mark.asyncio
-    async def test_multiple_writes_create_separate_records(
-        self, store: MongoYStore, mock_db
-    ):
+    async def test_multiple_writes_create_separate_records(self, store: MongoYStore, mock_db):
         """Each write call should create an independent MongoDB document."""
         doc = Doc()
         text = doc.get("content", type=Text)
@@ -78,7 +75,7 @@ class TestMongoYStoreRead:
     async def test_read_empty_room_yields_nothing(self, store: MongoYStore):
         """Reading from a room with no writes should yield zero results."""
         updates = []
-        async for update, metadata, timestamp in store.read():
+        async for update, _metadata, _timestamp in store.read():
             updates.append(update)
         assert updates == []
 

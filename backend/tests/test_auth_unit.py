@@ -1,14 +1,15 @@
 """Direct unit tests for auth modules: jwt, api_key, dependencies."""
 
-import pytest
-from jose import jwt
+from datetime import UTC
 
+import pytest
 from app.auth.api_key import get_user_from_api_key
 from app.auth.dependencies import get_current_user
 from app.auth.jwt import create_access_token, decode_access_token
 from app.config import settings
 from app.models.api_key import ApiKey
 from app.models.user import User
+from jose import jwt
 
 
 class TestCreateAccessToken:
@@ -34,8 +35,9 @@ class TestDecodeAccessToken:
         assert user_id == str(test_user.id)
 
     def test_expired_token_returns_none(self, test_user: User):
-        from datetime import datetime, timedelta, timezone
-        expire = datetime.now(timezone.utc) - timedelta(minutes=1)
+        from datetime import datetime, timedelta
+
+        expire = datetime.now(UTC) - timedelta(minutes=1)
         payload = {"sub": str(test_user.id), "exp": expire}
         token = jwt.encode(
             payload,
@@ -84,6 +86,7 @@ class TestGetUserFromApiKey:
     @pytest.mark.asyncio
     async def test_invalid_key_raises_401(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_user_from_api_key("cm_invalid_key_that_does_not_exist")
         assert exc_info.value.status_code == 401
@@ -102,6 +105,7 @@ class TestGetUserFromApiKey:
         await api_key_record.insert()
 
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_user_from_api_key(raw_key)
         assert exc_info.value.status_code == 401
@@ -144,6 +148,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_no_token_and_no_api_key_raises_401(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(access_token=None, api_key_user=None)
         assert exc_info.value.status_code == 401
@@ -152,6 +157,7 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_invalid_jwt_raises_401(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(access_token="invalid-token", api_key_user=None)
         assert exc_info.value.status_code == 401
@@ -162,6 +168,7 @@ class TestGetCurrentUser:
         token = create_access_token(str(test_user.id))
         await test_user.delete()
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(access_token=token, api_key_user=None)
         assert exc_info.value.status_code == 401
@@ -169,8 +176,9 @@ class TestGetCurrentUser:
 
     @pytest.mark.asyncio
     async def test_malformed_user_id_in_jwt_raises_401(self):
-        from datetime import datetime, timedelta, timezone
-        expire = datetime.now(timezone.utc) + timedelta(minutes=60)
+        from datetime import datetime, timedelta
+
+        expire = datetime.now(UTC) + timedelta(minutes=60)
         payload = {"sub": "not-a-valid-objectid", "exp": expire}
         token = jwt.encode(
             payload,
@@ -178,6 +186,7 @@ class TestGetCurrentUser:
             algorithm=settings.jwt_algorithm,
         )
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(access_token=token, api_key_user=None)
         assert exc_info.value.status_code == 401

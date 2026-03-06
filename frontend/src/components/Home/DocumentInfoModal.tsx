@@ -29,11 +29,7 @@ function formatSize(chars: number): string {
   return `${(chars / 1_000_000).toFixed(1)}M characters`;
 }
 
-export function DocumentInfoModal({
-  doc,
-  open,
-  onClose,
-}: DocumentInfoModalProps) {
+export function DocumentInfoModal({ doc, open, onClose }: DocumentInfoModalProps) {
   if (!open) return null;
 
   const rows: { label: string; value: string }[] = [
@@ -51,10 +47,7 @@ export function DocumentInfoModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
       <div
         className="w-[calc(100%-2rem)] max-w-md rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] shadow-xl"
         onClick={(e) => e.stopPropagation()}
@@ -62,9 +55,7 @@ export function DocumentInfoModal({
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-4">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-[var(--color-primary)]" />
-            <h2 className="text-lg font-semibold text-[var(--color-text)]">
-              Document Info
-            </h2>
+            <h2 className="text-lg font-semibold text-[var(--color-text)]">Document Info</h2>
           </div>
           <button
             onClick={onClose}
@@ -79,9 +70,7 @@ export function DocumentInfoModal({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.label}>
-                  <td className="py-2 pr-4 font-medium text-[var(--color-text-muted)]">
-                    {row.label}
-                  </td>
+                  <td className="py-2 pr-4 font-medium text-[var(--color-text-muted)]">{row.label}</td>
                   <td className="py-2 text-[var(--color-text)]">{row.value}</td>
                 </tr>
               ))}

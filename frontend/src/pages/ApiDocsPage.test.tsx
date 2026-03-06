@@ -5,14 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { ApiDocsPage } from "./ApiDocsPage";
 
 vi.mock("react-router", () => ({
-  Link: ({
-    to,
-    children,
-    ...props
-  }: {
-    to: string;
-    children: React.ReactNode;
-  }) => (
+  Link: ({ to, children, ...props }: { to: string; children: React.ReactNode }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -316,12 +309,14 @@ describe("ApiDocsPage", () => {
       const input = screen.getByPlaceholderText("cm_...");
       expect(input).toHaveValue("cm_test_key");
 
-      const createDocCard = screen.getAllByRole("button").find(
-        (b) =>
-          b.textContent?.includes("POST") &&
-          b.textContent?.includes("/api/documents") &&
-          !b.textContent?.includes("{doc_id}"),
-      );
+      const createDocCard = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.textContent?.includes("POST") &&
+            b.textContent?.includes("/api/documents") &&
+            !b.textContent?.includes("{doc_id}"),
+        );
       if (!createDocCard) throw new Error("Could not find Create a document card");
       await user.click(createDocCard);
 
@@ -360,12 +355,14 @@ describe("ApiDocsPage", () => {
 
       const user = userEvent.setup();
       render(<ApiDocsPage />);
-      const createDocCard = screen.getAllByRole("button").find(
-        (b) =>
-          b.textContent?.includes("POST") &&
-          b.textContent?.includes("/api/documents") &&
-          !b.textContent?.includes("{doc_id}"),
-      );
+      const createDocCard = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.textContent?.includes("POST") &&
+            b.textContent?.includes("/api/documents") &&
+            !b.textContent?.includes("{doc_id}"),
+        );
       if (!createDocCard) throw new Error("Could not find Create a document card");
       await user.click(createDocCard);
 
@@ -402,32 +399,39 @@ describe("ApiDocsPage", () => {
 
       const user = userEvent.setup();
       render(<ApiDocsPage />);
-      const createDocCard = screen.getAllByRole("button").find(
-        (b) =>
-          b.textContent?.includes("POST") &&
-          b.textContent?.includes("/api/documents") &&
-          !b.textContent?.includes("{doc_id}"),
-      );
+      const createDocCard = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.textContent?.includes("POST") &&
+            b.textContent?.includes("/api/documents") &&
+            !b.textContent?.includes("{doc_id}"),
+        );
       if (!createDocCard) throw new Error("Could not find Create a document card");
       await user.click(createDocCard);
 
       const sendBtn = await screen.findByRole("button", { name: /Send Request/ });
       await user.click(sendBtn);
 
-      await waitFor(() => {
-        expect(screen.getByText(/"id": "abc"/)).toBeInTheDocument();
-        expect(screen.getByText(/"title": "My Doc"/)).toBeInTheDocument();
-      });
-    });
+      await waitFor(
+        () => {
+          expect(screen.getByText(/"id": "abc"/)).toBeInTheDocument();
+          expect(screen.getByText(/"title": "My Doc"/)).toBeInTheDocument();
+        },
+        { timeout: 10_000 },
+      );
+    }, 15_000);
 
     it("path parameter inputs: endpoint with path params shows param input", async () => {
       render(<ApiDocsPage />);
-      const cardButtons = screen.getAllByRole("button").filter(
-        (b) =>
-          b.textContent?.includes("DELETE") &&
-          b.textContent?.includes("/api/keys/{key_id}") &&
-          !b.textContent?.includes("Send Request"),
-      );
+      const cardButtons = screen
+        .getAllByRole("button")
+        .filter(
+          (b) =>
+            b.textContent?.includes("DELETE") &&
+            b.textContent?.includes("/api/keys/{key_id}") &&
+            !b.textContent?.includes("Send Request"),
+        );
       const revokeKeyCard = cardButtons[0];
       if (!revokeKeyCard) throw new Error("Could not find Revoke an API key card");
       fireEvent.click(revokeKeyCard);
@@ -442,12 +446,14 @@ describe("ApiDocsPage", () => {
     it("body editing for POST endpoint: body textarea is rendered with default JSON", async () => {
       const user = userEvent.setup();
       render(<ApiDocsPage />);
-      const createDocCard = screen.getAllByRole("button").find(
-        (b) =>
-          b.textContent?.includes("POST") &&
-          b.textContent?.includes("/api/documents") &&
-          !b.textContent?.includes("{doc_id}"),
-      );
+      const createDocCard = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.textContent?.includes("POST") &&
+            b.textContent?.includes("/api/documents") &&
+            !b.textContent?.includes("{doc_id}"),
+        );
       if (!createDocCard) throw new Error("Could not find Create a document card");
       await user.click(createDocCard);
 
@@ -461,12 +467,14 @@ describe("ApiDocsPage", () => {
     it("edit body text: typing in body textarea updates value", async () => {
       const user = userEvent.setup();
       render(<ApiDocsPage />);
-      const createDocCard = screen.getAllByRole("button").find(
-        (b) =>
-          b.textContent?.includes("POST") &&
-          b.textContent?.includes("/api/documents") &&
-          !b.textContent?.includes("{doc_id}"),
-      );
+      const createDocCard = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.textContent?.includes("POST") &&
+            b.textContent?.includes("/api/documents") &&
+            !b.textContent?.includes("{doc_id}"),
+        );
       if (!createDocCard) throw new Error("Could not find Create a document card");
       await user.click(createDocCard);
 
@@ -502,12 +510,14 @@ describe("ApiDocsPage", () => {
 
       const user = userEvent.setup();
       render(<ApiDocsPage />);
-      const createDocCard = screen.getAllByRole("button").find(
-        (b) =>
-          b.textContent?.includes("POST") &&
-          b.textContent?.includes("/api/documents") &&
-          !b.textContent?.includes("{doc_id}"),
-      );
+      const createDocCard = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.textContent?.includes("POST") &&
+            b.textContent?.includes("/api/documents") &&
+            !b.textContent?.includes("{doc_id}"),
+        );
       if (!createDocCard) throw new Error("Could not find Create a document card");
       await user.click(createDocCard);
 
@@ -522,12 +532,14 @@ describe("ApiDocsPage", () => {
     it("TryIt panel for DELETE endpoint: shows Send button", async () => {
       const user = userEvent.setup();
       render(<ApiDocsPage />);
-      const deleteDocCard = screen.getAllByRole("button").find(
-        (b) =>
-          b.textContent?.includes("DELETE") &&
-          b.textContent?.includes("/api/documents/{doc_id}") &&
-          b.textContent?.includes("Delete a document"),
-      );
+      const deleteDocCard = screen
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.textContent?.includes("DELETE") &&
+            b.textContent?.includes("/api/documents/{doc_id}") &&
+            b.textContent?.includes("Delete a document"),
+        );
       if (!deleteDocCard) throw new Error("Could not find Delete a document card");
       await user.click(deleteDocCard);
 

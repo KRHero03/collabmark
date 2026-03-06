@@ -33,13 +33,7 @@ interface MarkdownPreviewProps {
  * Lazily imports the mermaid library and converts the definition into an SVG.
  * Re-renders when chart content or dark mode changes.
  */
-const MermaidBlock = memo(function MermaidBlock({
-  chart,
-  isDark,
-}: {
-  chart: string;
-  isDark: boolean;
-}) {
+const MermaidBlock = memo(function MermaidBlock({ chart, isDark }: { chart: string; isDark: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>("");
   const [error, setError] = useState<string>("");
@@ -57,10 +51,7 @@ const MermaidBlock = memo(function MermaidBlock({
           securityLevel: "loose",
         });
 
-        const { svg: rendered } = await mermaid.render(
-          stableId.current,
-          chart.trim(),
-        );
+        const { svg: rendered } = await mermaid.render(stableId.current, chart.trim());
         if (!cancelled) {
           setSvg(rendered);
           setError("");
@@ -77,27 +68,15 @@ const MermaidBlock = memo(function MermaidBlock({
 
   if (error) {
     return (
-      <pre className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-600">
-        Mermaid error: {error}
-      </pre>
+      <pre className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-600">Mermaid error: {error}</pre>
     );
   }
 
   if (!svg) {
-    return (
-      <div className="flex items-center justify-center py-4 text-sm text-gray-400">
-        Rendering diagram...
-      </div>
-    );
+    return <div className="flex items-center justify-center py-4 text-sm text-gray-400">Rendering diagram...</div>;
   }
 
-  return (
-    <div
-      ref={containerRef}
-      className="my-4 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
-  );
+  return <div ref={containerRef} className="my-4 overflow-x-auto" dangerouslySetInnerHTML={{ __html: svg }} />;
 });
 
 /**
@@ -129,11 +108,7 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
 
   const components = useMemo(
     () => ({
-      code({
-        className: cn,
-        children,
-        ...props
-      }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
+      code({ className: cn, children, ...props }: React.ComponentPropsWithoutRef<"code"> & { className?: string }) {
         if (/language-mermaid/.test(cn || "")) {
           return <MermaidBlock chart={String(children)} isDark={isDark} />;
         }
@@ -148,14 +123,8 @@ export function MarkdownPreview({ content, className }: MarkdownPreviewProps) {
   );
 
   return (
-    <div
-      className={`prose prose-sm dark:prose-invert max-w-none overflow-auto p-6 ${className ?? ""}`}
-    >
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
-        components={components}
-      >
+    <div className={`prose prose-sm dark:prose-invert max-w-none overflow-auto p-6 ${className ?? ""}`}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]} components={components}>
         {content}
       </ReactMarkdown>
     </div>

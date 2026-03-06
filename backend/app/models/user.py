@@ -1,6 +1,6 @@
 """User model and related Pydantic schemas for API responses and updates."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from beanie import Document, Indexed
@@ -16,15 +16,15 @@ class User(Document):
     avatar_url: Optional[str] = None
     org_id: Optional[str] = None
     auth_provider: str = "google"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "users"
 
     def touch(self) -> None:
         """Update updated_at to the current UTC timestamp."""
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
 
 class UserRead(BaseModel):

@@ -24,15 +24,30 @@ from app.models.document import Document_
 from app.models.document_version import DocumentVersion
 from app.models.document_view import DocumentView
 from app.models.folder import Folder, FolderAccess, FolderView
+from app.models.org_sso_config import OrgSSOConfig
+from app.models.organization import Organization, OrgMembership
 from app.models.share_link import DocumentAccess, ShareLink
 from app.models.user import User
-from app.models.organization import Organization, OrgMembership
-from app.models.org_sso_config import OrgSSOConfig
 from app.routes import auth, comments, documents, folders, keys, orgs, sharing, users, versions, ws
 from app.services.crdt_store import MongoYStore
 from app.ws.handler import start_websocket_server, stop_websocket_server
 
-DOCUMENT_MODELS = [User, Document_, ApiKey, DocumentAccess, ShareLink, DocumentVersion, Comment, DocumentView, Folder, FolderAccess, FolderView, Organization, OrgMembership, OrgSSOConfig]
+DOCUMENT_MODELS = [
+    User,
+    Document_,
+    ApiKey,
+    DocumentAccess,
+    ShareLink,
+    DocumentVersion,
+    Comment,
+    DocumentView,
+    Folder,
+    FolderAccess,
+    FolderView,
+    Organization,
+    OrgMembership,
+    OrgSSOConfig,
+]
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
@@ -62,7 +77,7 @@ app = FastAPI(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.jwt_secret_key,
+    secret_key=settings.session_secret_key,
 )
 
 app.add_middleware(
@@ -105,10 +120,17 @@ if STATIC_DIR.is_dir():
     if _assets_dir.is_dir():
         app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="static-assets")
 
+    _static_resolved = STATIC_DIR.resolve()
+
     @app.get("/{full_path:path}")
     async def spa_fallback(request: Request, full_path: str) -> FileResponse:
-        """Serve static files if they exist, otherwise serve index.html for SPA routing."""
-        candidate = STATIC_DIR / full_path
-        if full_path and candidate.is_file():
-            return FileResponse(candidate)
+        """Serve static files if they exist, otherwise serve index.html for SPA routing.
+
+        Path traversal is prevented by resolving the candidate and verifying
+        it is within the static directory.
+        """
+        if full_path:
+            candidate = (STATIC_DIR / full_path).resolve()
+            if candidate.is_file() and (_static_resolved in candidate.parents or candidate == _static_resolved):
+                return FileResponse(candidate)
         return FileResponse(_index_html)

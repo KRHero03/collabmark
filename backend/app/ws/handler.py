@@ -11,6 +11,7 @@ the user's permission from the database so that mid-session ACL changes
 within ``_PERM_RECHECK_INTERVAL`` seconds.
 """
 
+import contextlib
 import logging
 import time
 from typing import Any
@@ -57,7 +58,8 @@ class CollabWebsocketServer(WebsocketServer):
             if update_count:
                 logger.info(
                     "Loaded %d CRDT updates from store for room %s",
-                    update_count, name,
+                    update_count,
+                    name,
                 )
             self.rooms[name] = YRoom(
                 ready=self.rooms_ready,
@@ -118,10 +120,8 @@ class FastAPIWebsocketAdapter:
         Args:
             message: The binary data to send.
         """
-        try:
+        with contextlib.suppress(Exception):
             await self.websocket.send_bytes(message)
-        except Exception:
-            pass
 
     def _is_write_message(self, data: bytes) -> bool:
         """Check if a message is a Yjs sync-update (document edit).
@@ -158,7 +158,8 @@ class FastAPIWebsocketAdapter:
             if not self.read_only:
                 logger.info(
                     "Permission changed to %s for user on room %s; enabling read-only",
-                    perm, self.path,
+                    perm,
+                    self.path,
                 )
             self.read_only = True
 
@@ -179,9 +180,9 @@ class FastAPIWebsocketAdapter:
             try:
                 data = await self.websocket.receive_bytes()
             except WebSocketDisconnect:
-                raise StopAsyncIteration()
+                raise StopAsyncIteration() from None
             except Exception:
-                raise StopAsyncIteration()
+                raise StopAsyncIteration() from None
 
             if self._is_write_message(data):
                 await self._recheck_permission()
@@ -214,7 +215,8 @@ async def start_websocket_server() -> None:
     server = await get_websocket_server()
     if server._task_group is None:
         import asyncio
-        asyncio.create_task(server.start())
+
+        _bg_task = asyncio.create_task(server.start())  # noqa: RUF006 - prevent GC
         await server.started.wait()
         logger.info("CollabWebsocketServer started")
 

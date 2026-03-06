@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import {
-  Clock,
-  FileText,
-  Folder,
-  FolderPlus,
-  MoreVertical,
-  Plus,
-  Trash2,
-  Users,
-  XCircle,
-} from "lucide-react";
+import { Clock, FileText, Folder, FolderPlus, MoreVertical, Plus, Trash2, Users, XCircle } from "lucide-react";
 import { Navbar } from "../components/Layout/Navbar";
 import { FolderBreadcrumbs } from "../components/Home/FolderBreadcrumbs";
 import { CreateFolderDialog } from "../components/Home/CreateFolderDialog";
@@ -47,9 +37,14 @@ import {
   type RecentlyViewedFolder,
 } from "../lib/api";
 
+const Spinner = () => (
+  <div className="flex justify-center py-20">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
+  </div>
+);
+
 function extractApiError(err: unknown, fallback: string): string {
-  const detail = (err as { response?: { data?: { detail?: string } } })
-    ?.response?.data?.detail;
+  const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
   return detail || fallback;
 }
 
@@ -70,15 +65,8 @@ interface ConfirmState {
 }
 
 export function HomePage() {
-  const {
-    trash,
-    trashLoading,
-    deleteDocument,
-    renameDocument,
-    fetchTrash,
-    restoreDocument,
-    hardDeleteDocument,
-  } = useDocuments();
+  const { trash, trashLoading, deleteDocument, renameDocument, fetchTrash, restoreDocument, hardDeleteDocument } =
+    useDocuments();
   const {
     currentFolderId,
     currentFolderPermission,
@@ -121,10 +109,7 @@ export function HomePage() {
   const [shareFolder, setShareFolder] = useState<FolderItem | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
 
-  const requestConfirm = useCallback(
-    (state: ConfirmState) => setConfirmState(state),
-    [],
-  );
+  const requestConfirm = useCallback((state: ConfirmState) => setConfirmState(state), []);
   const closeConfirm = useCallback(() => setConfirmState(null), []);
 
   useEffect(() => {
@@ -140,15 +125,18 @@ export function HomePage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (currentFolderId) {
-        next.set("folder", currentFolderId);
-      } else {
-        next.delete("folder");
-      }
-      return next;
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (currentFolderId) {
+          next.set("folder", currentFolderId);
+        } else {
+          next.delete("folder");
+        }
+        return next;
+      },
+      { replace: true },
+    );
   }, [currentFolderId, setSearchParams]);
 
   useEffect(() => {
@@ -162,20 +150,14 @@ export function HomePage() {
   useEffect(() => {
     if (tab === "shared") {
       setSharedLoading(true);
-      Promise.all([
-        sharingApi.listShared(),
-        foldersApi.listShared(),
-      ]).then(([docsRes, foldersRes]) => {
+      Promise.all([sharingApi.listShared(), foldersApi.listShared()]).then(([docsRes, foldersRes]) => {
         setSharedDocs(docsRes.data);
         setSharedFolders(foldersRes.data);
         setSharedLoading(false);
       });
     } else if (tab === "recent") {
       setRecentLoading(true);
-      Promise.all([
-        sharingApi.listRecentlyViewed(),
-        foldersApi.listRecentlyViewed(),
-      ]).then(([docsRes, foldersRes]) => {
+      Promise.all([sharingApi.listRecentlyViewed(), foldersApi.listRecentlyViewed()]).then(([docsRes, foldersRes]) => {
         setRecentDocs(docsRes.data);
         setRecentFolders(foldersRes.data);
         setRecentLoading(false);
@@ -455,20 +437,16 @@ export function HomePage() {
     [buildTrashFolderActions],
   );
 
-  const openMenuFromButton = useCallback(
-    (e: React.MouseEvent<HTMLButtonElement>, actions: ContextMenuAction[]) => {
-      e.stopPropagation();
-      const rect = e.currentTarget.getBoundingClientRect();
-      setContextMenu({ x: rect.right, y: rect.bottom, actions });
-    },
-    [],
-  );
+  const openMenuFromButton = useCallback((e: React.MouseEvent<HTMLButtonElement>, actions: ContextMenuAction[]) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({ x: rect.right, y: rect.bottom, actions });
+  }, []);
 
   const handleEmptyTrash = () => {
     requestConfirm({
       title: "Empty Trash",
-      message:
-        "Permanently delete all items in trash? This cannot be undone.",
+      message: "Permanently delete all items in trash? This cannot be undone.",
       confirmLabel: "Empty Trash",
       variant: "danger",
       onConfirm: async () => {
@@ -492,19 +470,11 @@ export function HomePage() {
     <button
       onClick={() => setTab(t)}
       className={`flex-shrink-0 flex-1 rounded-md px-4 py-2 text-sm font-medium transition ${
-        tab === t
-          ? "bg-[var(--color-primary)] text-white"
-          : "text-[var(--color-text-muted)] hover:bg-gray-50"
+        tab === t ? "bg-[var(--color-primary)] text-white" : "text-[var(--color-text-muted)] hover:bg-gray-50"
       }`}
     >
       {label}
     </button>
-  );
-
-  const Spinner = () => (
-    <div className="flex justify-center py-20">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
-    </div>
   );
 
   return (
@@ -560,15 +530,10 @@ export function HomePage() {
         {/* ========== BROWSE (File Browser) ========== */}
         {tab === "browse" && (
           <>
-            <FolderBreadcrumbs
-              breadcrumbs={breadcrumbs}
-              onNavigate={navigateToFolder}
-            />
+            <FolderBreadcrumbs breadcrumbs={breadcrumbs} onNavigate={navigateToFolder} />
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-xl font-semibold">
-                {breadcrumbs.length > 0
-                  ? breadcrumbs[breadcrumbs.length - 1].name
-                  : "My Files"}
+                {breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].name : "My Files"}
               </h2>
               {currentFolderPermission === "edit" && (
                 <div className="flex gap-2">
@@ -678,9 +643,7 @@ export function HomePage() {
             ) : sharedDocs.length === 0 && sharedFolders.length === 0 ? (
               <div className="rounded-lg border border-dashed border-[var(--color-border)] p-12 text-center">
                 <Users className="mx-auto mb-3 h-10 w-10 text-[var(--color-text-muted)]" />
-                <p className="text-[var(--color-text-muted)]">
-                  No items shared with you yet.
-                </p>
+                <p className="text-[var(--color-text-muted)]">No items shared with you yet.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -699,8 +662,7 @@ export function HomePage() {
                       <div>
                         <p className="font-medium">{f.name}</p>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          by {f.owner_name} · {f.permission} access · Shared{" "}
-                          {formatDateTime(f.last_accessed_at)}
+                          by {f.owner_name} · {f.permission} access · Shared {formatDateTime(f.last_accessed_at)}
                         </p>
                       </div>
                     </div>
@@ -728,8 +690,7 @@ export function HomePage() {
                       <div>
                         <p className="font-medium">{doc.title}</p>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          {doc.permission} access | Last accessed{" "}
-                          {formatDateTime(doc.last_accessed_at)}
+                          {doc.permission} access | Last accessed {formatDateTime(doc.last_accessed_at)}
                         </p>
                       </div>
                     </div>
@@ -755,9 +716,7 @@ export function HomePage() {
             ) : recentDocs.length === 0 && recentFolders.length === 0 ? (
               <div className="rounded-lg border border-dashed border-[var(--color-border)] p-12 text-center">
                 <Clock className="mx-auto mb-3 h-10 w-10 text-[var(--color-text-muted)]" />
-                <p className="text-[var(--color-text-muted)]">
-                  No recently viewed items yet.
-                </p>
+                <p className="text-[var(--color-text-muted)]">No recently viewed items yet.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -776,8 +735,7 @@ export function HomePage() {
                       <div>
                         <p className="font-medium">{f.name}</p>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          by {f.owner_name} · {f.permission} access · Viewed{" "}
-                          {formatDateTime(f.viewed_at)}
+                          by {f.owner_name} · {f.permission} access · Viewed {formatDateTime(f.viewed_at)}
                         </p>
                       </div>
                     </div>
@@ -805,8 +763,7 @@ export function HomePage() {
                       <div>
                         <p className="font-medium">{doc.title}</p>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          by {doc.owner_name} · {doc.permission} access · Viewed{" "}
-                          {formatDateTime(doc.viewed_at)}
+                          by {doc.owner_name} · {doc.permission} access · Viewed {formatDateTime(doc.viewed_at)}
                         </p>
                       </div>
                     </div>
@@ -856,14 +813,9 @@ export function HomePage() {
                     <div className="flex items-center gap-3">
                       <Folder className="h-5 w-5 flex-shrink-0 text-[var(--color-text-muted)]" />
                       <div>
-                        <p className="font-medium text-[var(--color-text)]">
-                          {folder.name}
-                        </p>
+                        <p className="font-medium text-[var(--color-text)]">{folder.name}</p>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          Folder · Deleted{" "}
-                          {folder.deleted_at
-                            ? formatDateTime(folder.deleted_at)
-                            : "recently"}
+                          Folder · Deleted {folder.deleted_at ? formatDateTime(folder.deleted_at) : "recently"}
                         </p>
                       </div>
                     </div>
@@ -888,14 +840,9 @@ export function HomePage() {
                     <div className="flex items-center gap-3">
                       <FileText className="h-5 w-5 flex-shrink-0 text-[var(--color-text-muted)]" />
                       <div>
-                        <p className="font-medium text-[var(--color-text)]">
-                          {doc.title}
-                        </p>
+                        <p className="font-medium text-[var(--color-text)]">{doc.title}</p>
                         <p className="text-xs text-[var(--color-text-muted)]">
-                          Document · Deleted{" "}
-                          {doc.deleted_at
-                            ? formatDateTime(doc.deleted_at)
-                            : "recently"}
+                          Document · Deleted {doc.deleted_at ? formatDateTime(doc.deleted_at) : "recently"}
                         </p>
                       </div>
                     </div>
@@ -933,17 +880,9 @@ export function HomePage() {
         onCancel={closeConfirm}
       />
 
-      <DocumentInfoModal
-        doc={infoDoc!}
-        open={infoDoc !== null}
-        onClose={() => setInfoDoc(null)}
-      />
+      <DocumentInfoModal doc={infoDoc!} open={infoDoc !== null} onClose={() => setInfoDoc(null)} />
 
-      <FolderInfoModal
-        folder={infoFolder!}
-        open={infoFolder !== null}
-        onClose={() => setInfoFolder(null)}
-      />
+      <FolderInfoModal folder={infoFolder!} open={infoFolder !== null} onClose={() => setInfoFolder(null)} />
 
       {renameDoc && (
         <RenameDialog
@@ -994,9 +933,7 @@ export function HomePage() {
           ownerEmail={shareDoc.owner_email}
           ownerName={shareDoc.owner_name}
           ownerAvatarUrl={shareDoc.owner_avatar_url}
-          onGeneralAccessChange={(ga) =>
-            setShareDoc((prev) => (prev ? { ...prev, general_access: ga } : prev))
-          }
+          onGeneralAccessChange={(ga) => setShareDoc((prev) => (prev ? { ...prev, general_access: ga } : prev))}
         />
       )}
 
@@ -1010,9 +947,7 @@ export function HomePage() {
           ownerEmail={shareFolder.owner_email}
           ownerName={shareFolder.owner_name}
           ownerAvatarUrl={shareFolder.owner_avatar_url}
-          onGeneralAccessChange={(ga) =>
-            setShareFolder((prev) => (prev ? { ...prev, general_access: ga } : prev))
-          }
+          onGeneralAccessChange={(ga) => setShareFolder((prev) => (prev ? { ...prev, general_access: ga } : prev))}
         />
       )}
 

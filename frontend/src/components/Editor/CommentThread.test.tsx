@@ -56,9 +56,7 @@ describe("CommentThread", () => {
 
     expect(screen.getByText("Alice")).toBeInTheDocument();
     expect(screen.getByText("Test comment body")).toBeInTheDocument();
-    expect(
-      screen.getByText("Formatted: 2026-01-15T10:30:00Z"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Formatted: 2026-01-15T10:30:00Z")).toBeInTheDocument();
   });
 
   it("renders replies", () => {
@@ -70,18 +68,11 @@ describe("CommentThread", () => {
       created_at: "2026-01-15T11:00:00Z",
     });
 
-    render(
-      <CommentThread
-        {...defaultProps}
-        comment={makeComment({ replies: [reply] })}
-      />,
-    );
+    render(<CommentThread {...defaultProps} comment={makeComment({ replies: [reply] })} />);
 
     expect(screen.getByText("Reply content")).toBeInTheDocument();
     expect(screen.getByText("Bob")).toBeInTheDocument();
-    expect(
-      screen.getByText("Formatted: 2026-01-15T11:00:00Z"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Formatted: 2026-01-15T11:00:00Z")).toBeInTheDocument();
   });
 
   it("shows resolve button when not resolved", () => {
@@ -92,12 +83,7 @@ describe("CommentThread", () => {
   });
 
   it("does not show resolve button when resolved", () => {
-    render(
-      <CommentThread
-        {...defaultProps}
-        comment={makeComment({ is_resolved: true })}
-      />,
-    );
+    render(<CommentThread {...defaultProps} comment={makeComment({ is_resolved: true })} />);
 
     expect(screen.queryByTitle("Resolve")).not.toBeInTheDocument();
     expect(screen.getByText("Resolved")).toBeInTheDocument();
@@ -138,13 +124,7 @@ describe("CommentThread", () => {
   });
 
   it("orphaned state: shows Referenced text was removed badge", () => {
-    render(
-      <CommentThread
-        {...defaultProps}
-        comment={makeComment({ is_orphaned: true })}
-        anchorStatus="orphaned"
-      />,
-    );
+    render(<CommentThread {...defaultProps} comment={makeComment({ is_orphaned: true })} anchorStatus="orphaned" />);
 
     expect(screen.getByText("Referenced text was removed")).toBeInTheDocument();
   });
@@ -165,26 +145,13 @@ describe("CommentThread", () => {
   });
 
   it("modified state: shows Referenced text was modified badge", () => {
-    render(
-      <CommentThread
-        {...defaultProps}
-        comment={makeComment()}
-        anchorStatus="modified"
-      />,
-    );
+    render(<CommentThread {...defaultProps} comment={makeComment()} anchorStatus="modified" />);
 
-    expect(
-      screen.getByText("Referenced text was modified"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Referenced text was modified")).toBeInTheDocument();
   });
 
   it("resolved state: shows Resolved text and resolved styling", () => {
-    render(
-      <CommentThread
-        {...defaultProps}
-        comment={makeComment({ is_resolved: true })}
-      />,
-    );
+    render(<CommentThread {...defaultProps} comment={makeComment({ is_resolved: true })} />);
 
     expect(screen.getByText("Resolved")).toBeInTheDocument();
   });
@@ -247,37 +214,20 @@ describe("CommentThread", () => {
   });
 
   it("does not show reply section when resolved", () => {
-    render(
-      <CommentThread
-        {...defaultProps}
-        comment={makeComment({ is_resolved: true })}
-      />,
-    );
+    render(<CommentThread {...defaultProps} comment={makeComment({ is_resolved: true })} />);
 
     expect(screen.queryByText("Reply")).not.toBeInTheDocument();
   });
 
   it("renders quoted text when present", () => {
-    render(
-      <CommentThread
-        {...defaultProps}
-        comment={makeComment({ quoted_text: "The selected passage" })}
-      />,
-    );
+    render(<CommentThread {...defaultProps} comment={makeComment({ quoted_text: "The selected passage" })} />);
 
     expect(screen.getByText("The selected passage")).toBeInTheDocument();
   });
 
   it("orphaned from comment.is_orphaned without anchorStatus", () => {
-    render(
-      <CommentThread
-        {...defaultProps}
-        comment={makeComment({ is_orphaned: true })}
-      />,
-    );
+    render(<CommentThread {...defaultProps} comment={makeComment({ is_orphaned: true })} />);
 
-    expect(
-      screen.getByText("Referenced text was removed"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Referenced text was removed")).toBeInTheDocument();
   });
 });

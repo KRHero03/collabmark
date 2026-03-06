@@ -1,14 +1,13 @@
 """Tests for trash list, hard delete, and related cleanup."""
 
 import pytest
-from httpx import AsyncClient
-
 from app.auth.jwt import create_access_token
 from app.models.comment import Comment
 from app.models.document_version import DocumentVersion
 from app.models.document_view import DocumentView
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
+from httpx import AsyncClient
 
 
 def _auth_cookies(user: User) -> dict[str, str]:
@@ -31,9 +30,7 @@ class TestListTrash:
         assert resp.json() == []
 
     @pytest.mark.asyncio
-    async def test_trash_returns_only_deleted_docs(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_trash_returns_only_deleted_docs(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc1 = await _create_doc(async_client, "Active Doc")
         doc2 = await _create_doc(async_client, "Trashed Doc")
@@ -54,9 +51,7 @@ class TestListTrash:
         assert doc2["id"] not in active_ids
 
     @pytest.mark.asyncio
-    async def test_trash_sorted_by_deleted_at_desc(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_trash_sorted_by_deleted_at_desc(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc1 = await _create_doc(async_client, "First Deleted")
         doc2 = await _create_doc(async_client, "Second Deleted")
@@ -79,9 +74,7 @@ class TestListTrash:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_trash_excludes_other_users_docs(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_trash_excludes_other_users_docs(self, async_client: AsyncClient, test_user: User):
         other_user = User(
             google_id="google-other-456",
             email="other@example.com",
@@ -99,9 +92,7 @@ class TestListTrash:
         assert resp.json() == []
 
     @pytest.mark.asyncio
-    async def test_trash_includes_deleted_at_and_content_length(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_trash_includes_deleted_at_and_content_length(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client, "Info Doc", content="Hello World")
         await async_client.delete(f"/api/documents/{doc['id']}")
@@ -113,9 +104,7 @@ class TestListTrash:
         assert trash[0]["content_length"] == len("Hello World")
 
     @pytest.mark.asyncio
-    async def test_restored_doc_disappears_from_trash(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_restored_doc_disappears_from_trash(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client, "Restore Me")
         await async_client.delete(f"/api/documents/{doc['id']}")
@@ -131,9 +120,7 @@ class TestListTrash:
 
 class TestHardDelete:
     @pytest.mark.asyncio
-    async def test_hard_delete_removes_document(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_hard_delete_removes_document(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client, "Delete Me Forever")
 
@@ -144,9 +131,7 @@ class TestHardDelete:
         assert get_resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_hard_delete_trashed_doc(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_hard_delete_trashed_doc(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client, "Trash Then Nuke")
         await async_client.delete(f"/api/documents/{doc['id']}")
@@ -158,19 +143,13 @@ class TestHardDelete:
         assert doc["id"] not in [d["id"] for d in trash_resp.json()]
 
     @pytest.mark.asyncio
-    async def test_hard_delete_nonexistent(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_hard_delete_nonexistent(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
-        resp = await async_client.delete(
-            "/api/documents/000000000000000000000000/permanent"
-        )
+        resp = await async_client.delete("/api/documents/000000000000000000000000/permanent")
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_hard_delete_non_owner(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_hard_delete_non_owner(self, async_client: AsyncClient, test_user: User):
         other_user = User(
             google_id="google-nonowner-789",
             email="nonowner@example.com",
@@ -187,23 +166,17 @@ class TestHardDelete:
 
     @pytest.mark.asyncio
     async def test_hard_delete_unauthenticated(self, async_client: AsyncClient):
-        resp = await async_client.delete(
-            "/api/documents/000000000000000000000000/permanent"
-        )
+        resp = await async_client.delete("/api/documents/000000000000000000000000/permanent")
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_hard_delete_invalid_id(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_hard_delete_invalid_id(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         resp = await async_client.delete("/api/documents/not-an-id/permanent")
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_hard_delete_does_not_affect_other_docs(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_hard_delete_does_not_affect_other_docs(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc1 = await _create_doc(async_client, "Keep Me")
         doc2 = await _create_doc(async_client, "Delete Me")
@@ -217,9 +190,7 @@ class TestHardDelete:
 
 class TestHardDeleteCleanup:
     @pytest.mark.asyncio
-    async def test_cleans_up_comments(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_cleans_up_comments(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client)
         doc_id = doc["id"]
@@ -237,9 +208,7 @@ class TestHardDeleteCleanup:
         assert await Comment.find(Comment.document_id == doc_id).count() == 0
 
     @pytest.mark.asyncio
-    async def test_cleans_up_versions(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_cleans_up_versions(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client)
         doc_id = doc["id"]
@@ -258,9 +227,7 @@ class TestHardDeleteCleanup:
         assert await DocumentVersion.find(DocumentVersion.document_id == doc_id).count() == 0
 
     @pytest.mark.asyncio
-    async def test_cleans_up_access_records(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_cleans_up_access_records(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client)
         doc_id = doc["id"]
@@ -278,9 +245,7 @@ class TestHardDeleteCleanup:
         assert await DocumentAccess.find(DocumentAccess.document_id == doc_id).count() == 0
 
     @pytest.mark.asyncio
-    async def test_cleans_up_view_records(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_cleans_up_view_records(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client)
         doc_id = doc["id"]
@@ -293,9 +258,7 @@ class TestHardDeleteCleanup:
         assert await DocumentView.find(DocumentView.document_id == doc_id).count() == 0
 
     @pytest.mark.asyncio
-    async def test_cleans_up_multiple_related_records(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_cleans_up_multiple_related_records(self, async_client: AsyncClient, test_user: User):
         """Hard delete should remove all related data even when there are many records."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client)
@@ -325,25 +288,19 @@ class TestHardDeleteCleanup:
 
 class TestContentLength:
     @pytest.mark.asyncio
-    async def test_content_length_in_response(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_content_length_in_response(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client, "Sized", content="Hello, World!")
         assert doc["content_length"] == 13
 
     @pytest.mark.asyncio
-    async def test_content_length_empty(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_content_length_empty(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client, "Empty")
         assert doc["content_length"] == 0
 
     @pytest.mark.asyncio
-    async def test_content_length_updates_after_edit(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_content_length_updates_after_edit(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _create_doc(async_client, "Editable", content="short")
         assert doc["content_length"] == 5
@@ -355,9 +312,7 @@ class TestContentLength:
         assert resp.json()["content_length"] == 30
 
     @pytest.mark.asyncio
-    async def test_content_length_in_list(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_content_length_in_list(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         await _create_doc(async_client, "Doc1", content="abc")
         await _create_doc(async_client, "Doc2", content="abcdef")

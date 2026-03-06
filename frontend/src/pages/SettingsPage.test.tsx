@@ -62,12 +62,8 @@ describe("SettingsPage", () => {
       expect(vi.mocked(keysApi).list).toHaveBeenCalledTimes(1);
     });
     expect(screen.getByText("CI Pipeline")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Created formatted:2026-01-10T00:00:00Z/)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/Last used formatted:2026-01-15T12:00:00Z/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Created formatted:2026-01-10T00:00:00Z/)).toBeInTheDocument();
+    expect(screen.getByText(/Last used formatted:2026-01-15T12:00:00Z/)).toBeInTheDocument();
   });
 
   it("creates key with exact name entered and shows raw_key", async () => {
@@ -80,8 +76,8 @@ describe("SettingsPage", () => {
         created_at: "2026-03-01T00:00:00Z",
       },
     } as never);
-    vi.mocked(keysApi).list
-      .mockResolvedValueOnce({ data: [] } as never)
+    vi.mocked(keysApi)
+      .list.mockResolvedValueOnce({ data: [] } as never)
       .mockResolvedValueOnce({
         data: [
           {
@@ -165,8 +161,8 @@ describe("SettingsPage", () => {
         created_at: "2026-03-01T00:00:00Z",
       },
     } as never);
-    vi.mocked(keysApi).list
-      .mockResolvedValueOnce({ data: [] } as never)
+    vi.mocked(keysApi)
+      .list.mockResolvedValueOnce({ data: [] } as never)
       .mockResolvedValueOnce({
         data: [
           {
@@ -203,8 +199,8 @@ describe("SettingsPage", () => {
         created_at: "2026-03-01T00:00:00Z",
       },
     } as never);
-    vi.mocked(keysApi).list
-      .mockResolvedValueOnce({ data: [] } as never)
+    vi.mocked(keysApi)
+      .list.mockResolvedValueOnce({ data: [] } as never)
       .mockResolvedValueOnce({ data: [] } as never);
     render(<SettingsPage />);
     await waitFor(() => {

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 /**
  * Right-click context menu for document cards on the home page.
  *
@@ -7,16 +8,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import {
-  ExternalLink,
-  FolderOpen,
-  Pencil,
-  Share2,
-  Trash2,
-  Info,
-  RotateCcw,
-  XCircle,
-} from "lucide-react";
+import { ExternalLink, FolderOpen, Pencil, Share2, Trash2, Info, RotateCcw, XCircle } from "lucide-react";
 
 export interface ContextMenuAction {
   label: string;
@@ -32,12 +24,7 @@ interface DocumentContextMenuProps {
   onClose: () => void;
 }
 
-export function DocumentContextMenu({
-  x,
-  y,
-  actions,
-  onClose,
-}: DocumentContextMenuProps) {
+export function DocumentContextMenu({ x, y, actions, onClose }: DocumentContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -86,9 +73,7 @@ export function DocumentContextMenu({
             onClose();
           }}
           className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--color-hover)] ${
-            action.variant === "danger"
-              ? "text-red-600 dark:text-red-400"
-              : "text-[var(--color-text)]"
+            action.variant === "danger" ? "text-red-600 dark:text-red-400" : "text-[var(--color-text)]"
           }`}
         >
           {action.icon}
@@ -120,9 +105,7 @@ export function getEntityActions(
 ): ContextMenuAction[] {
   const actions: ContextMenuAction[] = [];
 
-  const openIcon = entityType === "folder"
-    ? <FolderOpen className="h-4 w-4" />
-    : <ExternalLink className="h-4 w-4" />;
+  const openIcon = entityType === "folder" ? <FolderOpen className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />;
   actions.push({ label: "Open", icon: openIcon, onClick: handlers.onOpen });
 
   if (perms.can_share && handlers.onShare) {
@@ -132,7 +115,12 @@ export function getEntityActions(
     actions.push({ label: "Rename", icon: <Pencil className="h-4 w-4" />, onClick: handlers.onRename });
   }
   if (perms.can_delete && handlers.onTrash) {
-    actions.push({ label: "Move to Trash", icon: <Trash2 className="h-4 w-4" />, onClick: handlers.onTrash, variant: "danger" });
+    actions.push({
+      label: "Move to Trash",
+      icon: <Trash2 className="h-4 w-4" />,
+      onClick: handlers.onTrash,
+      variant: "danger",
+    });
   }
   if (handlers.onViewAcl) {
     actions.push({ label: "View Permissions", icon: <Info className="h-4 w-4" />, onClick: handlers.onViewAcl });
@@ -152,11 +140,12 @@ export function getOwnedDocActions(handlers: {
   return getEntityActions("document", { can_view: true, can_edit: true, can_delete: true, can_share: true }, handlers);
 }
 
-export function getSharedDocActions(handlers: {
-  onOpen: () => void;
-  onInfo: () => void;
-}): ContextMenuAction[] {
-  return getEntityActions("document", { can_view: true, can_edit: false, can_delete: false, can_share: false }, handlers);
+export function getSharedDocActions(handlers: { onOpen: () => void; onInfo: () => void }): ContextMenuAction[] {
+  return getEntityActions(
+    "document",
+    { can_view: true, can_edit: false, can_delete: false, can_share: false },
+    handlers,
+  );
 }
 
 export function getTrashDocActions(handlers: {
@@ -166,7 +155,12 @@ export function getTrashDocActions(handlers: {
 }): ContextMenuAction[] {
   return [
     { label: "Restore", icon: <RotateCcw className="h-4 w-4" />, onClick: handlers.onRestore },
-    { label: "Delete permanently", icon: <XCircle className="h-4 w-4" />, onClick: handlers.onDeletePermanently, variant: "danger" },
+    {
+      label: "Delete permanently",
+      icon: <XCircle className="h-4 w-4" />,
+      onClick: handlers.onDeletePermanently,
+      variant: "danger",
+    },
     { label: "Info", icon: <Info className="h-4 w-4" />, onClick: handlers.onInfo },
   ];
 }
@@ -188,7 +182,12 @@ export function getTrashFolderActions(handlers: {
 }): ContextMenuAction[] {
   return [
     { label: "Restore", icon: <RotateCcw className="h-4 w-4" />, onClick: handlers.onRestore },
-    { label: "Delete permanently", icon: <XCircle className="h-4 w-4" />, onClick: handlers.onDeletePermanently, variant: "danger" },
+    {
+      label: "Delete permanently",
+      icon: <XCircle className="h-4 w-4" />,
+      onClick: handlers.onDeletePermanently,
+      variant: "danger",
+    },
     { label: "Info", icon: <Info className="h-4 w-4" />, onClick: handlers.onInfo },
   ];
 }

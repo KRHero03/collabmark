@@ -70,9 +70,7 @@ export function CommentThread({
           <UserAvatar url={comment.author_avatar_url} name={comment.author_name} size="sm" className="flex-shrink-0" />
           <div>
             <p className="text-sm font-medium">{comment.author_name}</p>
-            <p className="text-xs text-[var(--color-text-muted)]">
-              {formatDateTime(comment.created_at)}
-            </p>
+            <p className="text-xs text-[var(--color-text-muted)]">{formatDateTime(comment.created_at)}</p>
           </div>
         </div>
         <div className="flex gap-1">
@@ -111,20 +109,21 @@ export function CommentThread({
 
       <p className="mt-1 text-sm">{comment.content}</p>
 
-      {comment.is_resolved && (
-        <p className="mt-1 text-xs text-green-600">Resolved</p>
-      )}
+      {comment.is_resolved && <p className="mt-1 text-xs text-green-600">Resolved</p>}
 
       {comment.replies.length > 0 && (
         <div className="mt-2 space-y-2 border-l-2 border-gray-200 pl-3">
           {comment.replies.map((reply) => (
             <div key={reply.id} className="flex gap-2">
-              <UserAvatar url={reply.author_avatar_url} name={reply.author_name} size="sm" className="mt-0.5 flex-shrink-0" />
+              <UserAvatar
+                url={reply.author_avatar_url}
+                name={reply.author_name}
+                size="sm"
+                className="mt-0.5 flex-shrink-0"
+              />
               <div>
                 <p className="text-xs font-medium">{reply.author_name}</p>
-                <p className="text-xs text-[var(--color-text-muted)]">
-                  {formatDateTime(reply.created_at)}
-                </p>
+                <p className="text-xs text-[var(--color-text-muted)]">{formatDateTime(reply.created_at)}</p>
                 <p className="text-sm">{reply.content}</p>
               </div>
             </div>

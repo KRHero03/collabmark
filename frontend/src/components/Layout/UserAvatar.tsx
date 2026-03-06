@@ -14,12 +14,7 @@ interface UserAvatarProps {
   className?: string;
 }
 
-export function UserAvatar({
-  url,
-  name,
-  size = "md",
-  className = "",
-}: UserAvatarProps) {
+export function UserAvatar({ url, name, size = "md", className = "" }: UserAvatarProps) {
   const [failed, setFailed] = useState(false);
   const s = SIZES[size];
 

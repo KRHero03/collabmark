@@ -2,12 +2,11 @@ import asyncio
 
 import pytest
 import pytest_asyncio
+from app.main import DOCUMENT_MODELS, app
+from app.models.user import User
 from beanie import init_beanie
 from httpx import ASGITransport, AsyncClient
 from mongomock_motor import AsyncMongoMockClient
-
-from app.main import DOCUMENT_MODELS, app
-from app.models.user import User
 
 
 @pytest.fixture(scope="session")

@@ -59,9 +59,7 @@ describe("App", () => {
       fetchUser: mockFetchUser,
     });
     render(<App />);
-    const spinner = document.querySelector(
-      ".animate-spin.rounded-full.border-2"
-    );
+    const spinner = document.querySelector(".animate-spin.rounded-full.border-2");
     expect(spinner).toBeInTheDocument();
   });
 
@@ -101,9 +99,7 @@ describe("App", () => {
       window.history.pushState({}, "", "/edit/doc-123");
       render(<App />);
 
-      const spinner = document.querySelector(
-        ".animate-spin.rounded-full.border-2",
-      );
+      const spinner = document.querySelector(".animate-spin.rounded-full.border-2");
       expect(spinner).toBeInTheDocument();
       expect(screen.queryByTestId("editor-page")).not.toBeInTheDocument();
     });

@@ -20,9 +20,7 @@ export function ToastContainer() {
           data-testid={`toast-${toast.type}`}
           data-phase={toast.phase}
           className={`flex items-center gap-2 rounded-lg px-4 py-3 text-sm font-medium shadow-lg transition-all duration-300 ease-in-out ${phaseClasses[toast.phase]} ${
-            toast.type === "success"
-              ? "bg-green-600 text-white"
-              : "bg-red-600 text-white"
+            toast.type === "success" ? "bg-green-600 text-white" : "bg-red-600 text-white"
           }`}
         >
           {toast.type === "success" ? (

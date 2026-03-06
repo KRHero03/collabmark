@@ -192,9 +192,7 @@ describe("API client", () => {
 
     it("removeCollaborator calls DELETE /folders/:id/collaborators/:uid", async () => {
       await foldersApi.removeCollaborator("folder-1", "user-1");
-      expect(axios.delete).toHaveBeenCalledWith(
-        "/folders/folder-1/collaborators/user-1",
-      );
+      expect(axios.delete).toHaveBeenCalledWith("/folders/folder-1/collaborators/user-1");
     });
 
     it("recordView calls POST /folders/:id/view", async () => {
@@ -252,9 +250,7 @@ describe("API client", () => {
 
     it("removeMember calls DELETE /orgs/:id/members/:userId", async () => {
       await orgsApi.removeMember("org-123", "user-456");
-      expect(axios.delete).toHaveBeenCalledWith(
-        "/orgs/org-123/members/user-456",
-      );
+      expect(axios.delete).toHaveBeenCalledWith("/orgs/org-123/members/user-456");
     });
 
     it("getSSOConfig calls GET /orgs/:id/sso", async () => {
@@ -306,17 +302,12 @@ describe("API client", () => {
   describe("sharingApi", () => {
     it("getMyPermission calls GET /documents/:id/permission", async () => {
       await sharingApi.getMyPermission("doc-abc-123");
-      expect(axios.get).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/permission",
-      );
+      expect(axios.get).toHaveBeenCalledWith("/documents/doc-abc-123/permission");
     });
 
     it("updateGeneralAccess calls PUT /documents/:id/access with payload", async () => {
       await sharingApi.updateGeneralAccess("doc-abc-123", "anyone_view");
-      expect(axios.put).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/access",
-        { general_access: "anyone_view" },
-      );
+      expect(axios.put).toHaveBeenCalledWith("/documents/doc-abc-123/access", { general_access: "anyone_view" });
     });
 
     it("addCollaborator calls POST /documents/:id/collaborators with payload", async () => {
@@ -324,24 +315,20 @@ describe("API client", () => {
         email: "collab@example.com",
         permission: "edit",
       });
-      expect(axios.post).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/collaborators",
-        { email: "collab@example.com", permission: "edit" },
-      );
+      expect(axios.post).toHaveBeenCalledWith("/documents/doc-abc-123/collaborators", {
+        email: "collab@example.com",
+        permission: "edit",
+      });
     });
 
     it("listCollaborators calls GET /documents/:id/collaborators", async () => {
       await sharingApi.listCollaborators("doc-abc-123");
-      expect(axios.get).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/collaborators",
-      );
+      expect(axios.get).toHaveBeenCalledWith("/documents/doc-abc-123/collaborators");
     });
 
     it("removeCollaborator calls DELETE /documents/:id/collaborators/:userId", async () => {
       await sharingApi.removeCollaborator("doc-abc-123", "user-xyz-789");
-      expect(axios.delete).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/collaborators/user-xyz-789",
-      );
+      expect(axios.delete).toHaveBeenCalledWith("/documents/doc-abc-123/collaborators/user-xyz-789");
     });
 
     it("listShared calls GET /documents/shared", async () => {
@@ -363,9 +350,7 @@ describe("API client", () => {
   describe("commentsApi", () => {
     it("list calls GET /documents/:id/comments", async () => {
       await commentsApi.list("doc-abc-123");
-      expect(axios.get).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/comments",
-      );
+      expect(axios.get).toHaveBeenCalledWith("/documents/doc-abc-123/comments");
     });
 
     it("create calls POST /documents/:id/comments with payload", async () => {
@@ -375,32 +360,24 @@ describe("API client", () => {
         anchor_to: 10,
         quoted_text: "hello world",
       });
-      expect(axios.post).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/comments",
-        {
-          content: "Great point!",
-          anchor_from: 0,
-          anchor_to: 10,
-          quoted_text: "hello world",
-        },
-      );
+      expect(axios.post).toHaveBeenCalledWith("/documents/doc-abc-123/comments", {
+        content: "Great point!",
+        anchor_from: 0,
+        anchor_to: 10,
+        quoted_text: "hello world",
+      });
     });
 
     it("reply calls POST /comments/:id/reply with content payload", async () => {
       await commentsApi.reply("comment-xyz-789", {
         content: "I agree",
       });
-      expect(axios.post).toHaveBeenCalledWith(
-        "/comments/comment-xyz-789/reply",
-        { content: "I agree" },
-      );
+      expect(axios.post).toHaveBeenCalledWith("/comments/comment-xyz-789/reply", { content: "I agree" });
     });
 
     it("resolve calls POST /comments/:id/resolve", async () => {
       await commentsApi.resolve("comment-xyz-789");
-      expect(axios.post).toHaveBeenCalledWith(
-        "/comments/comment-xyz-789/resolve",
-      );
+      expect(axios.post).toHaveBeenCalledWith("/comments/comment-xyz-789/resolve");
     });
 
     it("reanchor calls PATCH /comments/:id/reanchor with payload", async () => {
@@ -408,40 +385,29 @@ describe("API client", () => {
         anchor_from: 5,
         anchor_to: 15,
       });
-      expect(axios.patch).toHaveBeenCalledWith(
-        "/comments/comment-xyz-789/reanchor",
-        { anchor_from: 5, anchor_to: 15 },
-      );
+      expect(axios.patch).toHaveBeenCalledWith("/comments/comment-xyz-789/reanchor", { anchor_from: 5, anchor_to: 15 });
     });
 
     it("orphan calls PATCH /comments/:id/orphan", async () => {
       await commentsApi.orphan("comment-xyz-789");
-      expect(axios.patch).toHaveBeenCalledWith(
-        "/comments/comment-xyz-789/orphan",
-      );
+      expect(axios.patch).toHaveBeenCalledWith("/comments/comment-xyz-789/orphan");
     });
 
     it("delete calls DELETE /comments/:id", async () => {
       await commentsApi.delete("comment-xyz-789");
-      expect(axios.delete).toHaveBeenCalledWith(
-        "/comments/comment-xyz-789",
-      );
+      expect(axios.delete).toHaveBeenCalledWith("/comments/comment-xyz-789");
     });
   });
 
   describe("versionsApi", () => {
     it("list calls GET /documents/:id/versions", async () => {
       await versionsApi.list("doc-abc-123");
-      expect(axios.get).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/versions",
-      );
+      expect(axios.get).toHaveBeenCalledWith("/documents/doc-abc-123/versions");
     });
 
     it("get calls GET /documents/:id/versions/:versionNumber", async () => {
       await versionsApi.get("doc-abc-123", 42);
-      expect(axios.get).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/versions/42",
-      );
+      expect(axios.get).toHaveBeenCalledWith("/documents/doc-abc-123/versions/42");
     });
 
     it("create calls POST /documents/:id/versions with payload", async () => {
@@ -449,18 +415,15 @@ describe("API client", () => {
         content: "# Document content",
         summary: "Initial version",
       });
-      expect(axios.post).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/versions",
-        { content: "# Document content", summary: "Initial version" },
-      );
+      expect(axios.post).toHaveBeenCalledWith("/documents/doc-abc-123/versions", {
+        content: "# Document content",
+        summary: "Initial version",
+      });
     });
 
     it("create sends minimal payload without summary", async () => {
       await versionsApi.create("doc-abc-123", { content: "minimal" });
-      expect(axios.post).toHaveBeenCalledWith(
-        "/documents/doc-abc-123/versions",
-        { content: "minimal" },
-      );
+      expect(axios.post).toHaveBeenCalledWith("/documents/doc-abc-123/versions", { content: "minimal" });
     });
   });
 });

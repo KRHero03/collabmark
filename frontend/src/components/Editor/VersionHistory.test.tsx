@@ -46,35 +46,19 @@ describe("VersionHistory", () => {
 
   it("returns null when open is false", () => {
     const { container } = render(
-      <VersionHistory
-        docId="doc-1"
-        open={false}
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={vi.fn()}
-      />,
+      <VersionHistory docId="doc-1" open={false} onClose={vi.fn()} currentContent="Current" onRestore={vi.fn()} />,
     );
     expect(container.firstChild).toBeNull();
   });
 
   it("shows loading spinner when fetching versions", async () => {
-    mockVersionsApi.list.mockImplementation(
-      () => new Promise(() => {}),
-    );
+    mockVersionsApi.list.mockImplementation(() => new Promise(() => {}));
 
     const { container } = render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={vi.fn()}
-      />,
+      <VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current" onRestore={vi.fn()} />,
     );
 
-    const spinner = container.querySelector(
-      ".animate-spin.rounded-full.border-2",
-    );
+    const spinner = container.querySelector(".animate-spin.rounded-full.border-2");
     expect(spinner).toBeTruthy();
   });
 
@@ -82,21 +66,11 @@ describe("VersionHistory", () => {
     mockVersionsApi.list.mockResolvedValue({ data: [] });
 
     const { getByText } = render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={vi.fn()}
-      />,
+      <VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current" onRestore={vi.fn()} />,
     );
 
     await waitFor(() => {
-      expect(
-        getByText(
-          "No versions yet. Versions are created automatically as you edit.",
-        ),
-      ).toBeDefined();
+      expect(getByText("No versions yet. Versions are created automatically as you edit.")).toBeDefined();
     });
   });
 
@@ -106,13 +80,7 @@ describe("VersionHistory", () => {
     });
 
     const { getByText } = render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={vi.fn()}
-      />,
+      <VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current" onRestore={vi.fn()} />,
     );
 
     await waitFor(() => {
@@ -131,13 +99,7 @@ describe("VersionHistory", () => {
     });
 
     const { getAllByText, getAllByTestId } = render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current content"
-        onRestore={vi.fn()}
-      />,
+      <VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current content" onRestore={vi.fn()} />,
     );
 
     await waitFor(() => {
@@ -162,13 +124,7 @@ describe("VersionHistory", () => {
     });
 
     const { getAllByText, getByTestId } = render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={vi.fn()}
-      />,
+      <VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current" onRestore={vi.fn()} />,
     );
 
     await waitFor(() => {
@@ -192,13 +148,7 @@ describe("VersionHistory", () => {
 
     const onRestore = vi.fn();
     const { getAllByText, getByTestId } = render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={onRestore}
-      />,
+      <VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current" onRestore={onRestore} />,
     );
 
     await waitFor(() => {
@@ -213,10 +163,7 @@ describe("VersionHistory", () => {
 
     fireEvent.click(getByTestId("restore-version-btn"));
 
-    expect(onRestore).toHaveBeenCalledWith(
-      "Old content\nline2",
-      1,
-    );
+    expect(onRestore).toHaveBeenCalledWith("Old content\nline2", 1);
   });
 
   it("'Back to list' button returns to version list", async () => {
@@ -228,13 +175,7 @@ describe("VersionHistory", () => {
     });
 
     const { getAllByText, getByText } = render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={vi.fn()}
-      />,
+      <VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current" onRestore={vi.fn()} />,
     );
 
     await waitFor(() => {
@@ -257,15 +198,7 @@ describe("VersionHistory", () => {
   it("calls versionsApi.list when opened", async () => {
     mockVersionsApi.list.mockResolvedValue({ data: [] });
 
-    render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={vi.fn()}
-      />,
-    );
+    render(<VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current" onRestore={vi.fn()} />);
 
     await waitFor(() => {
       expect(mockVersionsApi.list).toHaveBeenCalledWith("doc-1");
@@ -281,13 +214,7 @@ describe("VersionHistory", () => {
     });
 
     const { getAllByText } = render(
-      <VersionHistory
-        docId="doc-1"
-        open
-        onClose={vi.fn()}
-        currentContent="Current"
-        onRestore={vi.fn()}
-      />,
+      <VersionHistory docId="doc-1" open onClose={vi.fn()} currentContent="Current" onRestore={vi.fn()} />,
     );
 
     await waitFor(() => {

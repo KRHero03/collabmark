@@ -11,15 +11,12 @@ Covers the User1/User2/User3 hierarchy scenario:
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
-
 from app.auth.jwt import create_access_token
 from app.models.document import Document_, GeneralAccess
 from app.models.folder import Folder, FolderAccess
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 from app.services.acl_service import (
-    EffectivePermission,
     all_children_owned_by,
     find_root_folder_by_walk,
     find_root_folder_from_id,
@@ -28,6 +25,7 @@ from app.services.acl_service import (
     get_root_owner_id,
     resolve_effective_permission,
 )
+from httpx import AsyncClient
 
 
 def _auth(user: User) -> dict[str, str]:
@@ -37,6 +35,7 @@ def _auth(user: User) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def user1() -> User:
@@ -124,6 +123,7 @@ async def hierarchy(user1: User, user2: User, user3: User):
 # find_root_folder helpers
 # =====================================================================
 
+
 class TestFindRootFolder:
     @pytest.mark.asyncio
     async def test_find_root_via_denormalized_id(self, hierarchy, user1):
@@ -166,6 +166,7 @@ class TestFindRootFolder:
 # all_children_owned_by
 # =====================================================================
 
+
 class TestAllChildrenOwnedBy:
     @pytest.mark.asyncio
     async def test_folder_with_foreign_children(self, hierarchy, user1, user2):
@@ -185,6 +186,7 @@ class TestAllChildrenOwnedBy:
 # =====================================================================
 # get_base_permission
 # =====================================================================
+
 
 class TestGetBasePermission:
     @pytest.mark.asyncio
@@ -240,6 +242,7 @@ class TestGetBasePermission:
 # =====================================================================
 # resolve_effective_permission
 # =====================================================================
+
 
 class TestResolveEffectivePermission:
     """Tests for the core permission resolver covering all roles."""
@@ -390,6 +393,7 @@ class TestResolveEffectivePermission:
 # ACL Summary
 # =====================================================================
 
+
 class TestAclSummary:
     @pytest.mark.asyncio
     async def test_folder_acl_summary(self, hierarchy, user1, user2, user3):
@@ -450,6 +454,7 @@ class TestAclSummary:
 # ACL API Endpoints
 # =====================================================================
 
+
 class TestAclEndpoints:
     @pytest.mark.asyncio
     async def test_folder_acl_endpoint(self, async_client: AsyncClient, hierarchy, user1):
@@ -499,6 +504,7 @@ class TestAclEndpoints:
 # Delete Permission Integration
 # =====================================================================
 
+
 class TestDeletePermission:
     @pytest.mark.asyncio
     async def test_editor_cannot_delete_folder(self, async_client: AsyncClient, hierarchy, user2):
@@ -538,6 +544,7 @@ class TestDeletePermission:
 # =====================================================================
 # root_folder_id denormalization
 # =====================================================================
+
 
 class TestRootFolderIdDenormalization:
     @pytest.mark.asyncio
@@ -579,6 +586,7 @@ class TestRootFolderIdDenormalization:
 # =====================================================================
 # Coverage: _get_folder, find_root_folder_from_id(None), find_root_folder_by_walk
 # =====================================================================
+
 
 class TestAclServiceEdgeCases:
     """Tests for ACL service edge cases and missing branches."""

@@ -10,11 +10,7 @@ import {
   _headingCommand,
 } from "./markdownShortcuts";
 
-function createEditorWithContent(
-  content: string,
-  selFrom: number,
-  selTo: number,
-): EditorView {
+function createEditorWithContent(content: string, selFrom: number, selTo: number): EditorView {
   const state = EditorState.create({
     doc: content,
     selection: { anchor: selFrom, head: selTo },

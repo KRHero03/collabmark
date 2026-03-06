@@ -1,18 +1,40 @@
-"""Authentication routes: Google OAuth login, callback, logout."""
+"""Authentication routes: Google OAuth login/callback, logout, and SSO (SAML/OIDC)."""
 
+import logging
 import secrets
 
 from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
+from app.auth.cookie_utils import clear_auth_cookie, set_auth_cookie
 from app.auth.google_oauth import get_google_oauth
 from app.auth.jwt import create_access_token
 from app.auth.sso_common import detect_org_by_email_domain, find_or_create_sso_user
 from app.config import settings
-from app.models.org_sso_config import SSOProtocol
+from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
 from app.models.user import User
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def _error_redirect(code: str) -> RedirectResponse:
+    """Build a redirect to the frontend with a generic error query param."""
+    return RedirectResponse(url=f"{settings.frontend_url}?error={code}")
+
+
+async def _get_enabled_sso_config(org_id: str) -> OrgSSOConfig | None:
+    """Find an enabled SSO config for the given org, or None."""
+    return await OrgSSOConfig.find_one(
+        OrgSSOConfig.org_id == org_id,
+        OrgSSOConfig.enabled == True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Google OAuth
+# ---------------------------------------------------------------------------
 
 
 @router.get("/google/login")
@@ -45,7 +67,7 @@ async def google_callback(request: Request):
     user_info = token.get("userinfo")
 
     if not user_info:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=oauth_failed")
+        return _error_redirect("oauth_failed")
 
     user = await User.find_one(User.google_id == user_info["sub"])
 
@@ -64,16 +86,8 @@ async def google_callback(request: Request):
         await user.save()
 
     access_token = create_access_token(str(user.id))
-
     response = RedirectResponse(url=settings.frontend_url)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=not settings.debug,
-        samesite="lax",
-        max_age=settings.jwt_expire_minutes * 60,
-    )
+    set_auth_cookie(response, access_token)
     return response
 
 
@@ -87,8 +101,13 @@ async def logout(response: Response):
     Returns:
         Dict with message confirming logout.
     """
-    response.delete_cookie("access_token")
+    clear_auth_cookie(response)
     return {"message": "Logged out"}
+
+
+# ---------------------------------------------------------------------------
+# SSO detect
+# ---------------------------------------------------------------------------
 
 
 @router.post("/sso/detect")
@@ -116,6 +135,11 @@ async def detect_idp(request: Request):
     }
 
 
+# ---------------------------------------------------------------------------
+# SAML SSO
+# ---------------------------------------------------------------------------
+
+
 @router.get("/sso/saml/login/{org_id}")
 async def saml_login(org_id: str, request: Request):
     """Redirect the user to the SAML Identity Provider for authentication.
@@ -128,14 +152,10 @@ async def saml_login(org_id: str, request: Request):
         RedirectResponse to the IdP's SSO URL.
     """
     from app.auth.sso_saml import create_saml_auth_request
-    from app.models.org_sso_config import OrgSSOConfig
 
-    sso_config = await OrgSSOConfig.find_one(
-        OrgSSOConfig.org_id == org_id,
-        OrgSSOConfig.enabled == True,
-    )
+    sso_config = await _get_enabled_sso_config(org_id)
     if sso_config is None:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=sso_not_configured")
+        return _error_redirect("sso_not_configured")
 
     base_url = str(request.base_url).rstrip("/")
     redirect_url = await create_saml_auth_request(sso_config, base_url, relay_state=org_id)
@@ -155,51 +175,45 @@ async def saml_callback(request: Request):
         RedirectResponse to frontend with JWT cookie set.
     """
     from app.auth.sso_saml import process_saml_response
-    from app.models.org_sso_config import OrgSSOConfig
 
     form = await request.form()
     saml_response = form.get("SAMLResponse")
     relay_state = form.get("RelayState", "")
     if not saml_response:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=saml_missing_response")
+        return _error_redirect("saml_missing_response")
 
-    # Relay state should encode org_id (set during login redirect)
     org_id = relay_state if relay_state else None
     if not org_id:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=saml_missing_org")
+        return _error_redirect("saml_missing_org")
 
-    sso_config = await OrgSSOConfig.find_one(
-        OrgSSOConfig.org_id == org_id,
-        OrgSSOConfig.enabled == True,
-    )
+    sso_config = await _get_enabled_sso_config(org_id)
     if sso_config is None:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=sso_not_configured")
+        return _error_redirect("sso_not_configured")
 
     try:
         base_url = str(request.base_url).rstrip("/")
         result = await process_saml_response(sso_config, base_url, {"SAMLResponse": saml_response})
-    except ValueError as e:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=saml_invalid&detail={e}")
+    except ValueError:
+        logger.warning("SAML validation failed for org %s", org_id, exc_info=True)
+        return _error_redirect("saml_invalid")
 
     from app.models.organization import Organization
 
     org = await Organization.get(org_id)
     if org is None:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=org_not_found")
+        return _error_redirect("org_not_found")
 
     user = await find_or_create_sso_user(result, org, SSOProtocol.SAML)
     access_token = create_access_token(str(user.id))
 
     response = RedirectResponse(url=settings.frontend_url)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=not settings.debug,
-        samesite="lax",
-        max_age=settings.jwt_expire_minutes * 60,
-    )
+    set_auth_cookie(response, access_token)
     return response
+
+
+# ---------------------------------------------------------------------------
+# OIDC SSO
+# ---------------------------------------------------------------------------
 
 
 @router.get("/sso/oidc/login/{org_id}")
@@ -214,14 +228,10 @@ async def oidc_login(org_id: str, request: Request):
         RedirectResponse to the IdP's authorization URL.
     """
     from app.auth.sso_oidc import initiate_oidc_login
-    from app.models.org_sso_config import OrgSSOConfig
 
-    sso_config = await OrgSSOConfig.find_one(
-        OrgSSOConfig.org_id == org_id,
-        OrgSSOConfig.enabled == True,
-    )
+    sso_config = await _get_enabled_sso_config(org_id)
     if sso_config is None:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=sso_not_configured")
+        return _error_redirect("sso_not_configured")
 
     base_url = str(request.base_url).rstrip("/")
     callback_url = f"{base_url}/api/auth/sso/oidc/callback"
@@ -231,7 +241,8 @@ async def oidc_login(org_id: str, request: Request):
     try:
         redirect_url = await initiate_oidc_login(sso_config, callback_url, state)
     except ValueError:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=oidc_config_error")
+        logger.warning("OIDC login init failed for org %s", org_id, exc_info=True)
+        return _error_redirect("oidc_config_error")
 
     return RedirectResponse(url=redirect_url)
 
@@ -249,50 +260,40 @@ async def oidc_callback(request: Request, code: str = Query(default=""), state: 
         RedirectResponse to frontend with JWT cookie set.
     """
     from app.auth.sso_oidc import process_oidc_callback
-    from app.models.org_sso_config import OrgSSOConfig
 
     if not code:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=oidc_missing_code")
+        return _error_redirect("oidc_missing_code")
 
     saved_state = request.session.get("oidc_state", "")
     if not state or state != saved_state:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=oidc_state_mismatch")
+        return _error_redirect("oidc_state_mismatch")
 
     org_id = state.split(":")[0] if ":" in state else ""
     if not org_id:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=oidc_missing_org")
+        return _error_redirect("oidc_missing_org")
 
-    sso_config = await OrgSSOConfig.find_one(
-        OrgSSOConfig.org_id == org_id,
-        OrgSSOConfig.enabled == True,
-    )
+    sso_config = await _get_enabled_sso_config(org_id)
     if sso_config is None:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=sso_not_configured")
+        return _error_redirect("sso_not_configured")
 
     base_url = str(request.base_url).rstrip("/")
     callback_url = f"{base_url}/api/auth/sso/oidc/callback"
 
     try:
         result = await process_oidc_callback(sso_config, callback_url, code)
-    except ValueError as e:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=oidc_failed&detail={e}")
+    except ValueError:
+        logger.warning("OIDC callback failed for org %s", org_id, exc_info=True)
+        return _error_redirect("oidc_failed")
 
     from app.models.organization import Organization
 
     org = await Organization.get(org_id)
     if org is None:
-        return RedirectResponse(url=f"{settings.frontend_url}?error=org_not_found")
+        return _error_redirect("org_not_found")
 
     user = await find_or_create_sso_user(result, org, SSOProtocol.OIDC)
     access_token = create_access_token(str(user.id))
 
     response = RedirectResponse(url=settings.frontend_url)
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=not settings.debug,
-        samesite="lax",
-        max_age=settings.jwt_expire_minutes * 60,
-    )
+    set_auth_cookie(response, access_token)
     return response

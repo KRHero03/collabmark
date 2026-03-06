@@ -14,10 +14,7 @@ export function DiffView({
   oldLabel = "Selected version",
   newLabel = "Current document",
 }: DiffViewProps) {
-  const changes = useMemo(
-    () => diffLines(oldText, newText),
-    [oldText, newText],
-  );
+  const changes = useMemo(() => diffLines(oldText, newText), [oldText, newText]);
 
   const identical = changes.length === 1 && !changes[0].added && !changes[0].removed;
 
@@ -53,20 +50,14 @@ export function DiffView({
 function DiffBlock({ change }: { change: Change }) {
   if (change.added) {
     return (
-      <div
-        data-testid="diff-added"
-        className="bg-green-50 text-green-900 dark:bg-green-900/30 dark:text-green-200"
-      >
+      <div data-testid="diff-added" className="bg-green-50 text-green-900 dark:bg-green-900/30 dark:text-green-200">
         {renderLines(change.value, "+")}
       </div>
     );
   }
   if (change.removed) {
     return (
-      <div
-        data-testid="diff-removed"
-        className="bg-red-50 text-red-900 dark:bg-red-900/30 dark:text-red-200"
-      >
+      <div data-testid="diff-removed" className="bg-red-50 text-red-900 dark:bg-red-900/30 dark:text-red-200">
         {renderLines(change.value, "-")}
       </div>
     );
@@ -82,9 +73,7 @@ function renderLines(text: string, prefix: string) {
   const lines = text.endsWith("\n") ? text.slice(0, -1).split("\n") : text.split("\n");
   return lines.map((line, i) => (
     <div key={i} className="whitespace-pre-wrap px-4">
-      <span className="mr-3 inline-block w-4 select-none text-right opacity-50">
-        {prefix}
-      </span>
+      <span className="mr-3 inline-block w-4 select-none text-right opacity-50">{prefix}</span>
       {line}
     </div>
   ));

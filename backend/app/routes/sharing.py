@@ -1,6 +1,6 @@
 """Sharing routes: collaborator management, general access, shared/recent docs list."""
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user
 from app.models.document import DocumentRead
@@ -33,10 +33,10 @@ async def update_general_access(
     Returns:
         Updated DocumentRead.
     """
-    doc = await share_service.update_general_access(
-        doc_id, user, payload.general_access
+    doc = await share_service.update_general_access(doc_id, user, payload.general_access)
+    return DocumentRead.from_doc(
+        doc, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url
     )
-    return DocumentRead.from_doc(doc, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url)
 
 
 @router.post(
@@ -59,10 +59,9 @@ async def add_collaborator(
     Returns:
         CollaboratorRead with user info and permission.
     """
-    access = await share_service.add_collaborator(
-        doc_id, user, payload.email, payload.permission
-    )
+    access = await share_service.add_collaborator(doc_id, user, payload.email, payload.permission)
     from beanie import PydanticObjectId
+
     collab_user = await User.get(PydanticObjectId(access.user_id))
     return CollaboratorRead(
         id=str(access.id),
@@ -131,8 +130,6 @@ async def get_my_permission(
     """
     perm = await share_service.get_user_permission(doc_id, user)
     if perm is None:
-        from fastapi import HTTPException, status
-
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No access to this document",
@@ -179,8 +176,6 @@ async def record_view(
     """Record that the current user viewed a document. Requires VIEW access."""
     perm = await share_service.get_user_permission(doc_id, user)
     if perm is None:
-        from fastapi import HTTPException, status
-
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No access to this document",

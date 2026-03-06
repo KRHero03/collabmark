@@ -6,10 +6,9 @@ mimicking real user actions. Each test class represents a user story.
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
-
 from app.auth.jwt import create_access_token
 from app.models.user import User
+from httpx import AsyncClient
 
 
 def _auth_cookies(user: User) -> dict[str, str]:
@@ -40,9 +39,7 @@ class TestDocumentLifecycle:
     """
 
     @pytest.mark.asyncio
-    async def test_full_owner_document_lifecycle(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_full_owner_document_lifecycle(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
 
         # Step 1: Create document
@@ -94,9 +91,7 @@ class TestDocumentLifecycle:
         assert len(list_after_del.json()) == 0
 
         # Step 8: Restore document
-        restore_resp = await async_client.post(
-            f"/api/documents/{doc_id}/restore"
-        )
+        restore_resp = await async_client.post(f"/api/documents/{doc_id}/restore")
         assert restore_resp.status_code == 200
         assert restore_resp.json()["is_deleted"] is False
 
@@ -119,14 +114,10 @@ class TestAgentApiKeyCrud:
     """
 
     @pytest.mark.asyncio
-    async def test_agent_crud_via_api_key(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_agent_crud_via_api_key(self, async_client: AsyncClient, test_user: User):
         # Step 1: User creates API key via JWT auth
         async_client.cookies.update(_auth_cookies(test_user))
-        key_resp = await async_client.post(
-            "/api/keys", json={"name": "Agent Key"}
-        )
+        key_resp = await async_client.post("/api/keys", json={"name": "Agent Key"})
         assert key_resp.status_code == 201
         raw_key = key_resp.json()["raw_key"]
         assert raw_key.startswith("cm_")
@@ -151,9 +142,7 @@ class TestAgentApiKeyCrud:
         assert doc1["owner_id"] == str(test_user.id)
 
         # Step 3: Agent reads the document
-        get_resp = await async_client.get(
-            f"/api/documents/{doc1_id}", headers=agent_headers
-        )
+        get_resp = await async_client.get(f"/api/documents/{doc1_id}", headers=agent_headers)
         assert get_resp.status_code == 200
         assert get_resp.json()["content"] == "# Agent Notes\n\nThis is stored context."
 
@@ -176,9 +165,7 @@ class TestAgentApiKeyCrud:
         doc2_id = create2_resp.json()["id"]
 
         # Step 6: Agent lists documents -- sees both
-        list_resp = await async_client.get(
-            "/api/documents", headers=agent_headers
-        )
+        list_resp = await async_client.get("/api/documents", headers=agent_headers)
         assert list_resp.status_code == 200
         docs = list_resp.json()
         assert len(docs) == 2
@@ -187,25 +174,19 @@ class TestAgentApiKeyCrud:
         assert doc2_id in doc_ids
 
         # Step 7: Agent deletes one document
-        del_resp = await async_client.delete(
-            f"/api/documents/{doc2_id}", headers=agent_headers
-        )
+        del_resp = await async_client.delete(f"/api/documents/{doc2_id}", headers=agent_headers)
         assert del_resp.status_code == 200
         assert del_resp.json()["is_deleted"] is True
 
         # Step 8: Agent verifies list updated (only 1 active doc)
-        list_after = await async_client.get(
-            "/api/documents", headers=agent_headers
-        )
+        list_after = await async_client.get("/api/documents", headers=agent_headers)
         assert list_after.status_code == 200
         active_docs = list_after.json()
         assert len(active_docs) == 1
         assert active_docs[0]["id"] == doc1_id
 
         # Step 9: Agent reads specific content
-        final_get = await async_client.get(
-            f"/api/documents/{doc1_id}", headers=agent_headers
-        )
+        final_get = await async_client.get(f"/api/documents/{doc1_id}", headers=agent_headers)
         assert final_get.status_code == 200
         assert final_get.json()["title"] == "Agent Context File"
         assert "Updated context with new findings" in final_get.json()["content"]
@@ -220,9 +201,7 @@ class TestSharingWorkflow:
     """
 
     @pytest.mark.asyncio
-    async def test_sharing_view_then_edit_upgrade(
-        self, async_client: AsyncClient, test_user: User, user_b: User
-    ):
+    async def test_sharing_view_then_edit_upgrade(self, async_client: AsyncClient, test_user: User, user_b: User):
         # Owner creates document
         async_client.cookies.update(_auth_cookies(test_user))
         create_resp = await async_client.post(
@@ -300,9 +279,7 @@ class TestVersionHistory:
     """
 
     @pytest.mark.asyncio
-    async def test_version_history_auto_snapshot(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_version_history_auto_snapshot(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
 
         # Create document
@@ -327,9 +304,7 @@ class TestVersionHistory:
             assert resp.status_code == 200
 
         # List versions -- should have 3 entries, newest first
-        versions_resp = await async_client.get(
-            f"/api/documents/{doc_id}/versions"
-        )
+        versions_resp = await async_client.get(f"/api/documents/{doc_id}/versions")
         assert versions_resp.status_code == 200
         versions = versions_resp.json()
         assert len(versions) == 3
@@ -343,17 +318,13 @@ class TestVersionHistory:
             assert v["author_id"] == str(test_user.id)
 
         # Fetch version 1 -- shows first edit content
-        v1_resp = await async_client.get(
-            f"/api/documents/{doc_id}/versions/1"
-        )
+        v1_resp = await async_client.get(f"/api/documents/{doc_id}/versions/1")
         assert v1_resp.status_code == 200
         assert v1_resp.json()["content"] == "# Version 1 - First Edit"
         assert v1_resp.json()["version_number"] == 1
 
         # Fetch version 3 -- shows latest content
-        v3_resp = await async_client.get(
-            f"/api/documents/{doc_id}/versions/3"
-        )
+        v3_resp = await async_client.get(f"/api/documents/{doc_id}/versions/3")
         assert v3_resp.status_code == 200
         assert v3_resp.json()["content"] == "# Version 3 - Third Edit"
         assert v3_resp.json()["version_number"] == 3
@@ -374,9 +345,7 @@ class TestCommentsWorkflow:
     """
 
     @pytest.mark.asyncio
-    async def test_comments_full_workflow(
-        self, async_client: AsyncClient, test_user: User, user_b: User
-    ):
+    async def test_comments_full_workflow(self, async_client: AsyncClient, test_user: User, user_b: User):
         # User A creates document
         async_client.cookies.update(_auth_cookies(test_user))
         create_resp = await async_client.post(
@@ -441,17 +410,13 @@ class TestCommentsWorkflow:
 
         # User A resolves the doc-level comment
         async_client.cookies.update(_auth_cookies(test_user))
-        resolve_resp = await async_client.post(
-            f"/api/comments/{doc_comment_id}/resolve"
-        )
+        resolve_resp = await async_client.post(f"/api/comments/{doc_comment_id}/resolve")
         assert resolve_resp.status_code == 200
         resolved = resolve_resp.json()
         assert resolved["is_resolved"] is True
 
         # List comments -- doc-level comment is resolved with reply nested
-        list_resp = await async_client.get(
-            f"/api/documents/{doc_id}/comments"
-        )
+        list_resp = await async_client.get(f"/api/documents/{doc_id}/comments")
         assert list_resp.status_code == 200
         comments = list_resp.json()
         assert len(comments) == 2  # 2 top-level comments
@@ -466,15 +431,11 @@ class TestCommentsWorkflow:
         assert inline["is_resolved"] is False
 
         # User A deletes the doc-level comment (reply cascades)
-        del_resp = await async_client.delete(
-            f"/api/comments/{doc_comment_id}"
-        )
+        del_resp = await async_client.delete(f"/api/comments/{doc_comment_id}")
         assert del_resp.status_code == 204
 
         # Verify only inline comment remains
-        list_after = await async_client.get(
-            f"/api/documents/{doc_id}/comments"
-        )
+        list_after = await async_client.get(f"/api/documents/{doc_id}/comments")
         assert list_after.status_code == 200
         remaining = list_after.json()
         assert len(remaining) == 1
@@ -490,20 +451,14 @@ class TestMultiAgentParallel:
     """
 
     @pytest.mark.asyncio
-    async def test_multi_agent_parallel_management(
-        self, async_client: AsyncClient, test_user: User, user_b: User
-    ):
+    async def test_multi_agent_parallel_management(self, async_client: AsyncClient, test_user: User, user_b: User):
         # Create two API keys for the same user
         async_client.cookies.update(_auth_cookies(test_user))
-        key_a_resp = await async_client.post(
-            "/api/keys", json={"name": "Agent A Key"}
-        )
+        key_a_resp = await async_client.post("/api/keys", json={"name": "Agent A Key"})
         assert key_a_resp.status_code == 201
         key_a = key_a_resp.json()["raw_key"]
 
-        key_b_resp = await async_client.post(
-            "/api/keys", json={"name": "Agent B Key"}
-        )
+        key_b_resp = await async_client.post("/api/keys", json={"name": "Agent B Key"})
         assert key_b_resp.status_code == 201
         key_b = key_b_resp.json()["raw_key"]
         async_client.cookies.clear()
@@ -521,9 +476,7 @@ class TestMultiAgentParallel:
         doc_id = create_resp.json()["id"]
 
         # Agent B reads it
-        read_resp = await async_client.get(
-            f"/api/documents/{doc_id}", headers=headers_b
-        )
+        read_resp = await async_client.get(f"/api/documents/{doc_id}", headers=headers_b)
         assert read_resp.status_code == 200
         assert read_resp.json()["content"] == "# Initial"
 
@@ -537,9 +490,7 @@ class TestMultiAgentParallel:
         assert update_resp.json()["content"] == "# Modified by Agent B"
 
         # Agent A reads updated content
-        read_updated = await async_client.get(
-            f"/api/documents/{doc_id}", headers=headers_a
-        )
+        read_updated = await async_client.get(f"/api/documents/{doc_id}", headers=headers_a)
         assert read_updated.status_code == 200
         assert read_updated.json()["content"] == "# Modified by Agent B"
 
@@ -580,14 +531,10 @@ class TestApiKeySecurityBoundaries:
     """
 
     @pytest.mark.asyncio
-    async def test_valid_key_crud(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_valid_key_crud(self, async_client: AsyncClient, test_user: User):
         """A valid API key allows full CRUD operations."""
         async_client.cookies.update(_auth_cookies(test_user))
-        key_resp = await async_client.post(
-            "/api/keys", json={"name": "Valid Key"}
-        )
+        key_resp = await async_client.post("/api/keys", json={"name": "Valid Key"})
         raw_key = key_resp.json()["raw_key"]
         async_client.cookies.clear()
 
@@ -603,9 +550,7 @@ class TestApiKeySecurityBoundaries:
         doc_id = resp.json()["id"]
 
         # Read
-        resp = await async_client.get(
-            f"/api/documents/{doc_id}", headers=headers
-        )
+        resp = await async_client.get(f"/api/documents/{doc_id}", headers=headers)
         assert resp.status_code == 200
 
         # Update
@@ -617,20 +562,14 @@ class TestApiKeySecurityBoundaries:
         assert resp.status_code == 200
 
         # Delete
-        resp = await async_client.delete(
-            f"/api/documents/{doc_id}", headers=headers
-        )
+        resp = await async_client.delete(f"/api/documents/{doc_id}", headers=headers)
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_revoked_key_rejected(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_revoked_key_rejected(self, async_client: AsyncClient, test_user: User):
         """A revoked API key returns 401."""
         async_client.cookies.update(_auth_cookies(test_user))
-        key_resp = await async_client.post(
-            "/api/keys", json={"name": "Revocable Key"}
-        )
+        key_resp = await async_client.post("/api/keys", json={"name": "Revocable Key"})
         raw_key = key_resp.json()["raw_key"]
         key_id = key_resp.json()["id"]
 
@@ -640,9 +579,7 @@ class TestApiKeySecurityBoundaries:
         async_client.cookies.clear()
 
         # Try to use the revoked key
-        resp = await async_client.get(
-            "/api/documents", headers={"X-API-Key": raw_key}
-        )
+        resp = await async_client.get("/api/documents", headers={"X-API-Key": raw_key})
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
@@ -655,9 +592,7 @@ class TestApiKeySecurityBoundaries:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_agent_cannot_access_other_users_docs(
-        self, async_client: AsyncClient, test_user: User, user_b: User
-    ):
+    async def test_agent_cannot_access_other_users_docs(self, async_client: AsyncClient, test_user: User, user_b: User):
         """An agent cannot access documents owned by another user without sharing."""
         # User B creates a document
         async_client.cookies.update(_auth_cookies(user_b))
@@ -671,9 +606,7 @@ class TestApiKeySecurityBoundaries:
 
         # test_user's agent tries to read User B's doc -> 403
         async_client.cookies.update(_auth_cookies(test_user))
-        key_resp = await async_client.post(
-            "/api/keys", json={"name": "Spy Key"}
-        )
+        key_resp = await async_client.post("/api/keys", json={"name": "Spy Key"})
         spy_key = key_resp.json()["raw_key"]
         async_client.cookies.clear()
 
@@ -708,9 +641,7 @@ class TestCrossFeatureIntegration:
     """
 
     @pytest.mark.asyncio
-    async def test_cross_feature_integration(
-        self, async_client: AsyncClient, test_user: User, user_b: User
-    ):
+    async def test_cross_feature_integration(self, async_client: AsyncClient, test_user: User, user_b: User):
         async_client.cookies.update(_auth_cookies(test_user))
 
         # Step 1: Create document
@@ -759,9 +690,7 @@ class TestCrossFeatureIntegration:
         assert update2_resp.status_code == 200
 
         # Verify 2 versions exist
-        versions_resp = await async_client.get(
-            f"/api/documents/{doc_id}/versions"
-        )
+        versions_resp = await async_client.get(f"/api/documents/{doc_id}/versions")
         assert versions_resp.status_code == 200
         versions = versions_resp.json()
         assert len(versions) == 2
@@ -776,24 +705,18 @@ class TestCrossFeatureIntegration:
         async_client.cookies.update(_auth_cookies(user_b))
 
         # Step 7: User B reads comments
-        comments_resp = await async_client.get(
-            f"/api/documents/{doc_id}/comments"
-        )
+        comments_resp = await async_client.get(f"/api/documents/{doc_id}/comments")
         assert comments_resp.status_code == 200
         comments = comments_resp.json()
         assert len(comments) == 2
 
         # Step 8: User B reads version history
-        versions_b_resp = await async_client.get(
-            f"/api/documents/{doc_id}/versions"
-        )
+        versions_b_resp = await async_client.get(f"/api/documents/{doc_id}/versions")
         assert versions_b_resp.status_code == 200
         assert len(versions_b_resp.json()) == 2
 
         # Step 9: User B can get a specific version
-        v1_resp = await async_client.get(
-            f"/api/documents/{doc_id}/versions/1"
-        )
+        v1_resp = await async_client.get(f"/api/documents/{doc_id}/versions/1")
         assert v1_resp.status_code == 200
         assert v1_resp.json()["content"] == "# Updated Content\n\nExpanded paragraph with more detail."
 
@@ -812,9 +735,7 @@ class TestCrossFeatureIntegration:
         assert final_doc.json()["title"] == "Cross-Feature Doc"
 
         # Step 13: Comments still intact with replies
-        final_comments = await async_client.get(
-            f"/api/documents/{doc_id}/comments"
-        )
+        final_comments = await async_client.get(f"/api/documents/{doc_id}/comments")
         assert final_comments.status_code == 200
         final_c = final_comments.json()
         assert len(final_c) == 2

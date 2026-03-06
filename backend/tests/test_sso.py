@@ -1,20 +1,20 @@
 """Comprehensive tests for SSO authentication: SAML, OIDC, detect, and shared logic."""
 
-import pytest
-import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+import pytest_asyncio
 from app.auth.jwt import create_access_token
-from app.models.organization import Organization, OrgMembership, OrgRole
-from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
-from app.models.user import User
 from app.auth.sso_common import (
     SSOCallbackResult,
     detect_org_by_email_domain,
     find_or_create_sso_user,
 )
-from app.auth.sso_saml import build_saml_settings, prepare_saml_request
 from app.auth.sso_oidc import create_oidc_client
+from app.auth.sso_saml import build_saml_settings, prepare_saml_request
+from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
+from app.models.organization import Organization, OrgMembership, OrgRole
+from app.models.user import User
 
 
 def _auth_headers(user: User) -> dict[str, str]:
@@ -340,9 +340,7 @@ class TestSamlLoginRoute:
 
 class TestSamlCallbackRoute:
     @pytest.mark.asyncio
-    async def test_post_with_valid_saml_response_creates_user_and_sets_cookie(
-        self, async_client, sso_org_and_config
-    ):
+    async def test_post_with_valid_saml_response_creates_user_and_sets_cookie(self, async_client, sso_org_and_config):
         org, config = sso_org_and_config
         config.protocol = SSOProtocol.SAML
         config.enabled = True
@@ -403,7 +401,7 @@ class TestSamlCallbackRoute:
 class TestOidcLoginRoute:
     @pytest.mark.asyncio
     async def test_get_with_valid_org_id_redirects_to_idp(self, async_client, sso_org_and_config):
-        org, config = sso_org_and_config
+        org, _config = sso_org_and_config
 
         with patch("app.auth.sso_oidc.initiate_oidc_login", new_callable=AsyncMock) as mock_initiate:
             mock_initiate.return_value = "https://idp.example.com/authorize?state=xxx"
@@ -432,10 +430,8 @@ class TestOidcLoginRoute:
 
 class TestOidcCallbackRoute:
     @pytest.mark.asyncio
-    async def test_get_with_valid_code_and_state_creates_user_and_sets_cookie(
-        self, async_client, sso_org_and_config
-    ):
-        org, config = sso_org_and_config
+    async def test_get_with_valid_code_and_state_creates_user_and_sets_cookie(self, async_client, sso_org_and_config):
+        org, _config = sso_org_and_config
         fixed_token = "test-state-token"
         state = f"{org.id}:{fixed_token}"
 
@@ -494,10 +490,8 @@ class TestOidcCallbackRoute:
 
 class TestSsoIntegration:
     @pytest.mark.asyncio
-    async def test_detect_then_oidc_login_then_callback_user_exists(
-        self, async_client, sso_org_and_config
-    ):
-        org, config = sso_org_and_config
+    async def test_detect_then_oidc_login_then_callback_user_exists(self, async_client, sso_org_and_config):
+        org, _config = sso_org_and_config
 
         # 1. Detect
         detect_resp = await async_client.post(
@@ -550,14 +544,16 @@ class TestSsoIntegration:
 
 class TestPrepareSamlRequest:
     def test_returns_correct_keys(self):
-        result = prepare_saml_request({
-            "http_host": "app.example.com",
-            "script_name": "/saml",
-            "server_port": 443,
-            "get_data": {"key": "val"},
-            "post_data": {"SAMLResponse": "base64data"},
-            "https": "on",
-        })
+        result = prepare_saml_request(
+            {
+                "http_host": "app.example.com",
+                "script_name": "/saml",
+                "server_port": 443,
+                "get_data": {"key": "val"},
+                "post_data": {"SAMLResponse": "base64data"},
+                "https": "on",
+            }
+        )
         assert result["http_host"] == "app.example.com"
         assert result["script_name"] == "/saml"
         assert result["server_port"] == 443
@@ -981,7 +977,7 @@ class TestSamlCallbackEdgeCases:
 
     @pytest.mark.asyncio
     async def test_post_with_nonexistent_org_in_relay_state(self, async_client, sso_org_and_config):
-        org, config = sso_org_and_config
+        _org, config = sso_org_and_config
         config.protocol = SSOProtocol.SAML
         config.enabled = True
         await config.save()
@@ -1006,7 +1002,7 @@ class TestSamlCallbackEdgeCases:
 class TestOidcLoginEdgeCases:
     @pytest.mark.asyncio
     async def test_oidc_login_with_config_error_redirects(self, async_client, sso_org_and_config):
-        org, config = sso_org_and_config
+        org, _config = sso_org_and_config
 
         with patch("app.auth.sso_oidc.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
             mock_init.side_effect = ValueError("Discovery failed")
@@ -1026,7 +1022,7 @@ class TestOidcLoginEdgeCases:
 class TestOidcCallbackEdgeCases:
     @pytest.mark.asyncio
     async def test_oidc_callback_with_process_error_redirects(self, async_client, sso_org_and_config):
-        org, config = sso_org_and_config
+        org, _config = sso_org_and_config
         fixed_token = "edge-token"
         state = f"{org.id}:{fixed_token}"
 
@@ -1051,7 +1047,7 @@ class TestOidcCallbackEdgeCases:
 
     @pytest.mark.asyncio
     async def test_oidc_callback_with_nonexistent_org_redirects(self, async_client, sso_org_and_config):
-        org, config = sso_org_and_config
+        org, _config = sso_org_and_config
         fixed_token = "edge-token-2"
         fake_org_id = "507f1f77bcf86cd799439011"
         state = f"{fake_org_id}:{fixed_token}"

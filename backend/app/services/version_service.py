@@ -16,9 +16,7 @@ logger = logging.getLogger(__name__)
 MAX_DEDUP_RETRIES = 2
 
 
-async def save_snapshot(
-    doc_id: str, user: User, content: str, summary: str = ""
-) -> DocumentVersion | None:
+async def save_snapshot(doc_id: str, user: User, content: str, summary: str = "") -> DocumentVersion | None:
     """Save a new version snapshot for a document.
 
     Deduplicates: if the content is identical to the latest snapshot,
@@ -38,13 +36,11 @@ async def save_snapshot(
     Raises:
         HTTPException: 404 if document not found.
     """
-    doc = await _find_doc_or_404(doc_id)
+    await _find_doc_or_404(doc_id)
 
     for _attempt in range(MAX_DEDUP_RETRIES + 1):
         latest = (
-            await DocumentVersion.find(DocumentVersion.document_id == doc_id)
-            .sort("-version_number")
-            .first_or_none()
+            await DocumentVersion.find(DocumentVersion.document_id == doc_id).sort("-version_number").first_or_none()
         )
 
         if latest is not None and latest.content == content:
@@ -85,11 +81,7 @@ async def list_versions(doc_id: str) -> list[DocumentVersion]:
     Returns:
         List of DocumentVersion documents sorted by version_number descending.
     """
-    return await (
-        DocumentVersion.find(DocumentVersion.document_id == doc_id)
-        .sort("-version_number")
-        .to_list()
-    )
+    return await DocumentVersion.find(DocumentVersion.document_id == doc_id).sort("-version_number").to_list()
 
 
 async def get_version(doc_id: str, version_number: int) -> DocumentVersion:

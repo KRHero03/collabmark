@@ -17,9 +17,10 @@ describe("SSOLoginFlow", () => {
     cleanup();
     mockDetectSSO.mockReset();
     Object.defineProperty(window, "location", {
-      value: { href: "" },
+      value: { href: "", search: "", pathname: "/login" },
       writable: true,
     });
+    window.history.replaceState = vi.fn();
   });
 
   afterEach(() => {
@@ -83,22 +84,25 @@ describe("SSOLoginFlow", () => {
     expect(window.location.href).toBe("/api/auth/sso/saml/login/org-123");
   });
 
-  it("SSO not detected: shows Google login fallback", async () => {
+  it("SSO not detected: shows domain-specific error message and Google fallback", async () => {
     mockDetectSSO.mockResolvedValue({ data: { sso: false } });
 
     const { getByTestId, getByPlaceholderText, getByRole } = render(<SSOLoginFlow />);
     fireEvent.change(getByPlaceholderText("Enter your work email"), {
-      target: { value: "user@gmail.com" },
+      target: { value: "user@example.com" },
     });
     fireEvent.click(getByTestId("sso-continue-btn"));
 
     await waitFor(() => {
       expect(getByTestId("sso-fallback")).toBeInTheDocument();
+      expect(getByTestId("sso-no-org-message")).toBeInTheDocument();
+      expect(getByTestId("sso-no-org-message")).toHaveTextContent('No SSO configured for "example.com"');
+      expect(getByTestId("sso-no-org-message")).toHaveTextContent("Your organization may not be onboarded yet");
       expect(getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
     });
   });
 
-  it("network error: falls back to Google login", async () => {
+  it("network error: shows error message and Google fallback", async () => {
     mockDetectSSO.mockRejectedValue(new Error("Network error"));
 
     const { getByTestId, getByPlaceholderText, getByRole } = render(<SSOLoginFlow />);
@@ -109,6 +113,7 @@ describe("SSOLoginFlow", () => {
 
     await waitFor(() => {
       expect(getByTestId("sso-fallback")).toBeInTheDocument();
+      expect(getByTestId("sso-no-org-message")).toHaveTextContent("Could not verify your email domain");
       expect(getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
     });
   });
@@ -132,7 +137,10 @@ describe("SSOLoginFlow", () => {
   it("loading state shown during detection", async () => {
     let resolveDetect: (value: unknown) => void;
     mockDetectSSO.mockImplementation(
-      () => new Promise((resolve) => { resolveDetect = resolve; })
+      () =>
+        new Promise((resolve) => {
+          resolveDetect = resolve;
+        }),
     );
 
     const { getByTestId, getByPlaceholderText } = render(<SSOLoginFlow />);
@@ -150,7 +158,7 @@ describe("SSOLoginFlow", () => {
     });
   });
 
-  it("typing after no_sso resets to idle", async () => {
+  it("typing after no_sso resets to idle and clears message", async () => {
     mockDetectSSO.mockResolvedValue({ data: { sso: false } });
 
     const { getByTestId, getByPlaceholderText, queryByTestId } = render(<SSOLoginFlow />);
@@ -161,19 +169,24 @@ describe("SSOLoginFlow", () => {
 
     await waitFor(() => {
       expect(getByTestId("sso-fallback")).toBeInTheDocument();
+      expect(getByTestId("sso-no-org-message")).toBeInTheDocument();
     });
 
     fireEvent.change(input, { target: { value: "user@example.comx" } });
 
     await waitFor(() => {
       expect(queryByTestId("sso-fallback")).toBeNull();
+      expect(queryByTestId("sso-no-org-message")).toBeNull();
     });
   });
 
   it("continue button is disabled during detection", async () => {
     let resolveDetect: (value: unknown) => void;
     mockDetectSSO.mockImplementation(
-      () => new Promise((resolve) => { resolveDetect = resolve; })
+      () =>
+        new Promise((resolve) => {
+          resolveDetect = resolve;
+        }),
     );
 
     const { getByTestId, getByPlaceholderText } = render(<SSOLoginFlow />);
@@ -188,5 +201,76 @@ describe("SSOLoginFlow", () => {
     await waitFor(() => {
       expect(getByTestId("sso-fallback")).toBeInTheDocument();
     });
+  });
+
+  it("handles ?error=sso_not_configured query param on mount", () => {
+    Object.defineProperty(window, "location", {
+      value: { href: "", search: "?error=sso_not_configured", pathname: "/login" },
+      writable: true,
+    });
+
+    const { getByTestId } = render(<SSOLoginFlow />);
+    expect(getByTestId("sso-error")).toHaveTextContent("SSO is not configured for this organization");
+    expect(window.history.replaceState).toHaveBeenCalled();
+  });
+
+  it("handles ?error=saml_invalid query param on mount", () => {
+    Object.defineProperty(window, "location", {
+      value: { href: "", search: "?error=saml_invalid", pathname: "/login" },
+      writable: true,
+    });
+
+    const { getByTestId } = render(<SSOLoginFlow />);
+    expect(getByTestId("sso-error")).toHaveTextContent("SAML authentication failed");
+  });
+
+  it("handles ?error=oidc_config_error query param on mount", () => {
+    Object.defineProperty(window, "location", {
+      value: { href: "", search: "?error=oidc_config_error", pathname: "/login" },
+      writable: true,
+    });
+
+    const { getByTestId } = render(<SSOLoginFlow />);
+    expect(getByTestId("sso-error")).toHaveTextContent("OIDC configuration error");
+  });
+
+  it("ignores unknown error query params", () => {
+    Object.defineProperty(window, "location", {
+      value: { href: "", search: "?error=unknown_error", pathname: "/login" },
+      writable: true,
+    });
+
+    const { queryByTestId } = render(<SSOLoginFlow />);
+    expect(queryByTestId("sso-error")).toBeNull();
+  });
+
+  it("shows different messages for gmail vs work domain", async () => {
+    mockDetectSSO.mockResolvedValue({ data: { sso: false } });
+
+    const { getByTestId, getByPlaceholderText } = render(<SSOLoginFlow />);
+    fireEvent.change(getByPlaceholderText("Enter your work email"), {
+      target: { value: "user@gmail.com" },
+    });
+    fireEvent.click(getByTestId("sso-continue-btn"));
+
+    await waitFor(() => {
+      expect(getByTestId("sso-no-org-message")).toHaveTextContent('No SSO configured for "gmail.com"');
+    });
+  });
+
+  it("typing after error from query param clears the error", () => {
+    Object.defineProperty(window, "location", {
+      value: { href: "", search: "?error=sso_not_configured", pathname: "/login" },
+      writable: true,
+    });
+
+    const { getByTestId, queryByTestId, getByPlaceholderText } = render(<SSOLoginFlow />);
+    expect(getByTestId("sso-error")).toBeInTheDocument();
+
+    fireEvent.change(getByPlaceholderText("Enter your work email"), {
+      target: { value: "a" },
+    });
+
+    expect(queryByTestId("sso-error")).toBeNull();
   });
 });

@@ -7,6 +7,8 @@ import { EditorPage } from "./pages/EditorPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ApiDocsPage } from "./pages/ApiDocsPage";
+import { SuperAdminPage } from "./pages/SuperAdminPage";
+import { OrgSettingsPage } from "./pages/OrgSettingsPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -77,6 +79,22 @@ export default function App() {
           }
         />
         <Route path="/api-docs" element={<ApiDocsPage />} />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <SuperAdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/org/:orgId/settings"
+          element={
+            <ProtectedRoute>
+              <OrgSettingsPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );

@@ -1,7 +1,7 @@
 """Share link and document access models for sharing and permissions."""
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Optional
 
@@ -23,7 +23,7 @@ class ShareLink(Document):
     token: Indexed(str, unique=True)
     permission: Permission = Permission.VIEW
     created_by: str
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     expires_at: Optional[datetime] = None
 
     class Settings:
@@ -42,24 +42,15 @@ class DocumentAccess(Document):
     user_id: Indexed(str)
     permission: Permission = Permission.VIEW
     granted_by: str
-    granted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_accessed_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    granted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_accessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "document_access"
 
     def touch_access(self) -> None:
         """Update last_accessed_at to the current UTC timestamp."""
-        self.last_accessed_at = datetime.now(timezone.utc)
-
-
-class ShareLinkCreate(BaseModel):
-    """Payload for creating a share link (legacy, kept for backward compatibility)."""
-
-    permission: Permission = Permission.VIEW
-    expires_at: Optional[datetime] = None
+        self.last_accessed_at = datetime.now(UTC)
 
 
 class ShareLinkRead(BaseModel):
@@ -105,7 +96,7 @@ class SharedDocumentRead(BaseModel):
 class GeneralAccessUpdate(BaseModel):
     """Payload for updating a document's general access level."""
 
-    general_access: str
+    general_access: str  # Validated as GeneralAccess enum at service layer
 
 
 class CollaboratorAdd(BaseModel):
@@ -116,7 +107,12 @@ class CollaboratorAdd(BaseModel):
 
 
 class CollaboratorRead(BaseModel):
-    """A collaborator's access info, including user details."""
+    """A collaborator's access info, including user details.
+
+    Returned when listing document or folder collaborators. Includes the
+    collaborator's user info (id, user_id, email, name, avatar_url),
+    permission level, and when access was granted.
+    """
 
     id: str
     user_id: str

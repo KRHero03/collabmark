@@ -1,12 +1,11 @@
 """Folder (Space) CRUD business logic with cascade soft-delete/restore/hard-delete and access control."""
 
 import logging
+from datetime import UTC, datetime
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
-
-from datetime import datetime, timezone
 
 from app.models.document import Document_, GeneralAccess
 from app.models.folder import Folder, FolderAccess, FolderCreate, FolderUpdate, FolderView
@@ -22,7 +21,7 @@ MAX_FOLDER_DEPTH = 20
 async def create_folder(owner: User, payload: FolderCreate) -> Folder:
     count = await Folder.find(
         Folder.owner_id == str(owner.id),
-        Folder.is_deleted == False,  # noqa: E712
+        Folder.is_deleted == False,
     ).count()
     if count >= MAX_FOLDERS_PER_USER:
         raise HTTPException(
@@ -34,6 +33,11 @@ async def create_folder(owner: User, payload: FolderCreate) -> Folder:
     if payload.parent_id is not None:
         parent = await _find_folder(payload.parent_id)
         await _assert_folder_access(parent, owner, Permission.EDIT)
+        if owner.org_id is not None and getattr(parent, "org_id", None) != owner.org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot create folder inside a folder from a different organization",
+            )
         await _check_depth(payload.parent_id, 1)
         root_folder_id = parent.root_folder_id or str(parent.id)
 
@@ -59,9 +63,7 @@ async def get_folder(folder_id: str, user: User) -> Folder:
     return folder
 
 
-async def list_folders(
-    user: User, parent_id: str | None = None
-) -> list[Folder]:
+async def list_folders(user: User, parent_id: str | None = None) -> list[Folder]:
     """List non-deleted folders owned by the user at a given level."""
     query = {
         "owner_id": str(user.id),
@@ -73,9 +75,13 @@ async def list_folders(
 
 async def list_shared_folders(user: User) -> list[dict]:
     """List folders shared with the user via FolderAccess, with owner info."""
-    accesses = await FolderAccess.find(
-        FolderAccess.user_id == str(user.id),
-    ).sort("-last_accessed_at").to_list()
+    accesses = (
+        await FolderAccess.find(
+            FolderAccess.user_id == str(user.id),
+        )
+        .sort("-last_accessed_at")
+        .to_list()
+    )
 
     results = []
     for access in accesses:
@@ -89,19 +95,19 @@ async def list_shared_folders(user: User) -> list[dict]:
             owner = await User.get(PydanticObjectId(folder.owner_id))
         except (InvalidId, ValueError):
             owner = None
-        results.append({
-            "folder": folder,
-            "permission": access.permission,
-            "last_accessed_at": access.last_accessed_at,
-            "owner_name": owner.name if owner else "Unknown",
-            "owner_email": owner.email if owner else "",
-        })
+        results.append(
+            {
+                "folder": folder,
+                "permission": access.permission,
+                "last_accessed_at": access.last_accessed_at,
+                "owner_name": owner.name if owner else "Unknown",
+                "owner_email": owner.email if owner else "",
+            }
+        )
     return results
 
 
-async def update_folder(
-    folder_id: str, user: User, payload: FolderUpdate
-) -> Folder:
+async def update_folder(folder_id: str, user: User, payload: FolderUpdate) -> Folder:
     folder = await _find_folder(folder_id)
     await _assert_folder_access(folder, user, Permission.EDIT)
 
@@ -113,6 +119,13 @@ async def update_folder(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A folder cannot be its own parent",
+            )
+        target_parent = await _find_folder(payload.parent_id)
+        await _assert_folder_access(target_parent, user, Permission.EDIT)
+        if folder.org_id is not None and getattr(target_parent, "org_id", None) != folder.org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot move folder to a parent in a different organization",
             )
         if await _is_descendant(payload.parent_id, folder_id):
             raise HTTPException(
@@ -163,10 +176,14 @@ async def restore_folder(folder_id: str, user: User) -> Folder:
 
 async def list_trash_folders(user: User) -> list[Folder]:
     """List top-level trashed folders (whose parent is NOT trashed or has no parent)."""
-    trashed = await Folder.find(
-        Folder.owner_id == str(user.id),
-        Folder.is_deleted == True,  # noqa: E712
-    ).sort("-deleted_at").to_list()
+    trashed = (
+        await Folder.find(
+            Folder.owner_id == str(user.id),
+            Folder.is_deleted == True,
+        )
+        .sort("-deleted_at")
+        .to_list()
+    )
 
     result = []
     for f in trashed:
@@ -193,12 +210,11 @@ async def get_folder_permission(folder_id: str, user: User) -> Permission | None
     Uses acl_service.get_base_permission with org boundary enforcement.
     """
     from app.services.acl_service import get_base_permission
+
     return await get_base_permission("folder", folder_id, str(user.id), user.org_id)
 
 
-async def list_folder_contents(
-    user: User, folder_id: str | None = None
-) -> dict:
+async def list_folder_contents(user: User, folder_id: str | None = None) -> dict:
     """List folders and documents at a given level.
 
     At root (folder_id=None): returns only content owned by the user.
@@ -210,25 +226,39 @@ async def list_folder_contents(
         await _assert_folder_access(folder, user, Permission.VIEW)
         permission = await get_folder_permission(folder_id, user)
 
-        child_folders = await Folder.find(
-            {"parent_id": folder_id, "is_deleted": False}
-        ).sort("-updated_at").to_list()
-        child_docs = await Document_.find(
-            {"folder_id": folder_id, "is_deleted": False}
-        ).sort("-updated_at").to_list()
+        child_folders = await Folder.find({"parent_id": folder_id, "is_deleted": False}).sort("-updated_at").to_list()
+        child_docs = await Document_.find({"folder_id": folder_id, "is_deleted": False}).sort("-updated_at").to_list()
 
         return {"folders": child_folders, "documents": child_docs, "permission": permission}
 
     own_folders = await list_folders(user, parent_id=None)
-    own_docs = await Document_.find(
-        {"owner_id": str(user.id), "is_deleted": False, "folder_id": None}
-    ).sort("-updated_at").to_list()
+    own_docs = (
+        await Document_.find({"owner_id": str(user.id), "is_deleted": False, "folder_id": None})
+        .sort("-updated_at")
+        .to_list()
+    )
 
     return {"folders": own_folders, "documents": own_docs, "permission": "edit"}
 
 
-async def get_breadcrumbs(folder_id: str) -> list[dict]:
-    """Build breadcrumb trail from root to the given folder."""
+async def get_breadcrumbs(folder_id: str, user: User) -> list[dict]:
+    """Build breadcrumb trail from root to the given folder.
+
+    Validates VIEW access on the target folder before returning breadcrumbs.
+
+    Args:
+        folder_id: The folder to build breadcrumbs for.
+        user: The requesting user (access is validated).
+
+    Returns:
+        List of dicts with 'id' and 'name', root-first order.
+
+    Raises:
+        HTTPException: 404/403 if folder not found or access denied.
+    """
+    target = await _find_folder(folder_id)
+    await _assert_folder_access(target, user, Permission.VIEW)
+
     crumbs: list[dict] = []
     current_id: str | None = folder_id
     visited: set[str] = set()
@@ -248,9 +278,11 @@ async def get_breadcrumbs(folder_id: str) -> list[dict]:
 
 # --- Sharing / Collaborators ---
 
+
 async def _assert_can_share_folder(folder: Folder, user: User) -> None:
     """ACL-aware share check: only users with can_share may manage collaborators."""
     from app.services.acl_service import resolve_effective_permission
+
     perm = await resolve_effective_permission("folder", str(folder.id), user)
     if not perm.can_share:
         raise HTTPException(
@@ -259,9 +291,7 @@ async def _assert_can_share_folder(folder: Folder, user: User) -> None:
         )
 
 
-async def add_folder_collaborator(
-    folder_id: str, owner: User, email: str, permission: Permission
-) -> FolderAccess:
+async def add_folder_collaborator(folder_id: str, owner: User, email: str, permission: Permission) -> FolderAccess:
     folder = await _find_folder(folder_id)
     await _assert_can_share_folder(folder, owner)
 
@@ -306,12 +336,26 @@ async def add_folder_collaborator(
 
 
 async def list_folder_collaborators(folder_id: str, user: User) -> list[dict]:
+    """List all collaborators for a folder. Requires can_share permission.
+
+    Args:
+        folder_id: The folder ID.
+        user: The user requesting the list (must have share permission).
+
+    Returns:
+        List of dicts with collaborator info: id, user_id, email, name, avatar_url,
+        permission, granted_at.
+    """
     folder = await _find_folder(folder_id)
     await _assert_can_share_folder(folder, user)
 
-    accesses = await FolderAccess.find(
-        FolderAccess.folder_id == folder_id,
-    ).sort("-granted_at").to_list()
+    accesses = (
+        await FolderAccess.find(
+            FolderAccess.folder_id == folder_id,
+        )
+        .sort("-granted_at")
+        .to_list()
+    )
 
     results = []
     for access in accesses:
@@ -321,21 +365,21 @@ async def list_folder_collaborators(folder_id: str, user: User) -> list[dict]:
             continue
         if collab_user is None:
             continue
-        results.append({
-            "id": str(access.id),
-            "user_id": str(collab_user.id),
-            "email": collab_user.email,
-            "name": collab_user.name,
-            "avatar_url": collab_user.avatar_url,
-            "permission": access.permission,
-            "granted_at": access.granted_at,
-        })
+        results.append(
+            {
+                "id": str(access.id),
+                "user_id": str(collab_user.id),
+                "email": collab_user.email,
+                "name": collab_user.name,
+                "avatar_url": collab_user.avatar_url,
+                "permission": access.permission,
+                "granted_at": access.granted_at,
+            }
+        )
     return results
 
 
-async def remove_folder_collaborator(
-    folder_id: str, owner: User, user_id: str
-) -> None:
+async def remove_folder_collaborator(folder_id: str, owner: User, user_id: str) -> None:
     folder = await _find_folder(folder_id)
     await _assert_can_share_folder(folder, owner)
 
@@ -352,6 +396,7 @@ async def remove_folder_collaborator(
 
 
 # --- Internal helpers ---
+
 
 async def _find_folder(folder_id: str) -> Folder:
     try:
@@ -373,17 +418,10 @@ async def _find_folder_or_none(folder_id: str) -> Folder | None:
         return None
 
 
-def _assert_owner(folder: Folder, user: User) -> None:
-    if folder.owner_id != str(user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this folder",
-        )
-
-
 async def _assert_can_delete_folder(folder: Folder, user: User) -> None:
     """ACL-aware delete check: root owner or entity owner with all children owned."""
     from app.services.acl_service import resolve_effective_permission
+
     perm = await resolve_effective_permission("folder", str(folder.id), user)
     if not perm.can_delete:
         raise HTTPException(
@@ -392,9 +430,7 @@ async def _assert_can_delete_folder(folder: Folder, user: User) -> None:
         )
 
 
-async def _assert_folder_access(
-    folder: Folder, user: User, min_permission: Permission
-) -> None:
+async def _assert_folder_access(folder: Folder, user: User, min_permission: Permission) -> None:
     """Check access: owner > explicit FolderAccess > parent chain inheritance > general_access > deny."""
     if folder.owner_id == str(user.id):
         return
@@ -423,7 +459,6 @@ async def _assert_folder_access(
                 pass
 
     ga = folder.general_access
-    from app.models.document import GeneralAccess
     if ga == GeneralAccess.ANYONE_EDIT:
         return
     if ga == GeneralAccess.ANYONE_VIEW and min_permission == Permission.VIEW:
@@ -433,8 +468,6 @@ async def _assert_folder_access(
         status_code=status.HTTP_403_FORBIDDEN,
         detail="Not authorized to access this folder",
     )
-
-
 
 
 async def _check_depth(parent_id: str | None, extra_levels: int) -> None:
@@ -492,14 +525,14 @@ async def _cascade_soft_delete(folder: Folder) -> None:
 
     child_folders = await Folder.find(
         Folder.parent_id == str(folder.id),
-        Folder.is_deleted == False,  # noqa: E712
+        Folder.is_deleted == False,
     ).to_list()
     for child in child_folders:
         await _cascade_soft_delete(child)
 
     child_docs = await Document_.find(
         Document_.folder_id == str(folder.id),
-        Document_.is_deleted == False,  # noqa: E712
+        Document_.is_deleted == False,
     ).to_list()
     for doc in child_docs:
         doc.soft_delete()
@@ -512,14 +545,14 @@ async def _cascade_restore(folder: Folder) -> None:
 
     child_folders = await Folder.find(
         Folder.parent_id == str(folder.id),
-        Folder.is_deleted == True,  # noqa: E712
+        Folder.is_deleted == True,
     ).to_list()
     for child in child_folders:
         await _cascade_restore(child)
 
     child_docs = await Document_.find(
         Document_.folder_id == str(folder.id),
-        Document_.is_deleted == True,  # noqa: E712
+        Document_.is_deleted == True,
     ).to_list()
     for doc in child_docs:
         doc.restore()
@@ -537,10 +570,8 @@ async def _cascade_hard_delete(folder: Folder) -> None:
         Document_.folder_id == str(folder.id),
     ).to_list()
     for doc in child_docs:
-        from app.services.document_service import hard_delete_document as _hard_del
         from app.models.comment import Comment
         from app.models.document_version import DocumentVersion
-        from app.models.document_view import DocumentView
         from app.models.share_link import DocumentAccess
 
         str_id = str(doc.id)
@@ -548,8 +579,10 @@ async def _cascade_hard_delete(folder: Folder) -> None:
         await DocumentVersion.find(DocumentVersion.document_id == str_id).delete()
         await DocumentAccess.find(DocumentAccess.document_id == str_id).delete()
         from app.models.document_view import DocumentView as DV
+
         await DV.find(DV.document_id == str_id).delete()
         from app.services.crdt_store import MongoYStore
+
         if MongoYStore._db is not None:
             await MongoYStore._db["crdt_updates"].delete_many({"room": str_id})
         await doc.delete()
@@ -573,7 +606,7 @@ async def record_folder_view(folder_id: str, user: User) -> None:
         FolderView.folder_id == folder_id,
     )
     if existing:
-        existing.viewed_at = datetime.now(timezone.utc)
+        existing.viewed_at = datetime.now(UTC)
         await existing.save()
     else:
         view = FolderView(user_id=str(user.id), folder_id=folder_id)
@@ -582,9 +615,13 @@ async def record_folder_view(folder_id: str, user: User) -> None:
 
 async def list_recently_viewed_folders(user: User) -> list[dict]:
     """List folders recently viewed by the user, sorted by most recent first."""
-    views = await FolderView.find(
-        FolderView.user_id == str(user.id),
-    ).sort("-viewed_at").to_list()
+    views = (
+        await FolderView.find(
+            FolderView.user_id == str(user.id),
+        )
+        .sort("-viewed_at")
+        .to_list()
+    )
 
     results = []
     for view in views:
@@ -604,11 +641,13 @@ async def list_recently_viewed_folders(user: User) -> list[dict]:
         except (InvalidId, ValueError):
             owner = None
 
-        results.append({
-            "folder": folder,
-            "permission": perm,
-            "viewed_at": view.viewed_at,
-            "owner_name": owner.name if owner else "Unknown",
-            "owner_email": owner.email if owner else "",
-        })
+        results.append(
+            {
+                "folder": folder,
+                "permission": perm,
+                "viewed_at": view.viewed_at,
+                "owner_name": owner.name if owner else "Unknown",
+                "owner_email": owner.email if owner else "",
+            }
+        )
     return results

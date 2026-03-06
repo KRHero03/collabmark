@@ -79,9 +79,7 @@ export function EditorToolbar({
           >
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <span className="text-lg font-semibold text-[var(--color-text)]">
-            {title || "Untitled"}
-          </span>
+          <span className="text-lg font-semibold text-[var(--color-text)]">{title || "Untitled"}</span>
         </div>
         <button
           onClick={onPresentation}
@@ -183,14 +181,22 @@ export function EditorToolbar({
 
       {/* Desktop: presence + full toolbar */}
       <div className="hidden items-center gap-2 md:flex">
-        <PresenceAvatars users={presenceUsers} currentUserName={currentUserName} currentUserAvatar={currentUserAvatar} />
+        <PresenceAvatars
+          users={presenceUsers}
+          currentUserName={currentUserName}
+          currentUserAvatar={currentUserAvatar}
+        />
         <div className="mx-1 h-6 w-px bg-[var(--color-border)]" />
         {toolbarButtons}
       </div>
 
       {/* Mobile: presence + overflow dropdown */}
       <div className="flex items-center gap-2 md:hidden">
-        <PresenceAvatars users={presenceUsers} currentUserName={currentUserName} currentUserAvatar={currentUserAvatar} />
+        <PresenceAvatars
+          users={presenceUsers}
+          currentUserName={currentUserName}
+          currentUserAvatar={currentUserAvatar}
+        />
         <div className="relative" ref={moreRef}>
           <button
             onClick={() => setMoreOpen((o) => !o)}
@@ -199,80 +205,80 @@ export function EditorToolbar({
           >
             <MoreHorizontal className="h-5 w-5" />
           </button>
-        {moreOpen && (
-          <div className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] py-1 shadow-lg">
-            {onHistory && (
+          {moreOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] py-1 shadow-lg">
+              {onHistory && (
+                <button
+                  onClick={() => {
+                    onHistory();
+                    setMoreOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <Clock className="h-4 w-4" />
+                  History
+                </button>
+              )}
+              {onComments && (
+                <button
+                  onClick={() => {
+                    onComments();
+                    setMoreOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Comments
+                </button>
+              )}
+              {onShare && (
+                <button
+                  onClick={() => {
+                    onShare();
+                    setMoreOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <Link className="h-4 w-4" />
+                  Share
+                </button>
+              )}
+              {onPresentation && (
+                <button
+                  onClick={() => {
+                    onPresentation?.();
+                    setMoreOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <Monitor className="h-4 w-4" />
+                  Presentation
+                </button>
+              )}
               <button
                 onClick={() => {
-                  onHistory();
+                  onExportMd();
                   setMoreOpen(false);
                 }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
               >
-                <Clock className="h-4 w-4" />
-                History
+                <FileDown className="h-4 w-4" />
+                Export .md
               </button>
-            )}
-            {onComments && (
-              <button
-                onClick={() => {
-                  onComments();
-                  setMoreOpen(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                <MessageSquare className="h-4 w-4" />
-                Comments
-              </button>
-            )}
-            {onShare && (
-              <button
-                onClick={() => {
-                  onShare();
-                  setMoreOpen(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                <Link className="h-4 w-4" />
-                Share
-              </button>
-            )}
-            {onPresentation && (
-              <button
-                onClick={() => {
-                  onPresentation?.();
-                  setMoreOpen(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                <Monitor className="h-4 w-4" />
-                Presentation
-              </button>
-            )}
-            <button
-              onClick={() => {
-                onExportMd();
-                setMoreOpen(false);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
-            >
-              <FileDown className="h-4 w-4" />
-              Export .md
-            </button>
-            {onExportPdf && (
-              <button
-                onClick={() => {
-                  onExportPdf();
-                  setMoreOpen(false);
-                }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
-              >
-                <FileText className="h-4 w-4" />
-                Export PDF
-              </button>
-            )}
-          </div>
-        )}
+              {onExportPdf && (
+                <button
+                  onClick={() => {
+                    onExportPdf();
+                    setMoreOpen(false);
+                  }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <FileText className="h-4 w-4" />
+                  Export PDF
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

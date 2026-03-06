@@ -4,7 +4,7 @@ Stores per-organization SAML 2.0 or OIDC identity provider settings.
 Only one SSO config per organization (org_id is unique-indexed).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Optional
 
@@ -46,15 +46,15 @@ class OrgSSOConfig(Document):
     scim_enabled: bool = False
     scim_bearer_token: Optional[str] = None
 
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "org_sso_configs"
 
     def touch(self) -> None:
         """Update updated_at to the current UTC timestamp."""
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
 
 class OrgSSOConfigRead(BaseModel):
@@ -76,6 +76,7 @@ class OrgSSOConfigRead(BaseModel):
 
     @classmethod
     def from_doc(cls, cfg: OrgSSOConfig) -> "OrgSSOConfigRead":
+        """Build OrgSSOConfigRead from an OrgSSOConfig document (secrets redacted)."""
         return cls(
             id=str(cfg.id),
             org_id=cfg.org_id,

@@ -1,4 +1,4 @@
-import { BookOpen, FileText, LogOut, Menu, Moon, Settings, Sun } from "lucide-react";
+import { BookOpen, Building2, FileText, LogOut, Menu, Moon, Settings, Sun } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { useAuth } from "../../hooks/useAuth";
 import { UserAvatar } from "./UserAvatar";
@@ -13,9 +13,7 @@ interface NavbarProps {
 export function Navbar({ activeTab, onTabChange }: NavbarProps) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [dark, setDark] = useState(
-    () => document.documentElement.classList.contains("dark"),
-  );
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggleDark = useCallback(() => {
@@ -80,6 +78,16 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
                   API Docs
                 </Link>
 
+                {user.org_id && (
+                  <Link
+                    to={`/org/${user.org_id}/settings`}
+                    className="flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+                    title="Org Settings"
+                  >
+                    <Building2 className="h-4 w-4" />
+                  </Link>
+                )}
+
                 <Link
                   to="/settings"
                   className="flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
@@ -87,10 +95,7 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
                   <Settings className="h-4 w-4" />
                 </Link>
 
-                <Link
-                  to="/profile"
-                  className="flex items-center gap-2 text-sm hover:opacity-80"
-                >
+                <Link to="/profile" className="flex items-center gap-2 text-sm hover:opacity-80">
                   <UserAvatar url={user.avatar_url} name={user.name} size="md" />
                   <span className="font-medium">{user.name}</span>
                 </Link>

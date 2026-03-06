@@ -1,11 +1,8 @@
 """Comprehensive unit tests for document_service."""
 
-import pytest
 from unittest.mock import patch
 
-from beanie import PydanticObjectId
-from fastapi import HTTPException
-
+import pytest
 from app.models.comment import Comment
 from app.models.document import Document_, DocumentCreate, DocumentUpdate, GeneralAccess
 from app.models.document_version import DocumentVersion
@@ -25,6 +22,8 @@ from app.services.document_service import (
     soft_delete_document,
     update_document,
 )
+from beanie import PydanticObjectId
+from fastapi import HTTPException
 
 
 class TestCreateDocument:
@@ -309,9 +308,7 @@ class TestUpdateDocument:
             test_user,
             DocumentUpdate(content="v2"),
         )
-        versions = await DocumentVersion.find(
-            DocumentVersion.document_id == str(doc.id)
-        ).to_list()
+        versions = await DocumentVersion.find(DocumentVersion.document_id == str(doc.id)).to_list()
         assert len(versions) == 1
         assert versions[0].content == "v2"
         assert versions[0].version_number == 1
@@ -619,7 +616,6 @@ class TestHardDeleteDocumentCrdtSkip:
 
     @pytest.mark.asyncio
     async def test_hard_delete_skips_crdt_when_db_none(self, test_user: User):
-        from unittest.mock import patch
         from app.services.crdt_store import MongoYStore
 
         doc = Document_(title="CRDT Doc", content="", owner_id=str(test_user.id))

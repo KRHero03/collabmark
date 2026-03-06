@@ -32,9 +32,7 @@ export function FolderInfoModal({ folder, open, onClose }: FolderInfoModalProps)
               <dd>
                 {folder.owner_name}
                 {folder.owner_email && (
-                  <span className="ml-1 text-[var(--color-text-muted)]">
-                    ({folder.owner_email})
-                  </span>
+                  <span className="ml-1 text-[var(--color-text-muted)]">({folder.owner_email})</span>
                 )}
               </dd>
             </div>

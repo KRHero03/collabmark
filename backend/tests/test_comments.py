@@ -1,12 +1,11 @@
 """Tests for comments: create, reply, list, resolve, reanchor, orphan, delete."""
 
 import pytest
-from httpx import AsyncClient
-
 from app.auth.jwt import create_access_token
 from app.models.comment import Comment
 from app.models.document import Document_
 from app.models.user import User
+from httpx import AsyncClient
 
 
 def _auth_cookies(user: User) -> dict[str, str]:
@@ -28,9 +27,7 @@ async def _make_doc(owner: User) -> Document_:
 
 class TestCreateComment:
     @pytest.mark.asyncio
-    async def test_create_doc_level_comment(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_create_doc_level_comment(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -48,9 +45,7 @@ class TestCreateComment:
         assert data["orphaned_at"] is None
 
     @pytest.mark.asyncio
-    async def test_create_inline_comment(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_create_inline_comment(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -70,9 +65,7 @@ class TestCreateComment:
         assert data["quoted_text"] == "# Content here"
 
     @pytest.mark.asyncio
-    async def test_create_inline_comment_with_relative_positions(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_create_inline_comment_with_relative_positions(self, async_client: AsyncClient, test_user: User):
         """Verify that Yjs RelativePosition strings are stored and returned."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -100,9 +93,7 @@ class TestCreateComment:
 
 class TestListComments:
     @pytest.mark.asyncio
-    async def test_list_with_replies(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_list_with_replies(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -126,9 +117,7 @@ class TestListComments:
         assert data[0]["replies"][0]["content"] == "Reply to comment"
 
     @pytest.mark.asyncio
-    async def test_empty_comments(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_empty_comments(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -139,9 +128,7 @@ class TestListComments:
 
 class TestReplyToComment:
     @pytest.mark.asyncio
-    async def test_reply_creates_child(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_reply_creates_child(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -159,9 +146,7 @@ class TestReplyToComment:
         assert resp.json()["parent_id"] == parent_id
 
     @pytest.mark.asyncio
-    async def test_cannot_reply_to_reply(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_cannot_reply_to_reply(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -186,9 +171,7 @@ class TestReplyToComment:
 
 class TestResolveComment:
     @pytest.mark.asyncio
-    async def test_resolve_marks_resolved(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_resolve_marks_resolved(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -208,9 +191,7 @@ class TestResolveComment:
 
 class TestReanchorComment:
     @pytest.mark.asyncio
-    async def test_reanchor_updates_offsets(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_reanchor_updates_offsets(self, async_client: AsyncClient, test_user: User):
         """Reanchoring an inline comment updates its absolute offsets."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -238,9 +219,7 @@ class TestReanchorComment:
         assert data["quoted_text"] == "original text"
 
     @pytest.mark.asyncio
-    async def test_reanchor_doc_level_comment_fails(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_reanchor_doc_level_comment_fails(self, async_client: AsyncClient, test_user: User):
         """Reanchoring a doc-level comment (no anchor) returns 400."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -259,9 +238,7 @@ class TestReanchorComment:
         assert "document-level" in resp.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_reanchor_nonexistent_comment(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_reanchor_nonexistent_comment(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         resp = await async_client.patch(
             "/api/comments/000000000000000000000000/reanchor",
@@ -272,9 +249,7 @@ class TestReanchorComment:
 
 class TestOrphanComment:
     @pytest.mark.asyncio
-    async def test_orphan_marks_comment(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_orphan_marks_comment(self, async_client: AsyncClient, test_user: User):
         """Orphaning sets is_orphaned=True and orphaned_at timestamp."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -300,9 +275,7 @@ class TestOrphanComment:
         assert data["quoted_text"] == "# Content"
 
     @pytest.mark.asyncio
-    async def test_orphan_already_orphaned_fails(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_orphan_already_orphaned_fails(self, async_client: AsyncClient, test_user: User):
         """Orphaning an already-orphaned comment returns 400."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -326,9 +299,7 @@ class TestOrphanComment:
         assert "already orphaned" in resp2.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_orphaned_comment_still_listed(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_orphaned_comment_still_listed(self, async_client: AsyncClient, test_user: User):
         """Orphaned comments still appear in the list response."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -353,9 +324,7 @@ class TestOrphanComment:
         assert data[0]["quoted_text"] == "text"
 
     @pytest.mark.asyncio
-    async def test_orphaned_comment_can_be_replied_to(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_orphaned_comment_can_be_replied_to(self, async_client: AsyncClient, test_user: User):
         """Users can still reply to orphaned comments."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -380,9 +349,7 @@ class TestOrphanComment:
         assert reply_resp.json()["content"] == "Reply to orphan"
 
     @pytest.mark.asyncio
-    async def test_orphaned_comment_can_be_resolved(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_orphaned_comment_can_be_resolved(self, async_client: AsyncClient, test_user: User):
         """Orphaned comments can still be resolved."""
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
@@ -399,9 +366,7 @@ class TestOrphanComment:
         comment_id = create_resp.json()["id"]
         await async_client.patch(f"/api/comments/{comment_id}/orphan")
 
-        resolve_resp = await async_client.post(
-            f"/api/comments/{comment_id}/resolve"
-        )
+        resolve_resp = await async_client.post(f"/api/comments/{comment_id}/resolve")
         assert resolve_resp.status_code == 200
         data = resolve_resp.json()
         assert data["is_orphaned"] is True
@@ -410,9 +375,7 @@ class TestOrphanComment:
 
 class TestDeleteComment:
     @pytest.mark.asyncio
-    async def test_author_can_delete(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_author_can_delete(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -429,9 +392,7 @@ class TestDeleteComment:
         assert len(list_resp.json()) == 0
 
     @pytest.mark.asyncio
-    async def test_non_author_cannot_delete(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_non_author_cannot_delete(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -448,9 +409,7 @@ class TestDeleteComment:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_delete_cascades_to_replies(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_delete_cascades_to_replies(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -472,9 +431,7 @@ class TestDeleteComment:
         resp = await async_client.delete(f"/api/comments/{parent_id}")
         assert resp.status_code == 204
 
-        all_comments = await Comment.find(
-            Comment.document_id == str(doc.id)
-        ).to_list()
+        all_comments = await Comment.find(Comment.document_id == str(doc.id)).to_list()
         assert len(all_comments) == 0
 
 
@@ -482,9 +439,7 @@ class TestCommentAnchorLifecycle:
     """End-to-end lifecycle: create inline → reanchor → orphan → still usable."""
 
     @pytest.mark.asyncio
-    async def test_full_anchor_lifecycle(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_full_anchor_lifecycle(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         doc = await _make_doc(test_user)
 
@@ -513,9 +468,7 @@ class TestCommentAnchorLifecycle:
         assert reanchor_resp.json()["anchor_from_relative"] == "AQAAAA=="
         assert reanchor_resp.json()["quoted_text"] == "# Content"
 
-        orphan_resp = await async_client.patch(
-            f"/api/comments/{comment_id}/orphan"
-        )
+        orphan_resp = await async_client.patch(f"/api/comments/{comment_id}/orphan")
         assert orphan_resp.status_code == 200
         assert orphan_resp.json()["is_orphaned"] is True
         assert orphan_resp.json()["orphaned_at"] is not None
@@ -526,9 +479,7 @@ class TestCommentAnchorLifecycle:
         )
         assert reply_resp.status_code == 201
 
-        resolve_resp = await async_client.post(
-            f"/api/comments/{comment_id}/resolve"
-        )
+        resolve_resp = await async_client.post(f"/api/comments/{comment_id}/resolve")
         assert resolve_resp.status_code == 200
         assert resolve_resp.json()["is_resolved"] is True
         assert resolve_resp.json()["is_orphaned"] is True

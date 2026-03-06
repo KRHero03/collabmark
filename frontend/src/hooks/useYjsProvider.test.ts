@@ -143,10 +143,9 @@ describe("useYjsProvider", () => {
   });
 
   it("cleans up and recreates when documentId changes", () => {
-    const { rerender } = renderHook(
-      ({ documentId }) => useYjsProvider(documentId),
-      { initialProps: { documentId: "doc-1" as string } },
-    );
+    const { rerender } = renderHook(({ documentId }) => useYjsProvider(documentId), {
+      initialProps: { documentId: "doc-1" as string },
+    });
 
     expect(providerCallArgs).toHaveLength(1);
     expect(providerCallArgs[0][1]).toBe("doc-1");

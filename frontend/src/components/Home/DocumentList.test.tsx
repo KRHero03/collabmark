@@ -37,12 +37,8 @@ describe("DocumentList", () => {
   });
 
   it("renders empty state with 'No documents yet' message", () => {
-    render(
-      <DocumentList documents={[]} onDelete={vi.fn()} onCreate={vi.fn()} />
-    );
-    expect(
-      screen.getByText("No documents yet. Create your first one!")
-    ).toBeInTheDocument();
+    render(<DocumentList documents={[]} onDelete={vi.fn()} onCreate={vi.fn()} />);
+    expect(screen.getByText("No documents yet. Create your first one!")).toBeInTheDocument();
   });
 
   it("renders list of documents with correct titles", () => {
@@ -50,30 +46,22 @@ describe("DocumentList", () => {
       createDoc({ id: "a", title: "First Doc" }),
       createDoc({ id: "b", title: "Second Doc" }),
     ];
-    render(
-      <DocumentList documents={docs} onDelete={vi.fn()} onCreate={vi.fn()} />
-    );
+    render(<DocumentList documents={docs} onDelete={vi.fn()} onCreate={vi.fn()} />);
     expect(screen.getByText("First Doc")).toBeInTheDocument();
     expect(screen.getByText("Second Doc")).toBeInTheDocument();
   });
 
   it("calls onCreate when 'New Document' button clicked", () => {
     const onCreate = vi.fn();
-    render(
-      <DocumentList documents={[]} onDelete={vi.fn()} onCreate={onCreate} />
-    );
+    render(<DocumentList documents={[]} onDelete={vi.fn()} onCreate={onCreate} />);
     fireEvent.click(screen.getByRole("button", { name: /new document/i }));
     expect(onCreate).toHaveBeenCalledTimes(1);
   });
 
   it("calls onDelete with exact doc.id when trash button clicked", () => {
     const onDelete = vi.fn();
-    const docs: MarkdownDocument[] = [
-      createDoc({ id: "doc-abc-123", title: "To Delete" }),
-    ];
-    render(
-      <DocumentList documents={docs} onDelete={onDelete} onCreate={vi.fn()} />
-    );
+    const docs: MarkdownDocument[] = [createDoc({ id: "doc-abc-123", title: "To Delete" })];
+    render(<DocumentList documents={docs} onDelete={onDelete} onCreate={vi.fn()} />);
     const row = screen.getByText("To Delete").closest(".group");
     expect(row).toBeInTheDocument();
     const trashBtn = row!.querySelector("button");
@@ -84,12 +72,8 @@ describe("DocumentList", () => {
   });
 
   it("navigates to /edit/{doc.id} when clicking a document row", () => {
-    const docs: MarkdownDocument[] = [
-      createDoc({ id: "doc-xyz-789", title: "Click Me" }),
-    ];
-    render(
-      <DocumentList documents={docs} onDelete={vi.fn()} onCreate={vi.fn()} />
-    );
+    const docs: MarkdownDocument[] = [createDoc({ id: "doc-xyz-789", title: "Click Me" })];
+    render(<DocumentList documents={docs} onDelete={vi.fn()} onCreate={vi.fn()} />);
     fireEvent.click(screen.getByText("Click Me"));
     expect(mockNavigate).toHaveBeenCalledWith("/edit/doc-xyz-789");
   });
@@ -97,30 +81,18 @@ describe("DocumentList", () => {
   it("calls onContextMenu with the event and exact doc when right-clicking", () => {
     const onContextMenu = vi.fn();
     const doc = createDoc({ id: "doc-ctx", title: "Context Doc" });
-    render(
-      <DocumentList
-        documents={[doc]}
-        onDelete={vi.fn()}
-        onCreate={vi.fn()}
-        onContextMenu={onContextMenu}
-      />
-    );
+    render(<DocumentList documents={[doc]} onDelete={vi.fn()} onCreate={vi.fn()} onContextMenu={onContextMenu} />);
     const row = screen.getByText("Context Doc").closest("div")!;
     const event = new MouseEvent("contextmenu", { bubbles: true });
     Object.defineProperty(event, "preventDefault", { value: vi.fn() });
     fireEvent(row, event);
     expect(onContextMenu).toHaveBeenCalledTimes(1);
-    expect(onContextMenu).toHaveBeenCalledWith(
-      expect.objectContaining({ type: "contextmenu" }),
-      doc
-    );
+    expect(onContextMenu).toHaveBeenCalledWith(expect.objectContaining({ type: "contextmenu" }), doc);
   });
 
   it("does not crash when onContextMenu is undefined and right-click happens", () => {
     const doc = createDoc({ id: "doc-no-ctx", title: "No Context" });
-    render(
-      <DocumentList documents={[doc]} onDelete={vi.fn()} onCreate={vi.fn()} />
-    );
+    render(<DocumentList documents={[doc]} onDelete={vi.fn()} onCreate={vi.fn()} />);
     const row = screen.getByText("No Context").closest("div")!;
     expect(() => fireEvent.contextMenu(row)).not.toThrow();
   });
@@ -133,11 +105,7 @@ describe("DocumentList", () => {
         updated_at: "2026-03-01T12:00:00Z",
       }),
     ];
-    render(
-      <DocumentList documents={docs} onDelete={vi.fn()} onCreate={vi.fn()} />
-    );
-    expect(
-      screen.getByText("Updated formatted:2026-03-01T12:00:00Z")
-    ).toBeInTheDocument();
+    render(<DocumentList documents={docs} onDelete={vi.fn()} onCreate={vi.fn()} />);
+    expect(screen.getByText("Updated formatted:2026-03-01T12:00:00Z")).toBeInTheDocument();
   });
 });

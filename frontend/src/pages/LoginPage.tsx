@@ -5,7 +5,9 @@ import { SSOLoginFlow } from "../components/Auth/SSOLoginFlow";
 export function LoginPage() {
   useEffect(() => {
     document.title = "Sign In - CollabMark";
-    return () => { document.title = "CollabMark"; };
+    return () => {
+      document.title = "CollabMark";
+    };
   }, []);
 
   return (
@@ -14,9 +16,7 @@ export function LoginPage() {
         <div className="mb-8 text-center">
           <FileText className="mx-auto mb-4 h-12 w-12 text-[var(--color-primary)]" />
           <h1 className="mb-2 text-2xl font-bold">CollabMark</h1>
-          <p className="text-[var(--color-text-muted)]">
-            Collaborative Markdown editing, made simple.
-          </p>
+          <p className="text-[var(--color-text-muted)]">Collaborative Markdown editing, made simple.</p>
         </div>
         <div className="flex justify-center">
           <SSOLoginFlow />

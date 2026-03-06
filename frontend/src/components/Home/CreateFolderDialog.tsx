@@ -6,11 +6,7 @@ interface CreateFolderDialogProps {
   onCreate: (name: string) => void;
 }
 
-export function CreateFolderDialog({
-  open,
-  onClose,
-  onCreate,
-}: CreateFolderDialogProps) {
+export function CreateFolderDialog({ open, onClose, onCreate }: CreateFolderDialogProps) {
   const [name, setName] = useState("Untitled Folder");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -36,10 +32,7 @@ export function CreateFolderDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <form
-        onSubmit={handleSubmit}
-        className="w-[calc(100%-2rem)] max-w-sm rounded-xl bg-white p-6 shadow-lg"
-      >
+      <form onSubmit={handleSubmit} className="w-[calc(100%-2rem)] max-w-sm rounded-xl bg-white p-6 shadow-lg">
         <h3 className="mb-4 text-lg font-semibold">New Folder</h3>
         <input
           ref={inputRef}

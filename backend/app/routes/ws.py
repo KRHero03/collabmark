@@ -9,6 +9,7 @@ state to all connected clients; write permissions are enforced by the
 editor UI (read-only mode for VIEW users).
 """
 
+import contextlib
 import logging
 
 from beanie import PydanticObjectId
@@ -55,7 +56,7 @@ async def _authenticate_ws(websocket: WebSocket) -> User | None:
         key_hash = ApiKey.hash_key(api_key_raw)
         record = await ApiKey.find_one(
             ApiKey.key_hash == key_hash,
-            ApiKey.is_active == True,  # noqa: E712
+            ApiKey.is_active == True,
         )
         if record:
             try:
@@ -100,10 +101,11 @@ async def websocket_endpoint(websocket: WebSocket, document_id: str):
     room = await server.get_room(document_id)
 
     adapter = FastAPIWebsocketAdapter(
-        websocket, path=document_id, read_only=read_only, user=user,
+        websocket,
+        path=document_id,
+        read_only=read_only,
+        user=user,
     )
 
-    try:
+    with contextlib.suppress(WebSocketDisconnect):
         await room.serve(adapter)
-    except WebSocketDisconnect:
-        pass

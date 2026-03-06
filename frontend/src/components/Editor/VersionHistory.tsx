@@ -19,13 +19,7 @@ interface VersionHistoryProps {
   onRestore: (content: string, versionNumber: number) => void;
 }
 
-export function VersionHistory({
-  docId,
-  open,
-  onClose,
-  currentContent,
-  onRestore,
-}: VersionHistoryProps) {
+export function VersionHistory({ docId, open, onClose, currentContent, onRestore }: VersionHistoryProps) {
   const [versions, setVersions] = useState<VersionListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<VersionDetail | null>(null);
@@ -76,12 +70,9 @@ export function VersionHistory({
         <div className="flex flex-1 flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
             <div>
-              <p className="text-sm font-medium">
-                Version {selected.version_number}
-              </p>
+              <p className="text-sm font-medium">Version {selected.version_number}</p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                {selected.author_name} &middot;{" "}
-                {formatDateTime(selected.created_at)}
+                {selected.author_name} &middot; {formatDateTime(selected.created_at)}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -135,12 +126,8 @@ export function VersionHistory({
                   className="cursor-pointer px-4 py-3 transition hover:bg-gray-50 dark:hover:bg-gray-800"
                 >
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">
-                      Version {ver.version_number}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      {formatDateTime(ver.created_at)}
-                    </p>
+                    <p className="text-sm font-medium">Version {ver.version_number}</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">{formatDateTime(ver.created_at)}</p>
                   </div>
                   <p className="mt-0.5 text-xs text-[var(--color-text-muted)]">
                     {ver.author_name} &middot; {ver.summary}

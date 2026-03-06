@@ -89,14 +89,8 @@ export function LandingPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  const nextSlide = useCallback(
-    () => setCurrentSlide((p) => (p + 1) % FEATURES.length),
-    [],
-  );
-  const prevSlide = useCallback(
-    () => setCurrentSlide((p) => (p - 1 + FEATURES.length) % FEATURES.length),
-    [],
-  );
+  const nextSlide = useCallback(() => setCurrentSlide((p) => (p + 1) % FEATURES.length), []);
+  const prevSlide = useCallback(() => setCurrentSlide((p) => (p - 1 + FEATURES.length) % FEATURES.length), []);
 
   useEffect(() => {
     if (paused) return;
@@ -112,7 +106,11 @@ export function LandingPage() {
   const handleTouchEnd = (e: React.TouchEvent) => {
     const dx = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(dx) > 50) {
-      dx > 0 ? prevSlide() : nextSlide();
+      if (dx > 0) {
+        prevSlide();
+      } else {
+        nextSlide();
+      }
     }
   };
 
@@ -161,9 +159,8 @@ export function LandingPage() {
             className="animate-fade-in-up mx-auto mb-10 max-w-2xl text-lg text-[var(--color-text-muted)] sm:text-xl"
             style={{ animationDelay: "0.3s" }}
           >
-            Real-time editing, version history with diffs, inline comments,
-            folder organization, and seamless sharing -- all in a beautiful
-            Markdown editor.
+            Real-time editing, version history with diffs, inline comments, folder organization, and seamless sharing --
+            all in a beautiful Markdown editor.
           </p>
           <div
             className="animate-fade-in-up flex flex-col items-center gap-4 sm:flex-row sm:justify-center"
@@ -179,35 +176,24 @@ export function LandingPage() {
           </div>
 
           {/* Abstract editor illustration */}
-          <div
-            className="animate-fade-in-up mx-auto mt-16 max-w-3xl"
-            style={{ animationDelay: "0.7s" }}
-          >
+          <div className="animate-fade-in-up mx-auto mt-16 max-w-3xl" style={{ animationDelay: "0.7s" }}>
             <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-2xl shadow-black/10 dark:bg-[var(--color-surface)]">
               <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-4 py-3">
                 <div className="h-3 w-3 rounded-full bg-red-400" />
                 <div className="h-3 w-3 rounded-full bg-yellow-400" />
                 <div className="h-3 w-3 rounded-full bg-green-400" />
-                <span className="ml-3 text-xs text-[var(--color-text-muted)]">
-                  README.md
-                </span>
+                <span className="ml-3 text-xs text-[var(--color-text-muted)]">README.md</span>
               </div>
               <div className="flex">
                 <div className="flex-1 border-r border-[var(--color-border)] p-4 font-mono text-xs leading-6 text-[var(--color-text-muted)] sm:text-sm">
                   <div>
                     <span className="text-purple-500"># </span>
-                    <span className="font-bold text-[var(--color-text)]">
-                      Project Overview
-                    </span>
+                    <span className="font-bold text-[var(--color-text)]">Project Overview</span>
                   </div>
-                  <div className="mt-2">
-                    Welcome to our collaborative docs.
-                  </div>
+                  <div className="mt-2">Welcome to our collaborative docs.</div>
                   <div className="mt-2">
                     <span className="text-purple-500">## </span>
-                    <span className="font-bold text-[var(--color-text)]">
-                      Features
-                    </span>
+                    <span className="font-bold text-[var(--color-text)]">Features</span>
                   </div>
                   <div>
                     <span className="text-blue-500">- </span>Real-time sync
@@ -224,9 +210,7 @@ export function LandingPage() {
                 </div>
                 <div className="hidden flex-1 p-4 text-xs leading-6 sm:block sm:text-sm">
                   <h3 className="text-base font-bold">Project Overview</h3>
-                  <p className="mt-2 text-[var(--color-text-muted)]">
-                    Welcome to our collaborative docs.
-                  </p>
+                  <p className="mt-2 text-[var(--color-text-muted)]">Welcome to our collaborative docs.</p>
                   <h4 className="mt-3 text-sm font-bold">Features</h4>
                   <ul className="mt-1 list-inside list-disc text-[var(--color-text-muted)]">
                     <li>Real-time sync</li>
@@ -243,9 +227,7 @@ export function LandingPage() {
       {/* --- Feature Carousel --- */}
       <section className="py-20 md:py-28">
         <div className="mx-auto max-w-5xl px-4 md:px-8">
-          <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl">
-            Everything you need
-          </h2>
+          <h2 className="mb-4 text-center text-3xl font-bold md:text-4xl">Everything you need</h2>
           <p className="mx-auto mb-12 max-w-xl text-center text-[var(--color-text-muted)]">
             A complete toolkit for teams that think in Markdown.
           </p>
@@ -272,12 +254,8 @@ export function LandingPage() {
                     <feat.icon className="h-10 w-10 text-white" />
                   </div>
                   <div>
-                    <h3 className="mb-2 text-xl font-bold sm:text-2xl">
-                      {feat.title}
-                    </h3>
-                    <p className="max-w-md text-[var(--color-text-muted)]">
-                      {feat.description}
-                    </p>
+                    <h3 className="mb-2 text-xl font-bold sm:text-2xl">{feat.title}</h3>
+                    <p className="max-w-md text-[var(--color-text-muted)]">{feat.description}</p>
                   </div>
                 </div>
               ))}
@@ -320,9 +298,7 @@ export function LandingPage() {
       {/* --- Feature Grid --- */}
       <section className="border-y border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-20 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-8">
-          <h2 className="mb-12 text-center text-3xl font-bold md:text-4xl">
-            Built for modern teams
-          </h2>
+          <h2 className="mb-12 text-center text-3xl font-bold md:text-4xl">Built for modern teams</h2>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feat) => (
               <div
@@ -335,9 +311,7 @@ export function LandingPage() {
                   <feat.icon className="h-6 w-6 text-white" />
                 </div>
                 <h3 className="mb-2 text-lg font-semibold">{feat.title}</h3>
-                <p className="text-sm text-[var(--color-text-muted)]">
-                  {feat.description}
-                </p>
+                <p className="text-sm text-[var(--color-text-muted)]">{feat.description}</p>
               </div>
             ))}
           </div>
@@ -354,9 +328,7 @@ export function LandingPage() {
                   <stat.icon className="h-7 w-7 text-[var(--color-primary)]" />
                 </div>
                 <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-sm text-[var(--color-text-muted)]">
-                  {stat.label}
-                </p>
+                <p className="text-sm text-[var(--color-text-muted)]">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -367,12 +339,9 @@ export function LandingPage() {
       <section className="relative overflow-hidden py-24 md:py-32">
         <div className="animate-gradient absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 opacity-[0.06] dark:opacity-[0.12]" />
         <div className="relative z-10 mx-auto max-w-2xl px-4 text-center md:px-8">
-          <h2 className="mb-4 text-3xl font-bold md:text-4xl">
-            Start collaborating now
-          </h2>
+          <h2 className="mb-4 text-3xl font-bold md:text-4xl">Start collaborating now</h2>
           <p className="mb-8 text-[var(--color-text-muted)]">
-            Free to use. No credit card required. Sign in and create your first
-            document in seconds.
+            Free to use. No credit card required. Sign in and create your first document in seconds.
           </p>
           <div className="flex justify-center">
             <SSOLoginFlow />
@@ -388,10 +357,7 @@ export function LandingPage() {
             <span>CollabMark</span>
           </div>
           <div className="flex gap-6">
-            <a
-              href="/api-docs"
-              className="transition hover:text-[var(--color-text)]"
-            >
+            <a href="/api-docs" className="transition hover:text-[var(--color-text)]">
               API Docs
             </a>
           </div>

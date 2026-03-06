@@ -34,17 +34,13 @@ describe("MarkdownPreview", () => {
   });
 
   it("renders headings correctly", () => {
-    const { getByRole } = render(
-      <MarkdownPreview content={"# Heading 1\n\n## Heading 2"} />,
-    );
+    const { getByRole } = render(<MarkdownPreview content={"# Heading 1\n\n## Heading 2"} />);
     expect(getByRole("heading", { level: 1 })).toBeDefined();
     expect(getByRole("heading", { level: 2 })).toBeDefined();
   });
 
   it("renders code blocks", () => {
-    render(
-      <MarkdownPreview content={"```javascript\nconst x = 1;\n```"} />,
-    );
+    render(<MarkdownPreview content={"```javascript\nconst x = 1;\n```"} />);
     const codeEl = document.querySelector("code");
     expect(codeEl).not.toBeNull();
     expect(codeEl?.textContent).toContain("const x = 1;");
@@ -56,12 +52,8 @@ describe("MarkdownPreview", () => {
   });
 
   it("applies additional className", () => {
-    const { container } = render(
-      <MarkdownPreview content="test" className="prose-base" />,
-    );
-    expect(
-      container.firstElementChild?.classList.contains("prose-base"),
-    ).toBe(true);
+    const { container } = render(<MarkdownPreview content="test" className="prose-base" />);
+    expect(container.firstElementChild?.classList.contains("prose-base")).toBe(true);
   });
 
   it("does not re-render when content is identical", () => {
@@ -109,9 +101,7 @@ describe("MarkdownPreview", () => {
       const mermaid = await import("mermaid");
       vi.mocked(mermaid.default.render).mockReturnValue(renderPromise as never);
 
-      const { getByText } = render(
-        <MarkdownPreview content={"```mermaid\ngraph TD\nA-->B\n```"} />,
-      );
+      const { getByText } = render(<MarkdownPreview content={"```mermaid\ngraph TD\nA-->B\n```"} />);
       expect(getByText("Rendering diagram...")).toBeInTheDocument();
 
       resolveRender!({ svg: "<svg>diagram</svg>", diagramType: "flowchart" });
@@ -125,9 +115,7 @@ describe("MarkdownPreview", () => {
         diagramType: "flowchart",
       });
 
-      const { getByTestId } = render(
-        <MarkdownPreview content={"```mermaid\ngraph TD\nA-->B\n```"} />,
-      );
+      const { getByTestId } = render(<MarkdownPreview content={"```mermaid\ngraph TD\nA-->B\n```"} />);
 
       await vi.waitFor(() => {
         const svg = getByTestId("mermaid-svg");
@@ -137,13 +125,9 @@ describe("MarkdownPreview", () => {
 
     it("renders Mermaid error when mermaid.render throws", async () => {
       const mermaid = await import("mermaid");
-      vi.mocked(mermaid.default.render).mockRejectedValue(
-        new Error("Invalid diagram syntax"),
-      );
+      vi.mocked(mermaid.default.render).mockRejectedValue(new Error("Invalid diagram syntax"));
 
-      const { getByText } = render(
-        <MarkdownPreview content={"```mermaid\ninvalid\n```"} />,
-      );
+      const { getByText } = render(<MarkdownPreview content={"```mermaid\ninvalid\n```"} />);
 
       await vi.waitFor(() => {
         expect(getByText(/Mermaid error:/)).toBeInTheDocument();
@@ -160,9 +144,7 @@ describe("MarkdownPreview", () => {
         diagramType: "flowchart",
       });
 
-      render(
-        <MarkdownPreview content={"```mermaid\ngraph TD\nA-->B\n```"} />,
-      );
+      render(<MarkdownPreview content={"```mermaid\ngraph TD\nA-->B\n```"} />);
 
       await vi.waitFor(() => {
         expect(mermaid.default.initialize).toHaveBeenCalledWith({
@@ -182,9 +164,7 @@ describe("MarkdownPreview", () => {
         diagramType: "flowchart",
       });
 
-      render(
-        <MarkdownPreview content={"```mermaid\ngraph TD\nA-->B\n```"} />,
-      );
+      render(<MarkdownPreview content={"```mermaid\ngraph TD\nA-->B\n```"} />);
 
       await vi.waitFor(() => {
         expect(mermaid.default.initialize).toHaveBeenCalledWith({
@@ -232,9 +212,7 @@ describe("MarkdownPreview", () => {
     it("renders long content without error", () => {
       const longContent = "# Title\n\n" + "Lorem ipsum. ".repeat(500);
       const { container } = render(<MarkdownPreview content={longContent} />);
-      expect(container.firstElementChild?.classList.contains("prose")).toBe(
-        true,
-      );
+      expect(container.firstElementChild?.classList.contains("prose")).toBe(true);
     });
 
     it("renders strikethrough via GFM", () => {
@@ -248,9 +226,7 @@ describe("MarkdownPreview", () => {
       mockUseDarkMode.mockReturnValue(false);
 
       const { container } = render(<MarkdownPreview content="x" />);
-      expect(container.firstElementChild?.className).toContain(
-        "dark:prose-invert",
-      );
+      expect(container.firstElementChild?.className).toContain("dark:prose-invert");
     });
   });
 });

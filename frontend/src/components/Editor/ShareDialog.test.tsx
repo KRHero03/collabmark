@@ -57,9 +57,7 @@ describe("ShareDialog", () => {
   });
 
   it("returns null when open is false", () => {
-    const { container } = render(
-      <ShareDialog {...defaultProps} open={false} />,
-    );
+    const { container } = render(<ShareDialog {...defaultProps} open={false} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -140,9 +138,7 @@ describe("ShareDialog", () => {
 
   it("add collaborator error: shows fallback when no detail in response", async () => {
     const user = userEvent.setup();
-    vi.mocked(sharingApi.addCollaborator).mockRejectedValue(
-      new Error("Network error"),
-    );
+    vi.mocked(sharingApi.addCollaborator).mockRejectedValue(new Error("Network error"));
 
     render(<ShareDialog {...defaultProps} />);
 
@@ -195,10 +191,7 @@ describe("ShareDialog", () => {
     await user.click(removeButton);
 
     await waitFor(() => {
-      expect(sharingApi.removeCollaborator).toHaveBeenCalledWith(
-        "doc-456",
-        "user-789",
-      );
+      expect(sharingApi.removeCollaborator).toHaveBeenCalledWith("doc-456", "user-789");
     });
   });
 
@@ -234,17 +227,12 @@ describe("ShareDialog", () => {
 
     const generalAccessSelects = screen.getAllByRole("combobox");
     const gaSelect = generalAccessSelects.find((s) =>
-      Array.from((s as HTMLSelectElement).options).some(
-        (o) => o.value === "anyone_edit",
-      ),
+      Array.from((s as HTMLSelectElement).options).some((o) => o.value === "anyone_edit"),
     ) as HTMLSelectElement;
     fireEvent.change(gaSelect, { target: { value: "anyone_edit" } });
 
     await waitFor(() => {
-      expect(sharingApi.updateGeneralAccess).toHaveBeenCalledWith(
-        "doc-456",
-        "anyone_edit",
-      );
+      expect(sharingApi.updateGeneralAccess).toHaveBeenCalledWith("doc-456", "anyone_edit");
     });
   });
 
@@ -252,18 +240,11 @@ describe("ShareDialog", () => {
     const onGeneralAccessChange = vi.fn();
     vi.mocked(sharingApi.updateGeneralAccess).mockResolvedValue({} as never);
 
-    render(
-      <ShareDialog
-        {...defaultProps}
-        onGeneralAccessChange={onGeneralAccessChange}
-      />,
-    );
+    render(<ShareDialog {...defaultProps} onGeneralAccessChange={onGeneralAccessChange} />);
 
     const generalAccessSelects = screen.getAllByRole("combobox");
     const gaSelect = generalAccessSelects.find((s) =>
-      Array.from((s as HTMLSelectElement).options).some(
-        (o) => o.value === "anyone_view",
-      ),
+      Array.from((s as HTMLSelectElement).options).some((o) => o.value === "anyone_view"),
     ) as HTMLSelectElement;
     fireEvent.change(gaSelect, { target: { value: "anyone_view" } });
 
@@ -273,24 +254,14 @@ describe("ShareDialog", () => {
   });
 
   it("general access displayed correctly for all 3 values", () => {
-    const { rerender } = render(
-      <ShareDialog {...defaultProps} generalAccess="restricted" />,
-    );
+    const { rerender } = render(<ShareDialog {...defaultProps} generalAccess="restricted" />);
     expect(screen.getAllByText("Restricted").length).toBeGreaterThan(0);
 
-    rerender(
-      <ShareDialog {...defaultProps} generalAccess="anyone_view" />,
-    );
-    expect(
-      screen.getAllByText("Anyone with the link can view").length,
-    ).toBeGreaterThan(0);
+    rerender(<ShareDialog {...defaultProps} generalAccess="anyone_view" />);
+    expect(screen.getAllByText("Anyone with the link can view").length).toBeGreaterThan(0);
 
-    rerender(
-      <ShareDialog {...defaultProps} generalAccess="anyone_edit" />,
-    );
-    expect(
-      screen.getAllByText("Anyone with the link can edit").length,
-    ).toBeGreaterThan(0);
+    rerender(<ShareDialog {...defaultProps} generalAccess="anyone_edit" />);
+    expect(screen.getAllByText("Anyone with the link can edit").length).toBeGreaterThan(0);
   });
 
   it("non-owner: hides Add people, shows general access as text", async () => {
@@ -299,9 +270,7 @@ describe("ShareDialog", () => {
     await waitFor(() => {});
 
     expect(screen.queryByText("Add people")).not.toBeInTheDocument();
-    expect(
-      screen.queryByPlaceholderText("Enter email address"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Enter email address")).not.toBeInTheDocument();
     expect(screen.queryByTitle("Remove access")).not.toBeInTheDocument();
     expect(screen.getByText("Restricted")).toBeInTheDocument();
   });
@@ -312,9 +281,7 @@ describe("ShareDialog", () => {
     const copyButton = screen.getByRole("button", { name: /Copy link/i });
     fireEvent.click(copyButton);
 
-    expect(mockWriteText).toHaveBeenCalledWith(
-      `${window.location.origin}/edit/doc-456`,
-    );
+    expect(mockWriteText).toHaveBeenCalledWith(`${window.location.origin}/edit/doc-456`);
   });
 
   it("copy link: shows Link copied after click", async () => {
@@ -360,25 +327,19 @@ describe("ShareDialog", () => {
   });
 
   it("general access error: shows error when updateGeneralAccess fails", async () => {
-    vi.mocked(sharingApi.updateGeneralAccess).mockRejectedValue(
-      new Error("Forbidden"),
-    );
+    vi.mocked(sharingApi.updateGeneralAccess).mockRejectedValue(new Error("Forbidden"));
 
     render(<ShareDialog {...defaultProps} />);
 
     const generalAccessSelects = screen.getAllByRole("combobox");
     const gaSelect = generalAccessSelects.find((s) =>
-      Array.from((s as HTMLSelectElement).options).some(
-        (o) => o.value === "anyone_view",
-      ),
+      Array.from((s as HTMLSelectElement).options).some((o) => o.value === "anyone_view"),
     ) as HTMLSelectElement;
     fireEvent.change(gaSelect, { target: { value: "anyone_view" } });
 
     await waitFor(
       () => {
-        expect(
-          screen.getByText("Failed to update access settings"),
-        ).toBeInTheDocument();
+        expect(screen.getByText("Failed to update access settings")).toBeInTheDocument();
       },
       { timeout: 1000 },
     );
@@ -388,9 +349,7 @@ describe("ShareDialog", () => {
     vi.mocked(sharingApi.listCollaborators).mockResolvedValue({
       data: [mockCollaborator],
     } as never);
-    vi.mocked(sharingApi.addCollaborator).mockRejectedValue(
-      new Error("Forbidden"),
-    );
+    vi.mocked(sharingApi.addCollaborator).mockRejectedValue(new Error("Forbidden"));
 
     render(<ShareDialog {...defaultProps} />);
 
@@ -408,9 +367,7 @@ describe("ShareDialog", () => {
   });
 
   it("fetchCollaborators catch: sets empty collaborators when listCollaborators fails", async () => {
-    vi.mocked(sharingApi.listCollaborators).mockRejectedValue(
-      new Error("Network error"),
-    );
+    vi.mocked(sharingApi.listCollaborators).mockRejectedValue(new Error("Network error"));
 
     render(<ShareDialog {...defaultProps} />);
 
@@ -425,13 +382,7 @@ describe("ShareDialog", () => {
       data: [],
     } as never);
 
-    const { getByTestId } = render(
-      <ShareDialog
-        {...defaultProps}
-        ownerName=""
-        ownerEmail="owner@example.com"
-      />,
-    );
+    const { getByTestId } = render(<ShareDialog {...defaultProps} ownerName="" ownerEmail="owner@example.com" />);
 
     await waitFor(() => {});
 

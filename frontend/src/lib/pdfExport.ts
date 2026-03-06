@@ -8,10 +8,6 @@ export const PORTRAIT_CONTENT_WIDTH = 720;
  * indicating landscape orientation should be used for PDF export.
  */
 export function detectNeedsLandscape(container: HTMLElement): boolean {
-  const wideEls = container.querySelectorAll(
-    "table, pre, svg, .overflow-x-auto",
-  );
-  return Array.from(wideEls).some(
-    (el) => el.scrollWidth > PORTRAIT_CONTENT_WIDTH,
-  );
+  const wideEls = container.querySelectorAll("table, pre, svg, .overflow-x-auto");
+  return Array.from(wideEls).some((el) => el.scrollWidth > PORTRAIT_CONTENT_WIDTH);
 }

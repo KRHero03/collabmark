@@ -111,9 +111,7 @@ describe("useCommentAnchors", () => {
 
   it("returns empty map when synced is false", () => {
     const { ydoc, ytext } = makeYDocWithText("hello world");
-    const comments = [
-      makeComment({ id: "c1", anchor_from: 0, anchor_to: 5 }),
-    ];
+    const comments = [makeComment({ id: "c1", anchor_from: 0, anchor_to: 5 })];
 
     const { result } = renderHook(() =>
       useCommentAnchors({
@@ -260,8 +258,7 @@ describe("useCommentAnchors", () => {
 
   it("resolves anchors via relative positions when using real Yjs", () => {
     const { ydoc, ytext } = makeYDocWithText("hello world");
-    const { anchor_from_relative, anchor_to_relative } =
-      createRelativePositions(ytext, 3, 8);
+    const { anchor_from_relative, anchor_to_relative } = createRelativePositions(ytext, 3, 8);
     const comments = [
       makeComment({
         id: "c1",
@@ -290,8 +287,7 @@ describe("useCommentAnchors", () => {
 
   it("returns orphaned when relative position resolves to null (deleted content)", () => {
     const { ydoc, ytext } = makeYDocWithText("hello world");
-    const { anchor_from_relative, anchor_to_relative } =
-      createRelativePositions(ytext, 3, 8);
+    const { anchor_from_relative, anchor_to_relative } = createRelativePositions(ytext, 3, 8);
     const comments = [
       makeComment({
         id: "c1",
@@ -320,8 +316,7 @@ describe("useCommentAnchors", () => {
 
   it("returns orphaned when from >= to (collapsed range)", () => {
     const { ydoc, ytext } = makeYDocWithText("hello world");
-    const { anchor_from_relative, anchor_to_relative } =
-      createRelativePositions(ytext, 5, 5);
+    const { anchor_from_relative, anchor_to_relative } = createRelativePositions(ytext, 5, 5);
     const comments = [
       makeComment({
         id: "c1",
@@ -374,8 +369,7 @@ describe("useCommentAnchors", () => {
 
   it("calls commentsApi.orphan when resolved status is orphaned and comment is not yet orphaned", async () => {
     const { ydoc, ytext } = makeYDocWithText("hello world");
-    const { anchor_from_relative, anchor_to_relative } =
-      createRelativePositions(ytext, 3, 8);
+    const { anchor_from_relative, anchor_to_relative } = createRelativePositions(ytext, 3, 8);
     const comments = [
       makeComment({
         id: "c1",
@@ -447,9 +441,7 @@ describe("useCommentAnchors", () => {
     expect(result.current.size).toBe(0);
 
     rerender({
-      comments: [
-        makeComment({ id: "c1", anchor_from: 0, anchor_to: 5 }),
-      ],
+      comments: [makeComment({ id: "c1", anchor_from: 0, anchor_to: 5 })],
     });
 
     expect(result.current.size).toBe(1);

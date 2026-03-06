@@ -34,14 +34,8 @@ export function ConfirmDialog({
   const isDanger = variant === "danger";
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onCancel}
-    >
-      <div
-        className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg" onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start gap-3">
           {isDanger && (
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
@@ -50,9 +44,7 @@ export function ConfirmDialog({
           )}
           <div>
             <h3 className="text-lg font-semibold">{title}</h3>
-            <p className="mt-1 text-sm text-[var(--color-text-muted)]">
-              {message}
-            </p>
+            <p className="mt-1 text-sm text-[var(--color-text-muted)]">{message}</p>
           </div>
         </div>
         <div className="flex justify-end gap-2">

@@ -53,7 +53,7 @@ async def list_api_keys(user: User = Depends(get_current_user)):
     """
     keys = await ApiKey.find(
         ApiKey.user_id == str(user.id),
-        ApiKey.is_active == True,  # noqa: E712
+        ApiKey.is_active == True,
     ).to_list()
     return [ApiKeyRead.from_doc(k) for k in keys]
 

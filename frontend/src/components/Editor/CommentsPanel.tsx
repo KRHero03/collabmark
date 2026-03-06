@@ -52,15 +52,7 @@ export function CommentsPanel({
   anchors,
   positions,
 }: CommentsPanelProps) {
-  const {
-    comments,
-    loading,
-    fetchComments,
-    addComment,
-    replyToComment,
-    resolveComment,
-    deleteComment,
-  } = useComments();
+  const { comments, loading, fetchComments, addComment, replyToComment, resolveComment, deleteComment } = useComments();
 
   const [newComment, setNewComment] = useState("");
 
@@ -86,45 +78,37 @@ export function CommentsPanel({
     } catch {
       // Error is already handled inside useComments hook
     }
-  }, [
-    docId,
-    newComment,
-    selectedText,
-    selectionRange,
-    selectionRelative,
-    addComment,
-  ]);
+  }, [docId, newComment, selectedText, selectionRange, selectionRelative, addComment]);
 
-  const { positionedComments, orphanedComments, docLevelComments } =
-    useMemo(() => {
-      const positioned: Array<{
-        comment: CommentData;
-        position: PositionedComment;
-        anchor: ResolvedAnchor;
-      }> = [];
-      const orphaned: CommentData[] = [];
-      const docLevel: CommentData[] = [];
+  const { positionedComments, orphanedComments, docLevelComments } = useMemo(() => {
+    const positioned: Array<{
+      comment: CommentData;
+      position: PositionedComment;
+      anchor: ResolvedAnchor;
+    }> = [];
+    const orphaned: CommentData[] = [];
+    const docLevel: CommentData[] = [];
 
-      for (const comment of comments) {
-        const anchor = anchors?.get(comment.id);
-        const position = positions?.find((p) => p.commentId === comment.id);
+    for (const comment of comments) {
+      const anchor = anchors?.get(comment.id);
+      const position = positions?.find((p) => p.commentId === comment.id);
 
-        if (comment.is_orphaned || anchor?.status === "orphaned") {
-          orphaned.push(comment);
-        } else if (position && anchor) {
-          positioned.push({ comment, position, anchor });
-        } else {
-          docLevel.push(comment);
-        }
+      if (comment.is_orphaned || anchor?.status === "orphaned") {
+        orphaned.push(comment);
+      } else if (position && anchor) {
+        positioned.push({ comment, position, anchor });
+      } else {
+        docLevel.push(comment);
       }
+    }
 
-      positioned.sort((a, b) => a.position.y - b.position.y);
-      return {
-        positionedComments: positioned,
-        orphanedComments: orphaned,
-        docLevelComments: docLevel,
-      };
-    }, [comments, anchors, positions]);
+    positioned.sort((a, b) => a.position.y - b.position.y);
+    return {
+      positionedComments: positioned,
+      orphanedComments: orphaned,
+      docLevelComments: docLevel,
+    };
+  }, [comments, anchors, positions]);
 
   if (!open) return null;
 
@@ -158,9 +142,7 @@ export function CommentsPanel({
           <input
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder={
-              selectedText ? "Comment on selection..." : "Add a comment..."
-            }
+            placeholder={selectedText ? "Comment on selection..." : "Add a comment..."}
             className="flex-1 rounded-md border border-[var(--color-border)] px-3 py-2 text-sm outline-none focus:border-[var(--color-primary)]"
             onKeyDown={(e) => e.key === "Enter" && handleCreate()}
           />
@@ -179,20 +161,14 @@ export function CommentsPanel({
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-[var(--color-primary)] border-t-transparent" />
           </div>
         ) : comments.length === 0 ? (
-          <p className="py-10 text-center text-sm text-[var(--color-text-muted)]">
-            No comments yet.
-          </p>
+          <p className="py-10 text-center text-sm text-[var(--color-text-muted)]">No comments yet.</p>
         ) : (
           <>
             {/* Position-synced inline comments */}
             {positionedComments.length > 0 && (
               <div className="relative" style={{ minHeight: getMinHeight(positionedComments) }}>
                 {positionedComments.map(({ comment, position, anchor }) => (
-                  <div
-                    key={comment.id}
-                    className="absolute left-0 right-0 px-3"
-                    style={{ top: position.y }}
-                  >
+                  <div key={comment.id} className="absolute left-0 right-0 px-3" style={{ top: position.y }}>
                     {position.isDisplaced && (
                       <svg
                         className="pointer-events-none absolute -left-1 w-4"
@@ -203,8 +179,10 @@ export function CommentsPanel({
                         }}
                       >
                         <line
-                          x1="8" y1="0"
-                          x2="8" y2="100%"
+                          x1="8"
+                          y1="0"
+                          x2="8"
+                          y2="100%"
                           stroke="var(--color-border)"
                           strokeWidth="1"
                           strokeDasharray="3 2"
@@ -277,9 +255,7 @@ export function CommentsPanel({
 }
 
 /** Estimate the minimum height needed to contain all positioned cards. */
-function getMinHeight(
-  items: Array<{ position: PositionedComment }>,
-): number {
+function getMinHeight(items: Array<{ position: PositionedComment }>): number {
   if (items.length === 0) return 0;
   const last = items[items.length - 1];
   return last.position.y + 120;

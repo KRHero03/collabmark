@@ -5,14 +5,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  BookOpen,
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Key,
-  Play,
-} from "lucide-react";
+import { BookOpen, ChevronDown, ChevronRight, Copy, Key, Play } from "lucide-react";
 import { Navbar } from "../components/Layout/Navbar";
 
 /* ------------------------------------------------------------------ */
@@ -52,11 +45,7 @@ const GROUPS: EndpointGroup[] = [
         summary: "Create a document",
         description:
           "Create a new Markdown document. Both fields are optional and default to 'Untitled' and empty content.",
-        body: JSON.stringify(
-          { title: "My Document", content: "# Hello World" },
-          null,
-          2,
-        ),
+        body: JSON.stringify({ title: "My Document", content: "# Hello World" }, null, 2),
         responseExample: JSON.stringify(
           {
             id: "abc123",
@@ -76,8 +65,7 @@ const GROUPS: EndpointGroup[] = [
         method: "GET",
         path: "/api/documents",
         summary: "List your documents",
-        description:
-          "Returns all documents owned by the authenticated user, sorted by most recently updated.",
+        description: "Returns all documents owned by the authenticated user, sorted by most recently updated.",
         params: [
           {
             name: "include_deleted",
@@ -91,8 +79,7 @@ const GROUPS: EndpointGroup[] = [
         method: "GET",
         path: "/api/documents/{doc_id}",
         summary: "Get a document",
-        description:
-          "Fetch a single document by ID. Works for documents you own or have access to (via sharing).",
+        description: "Fetch a single document by ID. Works for documents you own or have access to (via sharing).",
         params: [
           {
             name: "doc_id",
@@ -116,18 +103,13 @@ const GROUPS: EndpointGroup[] = [
             description: "Document ID",
           },
         ],
-        body: JSON.stringify(
-          { title: "Updated Title", content: "# Updated content" },
-          null,
-          2,
-        ),
+        body: JSON.stringify({ title: "Updated Title", content: "# Updated content" }, null, 2),
       },
       {
         method: "DELETE",
         path: "/api/documents/{doc_id}",
         summary: "Delete a document",
-        description:
-          "Soft-delete a document (moves to trash). Owner only. Can be restored later.",
+        description: "Soft-delete a document (moves to trash). Owner only. Can be restored later.",
         params: [
           {
             name: "doc_id",
@@ -176,8 +158,7 @@ const GROUPS: EndpointGroup[] = [
         method: "POST",
         path: "/api/documents/{doc_id}/collaborators",
         summary: "Add a collaborator",
-        description:
-          "Add a user by email as a collaborator with view or edit permission. Owner only.",
+        description: "Add a user by email as a collaborator with view or edit permission. Owner only.",
         params: [
           {
             name: "doc_id",
@@ -186,18 +167,13 @@ const GROUPS: EndpointGroup[] = [
             description: "Document ID",
           },
         ],
-        body: JSON.stringify(
-          { email: "user@example.com", permission: "edit" },
-          null,
-          2,
-        ),
+        body: JSON.stringify({ email: "user@example.com", permission: "edit" }, null, 2),
       },
       {
         method: "GET",
         path: "/api/documents/{doc_id}/collaborators",
         summary: "List collaborators",
-        description:
-          "List all users with explicit access to this document. Owner only.",
+        description: "List all users with explicit access to this document. Owner only.",
         params: [
           {
             name: "doc_id",
@@ -231,8 +207,7 @@ const GROUPS: EndpointGroup[] = [
         method: "GET",
         path: "/api/documents/shared",
         summary: "List shared documents",
-        description:
-          "List documents shared with you, sorted by most recently accessed.",
+        description: "List documents shared with you, sorted by most recently accessed.",
       },
     ],
   },
@@ -252,18 +227,13 @@ const GROUPS: EndpointGroup[] = [
             description: "Document ID",
           },
         ],
-        body: JSON.stringify(
-          { content: "# Snapshot content", summary: "Manual save" },
-          null,
-          2,
-        ),
+        body: JSON.stringify({ content: "# Snapshot content", summary: "Manual save" }, null, 2),
       },
       {
         method: "GET",
         path: "/api/documents/{doc_id}/versions",
         summary: "List version history",
-        description:
-          "List all version snapshots for a document, newest first.",
+        description: "List all version snapshots for a document, newest first.",
         params: [
           {
             name: "doc_id",
@@ -277,8 +247,7 @@ const GROUPS: EndpointGroup[] = [
         method: "GET",
         path: "/api/documents/{doc_id}/versions/{version_number}",
         summary: "Get a specific version",
-        description:
-          "Retrieve a specific version snapshot including the full content.",
+        description: "Retrieve a specific version snapshot including the full content.",
         params: [
           {
             name: "doc_id",
@@ -303,8 +272,7 @@ const GROUPS: EndpointGroup[] = [
         method: "POST",
         path: "/api/documents/{doc_id}/comments",
         summary: "Create a comment",
-        description:
-          "Add an inline or document-level comment. Omit anchor fields for a doc-level comment.",
+        description: "Add an inline or document-level comment. Omit anchor fields for a doc-level comment.",
         params: [
           {
             name: "doc_id",
@@ -328,8 +296,7 @@ const GROUPS: EndpointGroup[] = [
         method: "GET",
         path: "/api/documents/{doc_id}/comments",
         summary: "List comments",
-        description:
-          "List all top-level comments with nested replies for a document.",
+        description: "List all top-level comments with nested replies for a document.",
         params: [
           {
             name: "doc_id",
@@ -391,16 +358,14 @@ const GROUPS: EndpointGroup[] = [
         method: "POST",
         path: "/api/keys",
         summary: "Create an API key",
-        description:
-          'Generate a new API key. The raw key is only shown once in the response. Prefix: "cm_".',
+        description: 'Generate a new API key. The raw key is only shown once in the response. Prefix: "cm_".',
         body: JSON.stringify({ name: "My Agent Key" }, null, 2),
       },
       {
         method: "GET",
         path: "/api/keys",
         summary: "List API keys",
-        description:
-          "List all API keys for the authenticated user (raw key not included).",
+        description: "List all API keys for the authenticated user (raw key not included).",
       },
       {
         method: "DELETE",
@@ -436,13 +401,7 @@ const METHOD_STYLES: Record<string, string> = {
 /*  TryItPanel                                                         */
 /* ------------------------------------------------------------------ */
 
-function TryItPanel({
-  endpoint,
-  apiKey,
-}: {
-  endpoint: EndpointDef;
-  apiKey: string;
-}) {
+function TryItPanel({ endpoint, apiKey }: { endpoint: EndpointDef; apiKey: string }) {
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [bodyText, setBodyText] = useState(endpoint.body ?? "");
   const [response, setResponse] = useState<{
@@ -460,10 +419,7 @@ function TryItPanel({
     }
     const queryParams = (endpoint.params ?? [])
       .filter((p) => p.in === "query" && paramValues[p.name])
-      .map(
-        (p) =>
-          `${encodeURIComponent(p.name)}=${encodeURIComponent(paramValues[p.name])}`,
-      );
+      .map((p) => `${encodeURIComponent(p.name)}=${encodeURIComponent(paramValues[p.name])}`);
     if (queryParams.length) url += `?${queryParams.join("&")}`;
     return url;
   }, [endpoint, paramValues]);
@@ -507,9 +463,7 @@ function TryItPanel({
       {/* Params */}
       {(endpoint.params ?? []).length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">
-            Parameters
-          </h4>
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--color-text-muted)]">Parameters</h4>
           {(endpoint.params ?? []).map((p) => (
             <div key={p.name} className="flex items-center gap-2">
               <label className="w-32 text-xs font-medium text-[var(--color-text)]">
@@ -578,13 +532,9 @@ function TryItPanel({
             >
               {response.status || "ERR"}
             </span>
-            <span className="text-xs text-[var(--color-text-muted)]">
-              Response
-            </span>
+            <span className="text-xs text-[var(--color-text-muted)]">Response</span>
           </div>
-          <pre className="max-h-80 overflow-auto rounded-md bg-gray-900 p-3 text-xs text-gray-100">
-            {response.body}
-          </pre>
+          <pre className="max-h-80 overflow-auto rounded-md bg-gray-900 p-3 text-xs text-gray-100">{response.body}</pre>
         </div>
       )}
     </div>
@@ -595,13 +545,7 @@ function TryItPanel({
 /*  EndpointCard                                                       */
 /* ------------------------------------------------------------------ */
 
-function EndpointCard({
-  endpoint,
-  apiKey,
-}: {
-  endpoint: EndpointDef;
-  apiKey: string;
-}) {
+function EndpointCard({ endpoint, apiKey }: { endpoint: EndpointDef; apiKey: string }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -615,12 +559,8 @@ function EndpointCard({
         >
           {endpoint.method}
         </span>
-        <code className="flex-1 text-sm font-medium text-[var(--color-text)]">
-          {endpoint.path}
-        </code>
-        <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">
-          {endpoint.summary}
-        </span>
+        <code className="flex-1 text-sm font-medium text-[var(--color-text)]">{endpoint.path}</code>
+        <span className="hidden text-xs text-[var(--color-text-muted)] sm:inline">{endpoint.summary}</span>
         {expanded ? (
           <ChevronDown className="h-4 w-4 shrink-0 text-[var(--color-text-muted)]" />
         ) : (
@@ -630,9 +570,7 @@ function EndpointCard({
 
       {expanded && (
         <div className="border-t border-[var(--color-border)] px-4 py-3">
-          <p className="mb-2 text-sm text-[var(--color-text-muted)]">
-            {endpoint.description}
-          </p>
+          <p className="mb-2 text-sm text-[var(--color-text-muted)]">{endpoint.description}</p>
 
           {endpoint.responseExample && (
             <details className="mb-2">
@@ -659,12 +597,12 @@ function EndpointCard({
 export function ApiDocsPage() {
   useEffect(() => {
     document.title = "API Docs - CollabMark";
-    return () => { document.title = "CollabMark"; };
+    return () => {
+      document.title = "CollabMark";
+    };
   }, []);
 
-  const [apiKey, setApiKey] = useState(
-    () => sessionStorage.getItem("collabmark_api_key") ?? "",
-  );
+  const [apiKey, setApiKey] = useState(() => sessionStorage.getItem("collabmark_api_key") ?? "");
   const [copied, setCopied] = useState(false);
 
   const handleKeyChange = (value: string) => {
@@ -693,43 +631,30 @@ export function ApiDocsPage() {
             API Documentation
           </h1>
           <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-            Use the CollabMark API to programmatically manage Markdown documents,
-            sharing, comments, and more. Authenticate with an API key via the{" "}
-            <code className="rounded bg-[var(--color-hover)] px-1 py-0.5 text-xs">
-              X-API-Key
-            </code>{" "}
-            header.
+            Use the CollabMark API to programmatically manage Markdown documents, sharing, comments, and more.
+            Authenticate with an API key via the{" "}
+            <code className="rounded bg-[var(--color-hover)] px-1 py-0.5 text-xs">X-API-Key</code> header.
           </p>
         </div>
 
         {/* Quick start */}
         <div className="mb-8 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
-          <h2 className="mb-3 text-lg font-semibold text-[var(--color-text)]">
-            Quick Start
-          </h2>
+          <h2 className="mb-3 text-lg font-semibold text-[var(--color-text)]">Quick Start</h2>
           <ol className="mb-4 list-inside list-decimal space-y-1 text-sm text-[var(--color-text-muted)]">
             <li>
               Go to <strong>Settings</strong> and generate an API key
             </li>
             <li>
               Copy the key (it starts with{" "}
-              <code className="rounded bg-[var(--color-hover)] px-1 py-0.5 text-xs">
-                cm_
-              </code>
-              )
+              <code className="rounded bg-[var(--color-hover)] px-1 py-0.5 text-xs">cm_</code>)
             </li>
             <li>
-              Pass it in the{" "}
-              <code className="rounded bg-[var(--color-hover)] px-1 py-0.5 text-xs">
-                X-API-Key
-              </code>{" "}
+              Pass it in the <code className="rounded bg-[var(--color-hover)] px-1 py-0.5 text-xs">X-API-Key</code>{" "}
               header with every request
             </li>
           </ol>
           <div className="relative rounded-md bg-gray-900 p-3">
-            <pre className="overflow-x-auto text-xs text-gray-100">
-              {curlExample}
-            </pre>
+            <pre className="overflow-x-auto text-xs text-gray-100">{curlExample}</pre>
             <button
               onClick={() => copyCode(curlExample)}
               className="absolute right-2 top-2 rounded p-1 text-gray-400 hover:text-white"
@@ -737,11 +662,7 @@ export function ApiDocsPage() {
             >
               <Copy className="h-3.5 w-3.5" />
             </button>
-            {copied && (
-              <span className="absolute right-8 top-2.5 text-xs text-emerald-400">
-                Copied!
-              </span>
-            )}
+            {copied && <span className="absolute right-8 top-2.5 text-xs text-emerald-400">Copied!</span>}
           </div>
         </div>
 
@@ -752,8 +673,8 @@ export function ApiDocsPage() {
             Your API Key
           </h2>
           <p className="mb-3 text-xs text-[var(--color-text-muted)]">
-            Enter your API key to use the &quot;Try it&quot; panels below. The
-            key is stored in session storage and cleared when you close the tab.
+            Enter your API key to use the &quot;Try it&quot; panels below. The key is stored in session storage and
+            cleared when you close the tab.
           </p>
           <input
             type="password"
@@ -772,11 +693,7 @@ export function ApiDocsPage() {
             </h2>
             <div className="space-y-2">
               {group.endpoints.map((ep) => (
-                <EndpointCard
-                  key={`${ep.method} ${ep.path}`}
-                  endpoint={ep}
-                  apiKey={apiKey}
-                />
+                <EndpointCard key={`${ep.method} ${ep.path}`} endpoint={ep} apiKey={apiKey} />
               ))}
             </div>
           </section>
@@ -784,11 +701,8 @@ export function ApiDocsPage() {
 
         {/* Base URL note */}
         <div className="mt-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] p-4 text-xs text-[var(--color-text-muted)]">
-          <strong>Base URL:</strong>{" "}
-          <code className="rounded bg-[var(--color-hover)] px-1 py-0.5">
-            {baseUrl}
-          </code>
-          . All API paths shown above are relative to this origin.
+          <strong>Base URL:</strong> <code className="rounded bg-[var(--color-hover)] px-1 py-0.5">{baseUrl}</code>. All
+          API paths shown above are relative to this origin.
         </div>
       </div>
     </div>

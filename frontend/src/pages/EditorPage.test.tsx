@@ -18,22 +18,15 @@ vi.mock("yjs", async () => {
   return {
     ...actual,
     createRelativePositionFromTypeIndex: (...args: unknown[]) =>
-      (mockCreateRelativePositionFromTypeIndex as Function)(...args),
+      (mockCreateRelativePositionFromTypeIndex as (...a: unknown[]) => unknown)(...args),
     encodeRelativePosition: (...args: unknown[]) =>
-      (mockEncodeRelativePosition as Function)(...args),
+      (mockEncodeRelativePosition as (...a: unknown[]) => unknown)(...args),
   };
 });
 
 // Mock react-router
 vi.mock("react-router", () => ({
-  Link: ({
-    to,
-    children,
-    ...props
-  }: {
-    to: string;
-    children: React.ReactNode;
-  }) => (
+  Link: ({ to, children, ...props }: { to: string; children: React.ReactNode }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -70,8 +63,7 @@ vi.mock("../hooks/useCommentPositions", () => ({ useCommentPositions: () => new 
 // Mock pdfExport
 const mockDetectNeedsLandscape = vi.fn(() => false);
 vi.mock("../lib/pdfExport", () => ({
-  detectNeedsLandscape: (...args: unknown[]) =>
-    (mockDetectNeedsLandscape as Function)(...args),
+  detectNeedsLandscape: (...args: unknown[]) => (mockDetectNeedsLandscape as (...a: unknown[]) => unknown)(...args),
 }));
 
 // Mock useYjsProvider - key mock
@@ -144,9 +136,7 @@ vi.mock("../components/Editor/MarkdownEditor", () => ({
       {props.onSelectionChange && (
         <button
           data-testid="trigger-selection"
-          onClick={() =>
-            props.onSelectionChange!({ from: 0, to: 5, text: "Hello" })
-          }
+          onClick={() => props.onSelectionChange!({ from: 0, to: 5, text: "Hello" })}
         >
           Select
         </button>
@@ -154,9 +144,7 @@ vi.mock("../components/Editor/MarkdownEditor", () => ({
       {props.onAddComment && (
         <button
           data-testid="trigger-add-comment"
-          onClick={() =>
-            props.onAddComment!({ from: 0, to: 5, text: "Hello" })
-          }
+          onClick={() => props.onAddComment!({ from: 0, to: 5, text: "Hello" })}
         >
           Add comment
         </button>
@@ -166,9 +154,7 @@ vi.mock("../components/Editor/MarkdownEditor", () => ({
 }));
 
 vi.mock("../components/Editor/MarkdownPreview", () => ({
-  MarkdownPreview: (props: { content?: string }) => (
-    <div data-testid="markdown-preview">{props.content}</div>
-  ),
+  MarkdownPreview: (props: { content?: string }) => <div data-testid="markdown-preview">{props.content}</div>,
 }));
 
 vi.mock("../components/Editor/EditorToolbar", () => ({
@@ -187,9 +173,7 @@ vi.mock("../components/Editor/EditorToolbar", () => ({
       <input
         data-testid="title-input"
         value={props.title}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-          props.onTitleChange(e.target.value)
-        }
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => props.onTitleChange(e.target.value)}
       />
       {props.onShare && (
         <button data-testid="share-btn" onClick={props.onShare}>
@@ -227,21 +211,14 @@ vi.mock("../components/Editor/EditorToolbar", () => ({
 }));
 
 vi.mock("../components/Editor/ShareDialog", () => ({
-  ShareDialog: (props: { open?: boolean }) =>
-    props.open ? <div data-testid="share-dialog" /> : null,
+  ShareDialog: (props: { open?: boolean }) => (props.open ? <div data-testid="share-dialog" /> : null),
 }));
 
 vi.mock("../components/Editor/VersionHistory", () => ({
-  VersionHistory: (props: {
-    open?: boolean;
-    onRestore?: (content: string, versionNumber: number) => void;
-  }) =>
+  VersionHistory: (props: { open?: boolean; onRestore?: (content: string, versionNumber: number) => void }) =>
     props.open ? (
       <div data-testid="version-history">
-        <button
-          data-testid="restore-btn"
-          onClick={() => props.onRestore?.("restored content", 3)}
-        >
+        <button data-testid="restore-btn" onClick={() => props.onRestore?.("restored content", 3)}>
           Restore
         </button>
       </div>
@@ -636,9 +613,7 @@ describe("EditorPage", () => {
 
       fireEvent.click(getByTestId("export-pdf-btn"));
 
-      expect(mockWrite).toHaveBeenCalledWith(
-        expect.stringContaining("landscape")
-      );
+      expect(mockWrite).toHaveBeenCalledWith(expect.stringContaining("landscape"));
     });
   });
 
@@ -758,9 +733,7 @@ describe("EditorPage", () => {
       fireEvent.mouseDown(divider);
 
       act(() => {
-        window.dispatchEvent(
-          new MouseEvent("mousemove", { clientX: 300, bubbles: true })
-        );
+        window.dispatchEvent(new MouseEvent("mousemove", { clientX: 300, bubbles: true }));
       });
 
       act(() => {
@@ -1042,11 +1015,9 @@ describe("EditorPage", () => {
 
   describe("Export error handling", () => {
     it("handles URL.createObjectURL error gracefully in export MD", async () => {
-      const createObjectURLSpy = vi
-        .spyOn(URL, "createObjectURL")
-        .mockImplementation(() => {
-          throw new Error("createObjectURL failed");
-        });
+      const createObjectURLSpy = vi.spyOn(URL, "createObjectURL").mockImplementation(() => {
+        throw new Error("createObjectURL failed");
+      });
 
       const { getByTestId } = render(<EditorPage />);
 
@@ -1082,5 +1053,4 @@ describe("EditorPage", () => {
       });
     });
   });
-
 });

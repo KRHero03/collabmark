@@ -18,9 +18,7 @@ class MockResizeObserver {
 }
 globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
-function makeMockEditorView(
-  posToCoords: Record<number, { top: number; left: number; bottom: number }>,
-) {
+function makeMockEditorView(posToCoords: Record<number, { top: number; left: number; bottom: number }>) {
   return {
     coordsAtPos: vi.fn((pos: number) => posToCoords[pos] ?? null),
     state: { doc: { length: 1000 } },
@@ -52,9 +50,7 @@ function makeMockContainer(rect: Partial<DOMRect> = {}) {
 describe("useCommentPositions", () => {
   it("should return empty array when editorView is null", () => {
     const anchors = new Map<string, ResolvedAnchor>();
-    const { result } = renderHook(() =>
-      useCommentPositions(null, anchors, null),
-    );
+    const { result } = renderHook(() => useCommentPositions(null, anchors, null));
     expect(result.current).toEqual([]);
   });
 
@@ -63,13 +59,9 @@ describe("useCommentPositions", () => {
       10: { top: 100, left: 50, bottom: 120 },
     });
     const container = makeMockContainer();
-    const anchors = new Map<string, ResolvedAnchor>([
-      ["c1", { from: 10, to: 20, status: "exact" }],
-    ]);
+    const anchors = new Map<string, ResolvedAnchor>([["c1", { from: 10, to: 20, status: "exact" }]]);
 
-    const { result } = renderHook(() =>
-      useCommentPositions(view, anchors, container),
-    );
+    const { result } = renderHook(() => useCommentPositions(view, anchors, container));
 
     expect(result.current).toHaveLength(1);
     expect(result.current[0].commentId).toBe("c1");
@@ -89,9 +81,7 @@ describe("useCommentPositions", () => {
       ["c2", { from: 15, to: 20, status: "modified" }],
     ]);
 
-    const { result } = renderHook(() =>
-      useCommentPositions(view, anchors, container),
-    );
+    const { result } = renderHook(() => useCommentPositions(view, anchors, container));
 
     expect(result.current).toHaveLength(2);
     expect(result.current[0].commentId).toBe("c1");
@@ -109,13 +99,9 @@ describe("useCommentPositions", () => {
       10: { top: 100, left: 50, bottom: 120 },
     });
     const container = makeMockContainer();
-    const anchors = new Map<string, ResolvedAnchor>([
-      ["c1", { from: 10, to: 20, status: "orphaned" }],
-    ]);
+    const anchors = new Map<string, ResolvedAnchor>([["c1", { from: 10, to: 20, status: "orphaned" }]]);
 
-    const { result } = renderHook(() =>
-      useCommentPositions(view, anchors, container),
-    );
+    const { result } = renderHook(() => useCommentPositions(view, anchors, container));
 
     expect(result.current).toEqual([]);
   });
@@ -131,9 +117,7 @@ describe("useCommentPositions", () => {
       ["c-upper", { from: 10, to: 20, status: "exact" }],
     ]);
 
-    const { result } = renderHook(() =>
-      useCommentPositions(view, anchors, container),
-    );
+    const { result } = renderHook(() => useCommentPositions(view, anchors, container));
 
     expect(result.current[0].commentId).toBe("c-upper");
     expect(result.current[1].commentId).toBe("c-lower");
@@ -152,9 +136,7 @@ describe("useCommentPositions", () => {
       ["c3", { from: 14, to: 15, status: "exact" }],
     ]);
 
-    const { result } = renderHook(() =>
-      useCommentPositions(view, anchors, container),
-    );
+    const { result } = renderHook(() => useCommentPositions(view, anchors, container));
 
     expect(result.current).toHaveLength(3);
     expect(result.current[0].y).toBe(50);

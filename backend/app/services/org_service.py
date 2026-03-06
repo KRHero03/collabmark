@@ -14,11 +14,11 @@ from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
 from app.models.organization import (
-    OrgMembership,
-    OrgRole,
     Organization,
     OrganizationCreate,
     OrganizationUpdate,
+    OrgMembership,
+    OrgRole,
 )
 from app.models.user import User
 

@@ -2,9 +2,6 @@
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
-from fastapi import HTTPException
-
 from app.auth.jwt import create_access_token
 from app.models.comment import Comment
 from app.models.document import Document_
@@ -13,15 +10,14 @@ from app.models.document_view import DocumentView
 from app.models.folder import Folder, FolderAccess, FolderView
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
+from httpx import AsyncClient
 
 
 def _auth(user: User) -> dict[str, str]:
     return {"access_token": create_access_token(str(user.id))}
 
 
-async def _create_folder(
-    client: AsyncClient, name: str = "Test Folder", parent_id: str | None = None
-) -> dict:
+async def _create_folder(client: AsyncClient, name: str = "Test Folder", parent_id: str | None = None) -> dict:
     payload: dict = {"name": name}
     if parent_id is not None:
         payload["parent_id"] = parent_id
@@ -30,9 +26,7 @@ async def _create_folder(
     return resp.json()
 
 
-async def _create_doc(
-    client: AsyncClient, title: str = "Test Doc", folder_id: str | None = None
-) -> dict:
+async def _create_doc(client: AsyncClient, title: str = "Test Doc", folder_id: str | None = None) -> dict:
     payload: dict = {"title": title}
     if folder_id is not None:
         payload["folder_id"] = folder_id
@@ -55,6 +49,7 @@ async def other_user() -> User:
 # =====================================================================
 # CRUD
 # =====================================================================
+
 
 class TestFolderCreate:
     @pytest.mark.asyncio
@@ -147,9 +142,7 @@ class TestFolderUpdate:
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "Target Parent")
         child = await _create_folder(async_client, "Moving Folder")
-        resp = await async_client.put(
-            f"/api/folders/{child['id']}", json={"parent_id": parent["id"]}
-        )
+        resp = await async_client.put(f"/api/folders/{child['id']}", json={"parent_id": parent["id"]})
         assert resp.status_code == 200
         assert resp.json()["parent_id"] == parent["id"]
 
@@ -157,9 +150,7 @@ class TestFolderUpdate:
     async def test_cannot_move_folder_into_itself(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Self Loop")
-        resp = await async_client.put(
-            f"/api/folders/{f['id']}", json={"parent_id": f["id"]}
-        )
+        resp = await async_client.put(f"/api/folders/{f['id']}", json={"parent_id": f["id"]})
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
@@ -168,9 +159,7 @@ class TestFolderUpdate:
         grandparent = await _create_folder(async_client, "GP")
         parent = await _create_folder(async_client, "P", parent_id=grandparent["id"])
         child = await _create_folder(async_client, "C", parent_id=parent["id"])
-        resp = await async_client.put(
-            f"/api/folders/{grandparent['id']}", json={"parent_id": child["id"]}
-        )
+        resp = await async_client.put(f"/api/folders/{grandparent['id']}", json={"parent_id": child["id"]})
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
@@ -187,15 +176,11 @@ class TestFolderUpdate:
         f = await _create_folder(async_client, "Access Folder")
         assert f["general_access"] == "restricted"
 
-        resp = await async_client.put(
-            f"/api/folders/{f['id']}", json={"general_access": "anyone_view"}
-        )
+        resp = await async_client.put(f"/api/folders/{f['id']}", json={"general_access": "anyone_view"})
         assert resp.status_code == 200
         assert resp.json()["general_access"] == "anyone_view"
 
-        resp = await async_client.put(
-            f"/api/folders/{f['id']}", json={"general_access": "anyone_edit"}
-        )
+        resp = await async_client.put(f"/api/folders/{f['id']}", json={"general_access": "anyone_edit"})
         assert resp.status_code == 200
         assert resp.json()["general_access"] == "anyone_edit"
 
@@ -210,15 +195,14 @@ class TestFolderUpdate:
             json={"email": other_user.email, "permission": "edit"},
         )
         async_client.cookies.update(_auth(other_user))
-        resp = await async_client.put(
-            f"/api/folders/{f['id']}", json={"general_access": "anyone_view"}
-        )
+        resp = await async_client.put(f"/api/folders/{f['id']}", json={"general_access": "anyone_view"})
         assert resp.status_code == 403
 
 
 # =====================================================================
 # Contents & Breadcrumbs
 # =====================================================================
+
 
 class TestFolderContents:
     @pytest.mark.asyncio
@@ -305,6 +289,7 @@ class TestBreadcrumbs:
 # =====================================================================
 # Soft Delete / Restore (Cascade)
 # =====================================================================
+
 
 class TestFolderSoftDelete:
     @pytest.mark.asyncio
@@ -416,9 +401,7 @@ class TestFolderRestore:
         assert d.is_deleted is False
 
     @pytest.mark.asyncio
-    async def test_cannot_restore_folder_with_deleted_parent(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_cannot_restore_folder_with_deleted_parent(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "Parent")
         child = await _create_folder(async_client, "Child", parent_id=parent["id"])
@@ -441,6 +424,7 @@ class TestFolderRestore:
 # =====================================================================
 # Trash
 # =====================================================================
+
 
 class TestFolderTrash:
     @pytest.mark.asyncio
@@ -473,9 +457,7 @@ class TestFolderTrash:
         assert child["id"] not in ids
 
     @pytest.mark.asyncio
-    async def test_trash_excludes_other_users(
-        self, async_client: AsyncClient, test_user: User, other_user: User
-    ):
+    async def test_trash_excludes_other_users(self, async_client: AsyncClient, test_user: User, other_user: User):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "My Folder")
         await async_client.delete(f"/api/folders/{f['id']}")
@@ -502,6 +484,7 @@ class TestFolderTrash:
 # =====================================================================
 # Hard Delete
 # =====================================================================
+
 
 class TestFolderHardDelete:
     @pytest.mark.asyncio
@@ -549,9 +532,7 @@ class TestFolderHardDelete:
         assert await FolderAccess.find(FolderAccess.folder_id == f["id"]).count() == 0
 
     @pytest.mark.asyncio
-    async def test_hard_delete_cleans_nested_doc_related_data(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_hard_delete_cleans_nested_doc_related_data(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Folder")
         doc = await _create_doc(async_client, "Doc", folder_id=f["id"])
@@ -586,9 +567,7 @@ class TestFolderHardDelete:
         assert await DocumentView.find(DocumentView.document_id == doc_id).count() == 0
 
     @pytest.mark.asyncio
-    async def test_hard_delete_non_owner(
-        self, async_client: AsyncClient, test_user: User, other_user: User
-    ):
+    async def test_hard_delete_non_owner(self, async_client: AsyncClient, test_user: User, other_user: User):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Protected")
         async_client.cookies.update(_auth(other_user))
@@ -623,6 +602,7 @@ class TestFolderHardDelete:
 # Sharing / Collaborators
 # =====================================================================
 
+
 class TestFolderSharing:
     @pytest.mark.asyncio
     async def test_add_collaborator(self, async_client: AsyncClient, test_user: User, other_user: User):
@@ -656,9 +636,7 @@ class TestFolderSharing:
             f"/api/folders/{f['id']}/collaborators",
             json={"email": other_user.email, "permission": "view"},
         )
-        resp = await async_client.delete(
-            f"/api/folders/{f['id']}/collaborators/{str(other_user.id)}"
-        )
+        resp = await async_client.delete(f"/api/folders/{f['id']}/collaborators/{other_user.id!s}")
         assert resp.status_code == 204
         collabs = await async_client.get(f"/api/folders/{f['id']}/collaborators")
         assert len(collabs.json()) == 0
@@ -674,9 +652,7 @@ class TestFolderSharing:
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_add_collaborator_non_owner(
-        self, async_client: AsyncClient, test_user: User, other_user: User
-    ):
+    async def test_add_collaborator_non_owner(self, async_client: AsyncClient, test_user: User, other_user: User):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Mine")
         async_client.cookies.update(_auth(other_user))
@@ -713,18 +689,14 @@ class TestFolderSharing:
         assert f["id"] in ids
 
     @pytest.mark.asyncio
-    async def test_shared_folders_empty_for_new_user(
-        self, async_client: AsyncClient, other_user: User
-    ):
+    async def test_shared_folders_empty_for_new_user(self, async_client: AsyncClient, other_user: User):
         async_client.cookies.update(_auth(other_user))
         resp = await async_client.get("/api/folders/shared")
         assert resp.status_code == 200
         assert resp.json() == []
 
     @pytest.mark.asyncio
-    async def test_update_collaborator_permission(
-        self, async_client: AsyncClient, test_user: User, other_user: User
-    ):
+    async def test_update_collaborator_permission(self, async_client: AsyncClient, test_user: User, other_user: User):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Perm Update")
         await async_client.post(
@@ -742,6 +714,7 @@ class TestFolderSharing:
 # =====================================================================
 # Access Inheritance (Folder -> Document)
 # =====================================================================
+
 
 class TestAccessInheritance:
     @pytest.mark.asyncio
@@ -771,9 +744,7 @@ class TestAccessInheritance:
             json={"email": other_user.email, "permission": "view"},
         )
         async_client.cookies.update(_auth(other_user))
-        resp = await async_client.put(
-            f"/api/documents/{doc['id']}", json={"title": "Hacked"}
-        )
+        resp = await async_client.put(f"/api/documents/{doc['id']}", json={"title": "Hacked"})
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
@@ -788,9 +759,7 @@ class TestAccessInheritance:
             json={"email": other_user.email, "permission": "edit"},
         )
         async_client.cookies.update(_auth(other_user))
-        resp = await async_client.put(
-            f"/api/documents/{doc['id']}", json={"title": "Updated by Collab"}
-        )
+        resp = await async_client.put(f"/api/documents/{doc['id']}", json={"title": "Updated by Collab"})
         assert resp.status_code == 200
         assert resp.json()["title"] == "Updated by Collab"
 
@@ -811,9 +780,7 @@ class TestAccessInheritance:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_no_access_without_folder_sharing(
-        self, async_client: AsyncClient, test_user: User, other_user: User
-    ):
+    async def test_no_access_without_folder_sharing(self, async_client: AsyncClient, test_user: User, other_user: User):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Private")
         doc = await _create_doc(async_client, "Private Doc", folder_id=f["id"])
@@ -841,6 +808,7 @@ class TestAccessInheritance:
 # Document folder_id
 # =====================================================================
 
+
 class TestDocumentFolderId:
     @pytest.mark.asyncio
     async def test_create_doc_in_folder(self, async_client: AsyncClient, test_user: User):
@@ -860,9 +828,7 @@ class TestDocumentFolderId:
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Destination")
         doc = await _create_doc(async_client, "Moving Doc")
-        resp = await async_client.put(
-            f"/api/documents/{doc['id']}", json={"folder_id": f["id"]}
-        )
+        resp = await async_client.put(f"/api/documents/{doc['id']}", json={"folder_id": f["id"]})
         assert resp.status_code == 200
         assert resp.json()["folder_id"] == f["id"]
 
@@ -870,6 +836,7 @@ class TestDocumentFolderId:
 # =====================================================================
 # Edge Cases
 # =====================================================================
+
 
 class TestFolderEdgeCases:
     @pytest.mark.asyncio
@@ -914,6 +881,7 @@ class TestFolderEdgeCases:
 # =====================================================================
 # Folder View Recording & Recently Viewed
 # =====================================================================
+
 
 class TestFolderViews:
     @pytest.mark.asyncio
@@ -1016,9 +984,7 @@ class TestFolderViews:
         assert f["id"] in ids
 
         async_client.cookies.update(_auth(test_user))
-        await async_client.delete(
-            f"/api/folders/{f['id']}/collaborators/{str(other_user.id)}"
-        )
+        await async_client.delete(f"/api/folders/{f['id']}/collaborators/{other_user.id!s}")
 
         async_client.cookies.update(_auth(other_user))
         resp = await async_client.get("/api/folders/recent")
@@ -1046,6 +1012,7 @@ class TestFolderViews:
 # =====================================================================
 # Shared Folder Browsing & Permission-Aware Contents
 # =====================================================================
+
 
 class TestSharedFolderBrowsing:
     @pytest.mark.asyncio
@@ -1112,9 +1079,7 @@ class TestSharedFolderBrowsing:
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Public View")
         await _create_doc(async_client, "Public Doc", folder_id=f["id"])
-        await async_client.put(
-            f"/api/folders/{f['id']}", json={"general_access": "anyone_view"}
-        )
+        await async_client.put(f"/api/folders/{f['id']}", json={"general_access": "anyone_view"})
 
         async_client.cookies.update(_auth(other_user))
         resp = await async_client.get(f"/api/folders/contents?folder_id={f['id']}")
@@ -1128,9 +1093,7 @@ class TestSharedFolderBrowsing:
     ):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Public Edit")
-        await async_client.put(
-            f"/api/folders/{f['id']}", json={"general_access": "anyone_edit"}
-        )
+        await async_client.put(f"/api/folders/{f['id']}", json={"general_access": "anyone_edit"})
 
         async_client.cookies.update(_auth(other_user))
         resp = await async_client.get(f"/api/folders/contents?folder_id={f['id']}")
@@ -1164,6 +1127,7 @@ class TestSharedFolderBrowsing:
 # Permission Enforcement for Create in Shared Folders
 # =====================================================================
 
+
 class TestSharedFolderPermissionEnforcement:
     @pytest.mark.asyncio
     async def test_view_only_cannot_create_folder_inside(
@@ -1177,9 +1141,7 @@ class TestSharedFolderPermissionEnforcement:
         )
 
         async_client.cookies.update(_auth(other_user))
-        resp = await async_client.post(
-            "/api/folders", json={"name": "Unauthorized", "parent_id": f["id"]}
-        )
+        resp = await async_client.post("/api/folders", json={"name": "Unauthorized", "parent_id": f["id"]})
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
@@ -1194,9 +1156,7 @@ class TestSharedFolderPermissionEnforcement:
         )
 
         async_client.cookies.update(_auth(other_user))
-        resp = await async_client.post(
-            "/api/folders", json={"name": "Authorized", "parent_id": f["id"]}
-        )
+        resp = await async_client.post("/api/folders", json={"name": "Authorized", "parent_id": f["id"]})
         assert resp.status_code == 201
 
     @pytest.mark.asyncio
@@ -1211,9 +1171,7 @@ class TestSharedFolderPermissionEnforcement:
         )
 
         async_client.cookies.update(_auth(other_user))
-        resp = await async_client.post(
-            "/api/documents", json={"title": "No Access", "folder_id": f["id"]}
-        )
+        resp = await async_client.post("/api/documents", json={"title": "No Access", "folder_id": f["id"]})
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
@@ -1228,9 +1186,7 @@ class TestSharedFolderPermissionEnforcement:
         )
 
         async_client.cookies.update(_auth(other_user))
-        resp = await async_client.post(
-            "/api/documents", json={"title": "Allowed", "folder_id": f["id"]}
-        )
+        resp = await async_client.post("/api/documents", json={"title": "Allowed", "folder_id": f["id"]})
         assert resp.status_code == 201
 
 
@@ -1238,14 +1194,16 @@ class TestSharedFolderPermissionEnforcement:
 # Coverage: folder_service edge cases
 # =====================================================================
 
+
 class TestFolderServiceEdgeCases:
     """Tests for folder_service edge cases and missing branches."""
 
     @pytest.mark.asyncio
     async def test_create_folder_exceeds_max_per_user(self, async_client: AsyncClient, test_user: User):
         from unittest.mock import patch
-        from app.services.folder_service import create_folder, MAX_FOLDERS_PER_USER
+
         from app.models.folder import FolderCreate
+        from app.services.folder_service import create_folder
 
         with patch("app.services.folder_service.MAX_FOLDERS_PER_USER", 2):
             await create_folder(test_user, FolderCreate(name="F1"))
@@ -1257,7 +1215,9 @@ class TestFolderServiceEdgeCases:
             assert "2" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_list_shared_folders_invalid_folder_id_in_access(self, async_client: AsyncClient, test_user: User, other_user: User):
+    async def test_list_shared_folders_invalid_folder_id_in_access(
+        self, async_client: AsyncClient, test_user: User, other_user: User
+    ):
         from app.models.folder import FolderAccess
         from app.services.folder_service import list_shared_folders
 
@@ -1272,7 +1232,9 @@ class TestFolderServiceEdgeCases:
         assert len(results) == 0
 
     @pytest.mark.asyncio
-    async def test_list_shared_folders_deleted_folder_skipped(self, async_client: AsyncClient, test_user: User, other_user: User):
+    async def test_list_shared_folders_deleted_folder_skipped(
+        self, async_client: AsyncClient, test_user: User, other_user: User
+    ):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Shared")
         await async_client.post(
@@ -1287,7 +1249,9 @@ class TestFolderServiceEdgeCases:
         assert f["id"] not in ids
 
     @pytest.mark.asyncio
-    async def test_list_shared_folders_owner_not_found(self, async_client: AsyncClient, test_user: User, other_user: User):
+    async def test_list_shared_folders_owner_not_found(
+        self, async_client: AsyncClient, test_user: User, other_user: User
+    ):
         from app.models.folder import Folder, FolderAccess
         from app.services.folder_service import list_shared_folders
 
@@ -1343,7 +1307,7 @@ class TestFolderServiceEdgeCases:
         folder.parent_id = "000000000000000000000000"
         await folder.save()
 
-        crumbs = await get_breadcrumbs(str(folder.id))
+        crumbs = await get_breadcrumbs(str(folder.id), test_user)
         assert len(crumbs) == 1
         assert crumbs[0]["name"] == "Solo"
 
@@ -1367,9 +1331,7 @@ class TestFolderServiceEdgeCases:
     async def test_remove_folder_collaborator_nonexistent_access_404(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Remove")
-        resp = await async_client.delete(
-            f"/api/folders/{f['id']}/collaborators/000000000000000000000001"
-        )
+        resp = await async_client.delete(f"/api/folders/{f['id']}/collaborators/000000000000000000000001")
         assert resp.status_code == 404
         assert "Collaborator access record not found" in resp.json()["detail"]
 
@@ -1390,7 +1352,9 @@ class TestFolderServiceEdgeCases:
         assert f["id"] not in ids
 
     @pytest.mark.asyncio
-    async def test_list_recently_viewed_owner_not_found(self, async_client: AsyncClient, test_user: User, other_user: User):
+    async def test_list_recently_viewed_owner_not_found(
+        self, async_client: AsyncClient, test_user: User, other_user: User
+    ):
         from app.models.folder import Folder, FolderView
 
         folder = Folder(name="Orphan", owner_id="000000000000000000000001")
@@ -1409,6 +1373,7 @@ class TestFolderServiceEdgeCases:
         await fv.insert()
 
         from app.services.folder_service import list_recently_viewed_folders
+
         results = await list_recently_viewed_folders(other_user)
         assert len(results) >= 1
         item = next((r for r in results if str(r["folder"].id) == str(folder.id)), None)
@@ -1423,7 +1388,7 @@ class TestFolderServiceEdgeCases:
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "L1")
         for i in range(MAX_FOLDER_DEPTH - 1):
-            child = await _create_folder(async_client, f"L{i+2}", parent_id=parent["id"])
+            child = await _create_folder(async_client, f"L{i + 2}", parent_id=parent["id"])
             parent = child
 
         resp = await async_client.post(
@@ -1435,7 +1400,9 @@ class TestFolderServiceEdgeCases:
         assert "depth" in detail.lower() or "nesting" in detail.lower()
 
     @pytest.mark.asyncio
-    async def test_access_via_parent_chain_inheritance(self, async_client: AsyncClient, test_user: User, other_user: User):
+    async def test_access_via_parent_chain_inheritance(
+        self, async_client: AsyncClient, test_user: User, other_user: User
+    ):
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "Parent")
         await async_client.post(
@@ -1448,7 +1415,9 @@ class TestFolderServiceEdgeCases:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_access_via_general_access_anyone_edit(self, async_client: AsyncClient, test_user: User, other_user: User):
+    async def test_access_via_general_access_anyone_edit(
+        self, async_client: AsyncClient, test_user: User, other_user: User
+    ):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Public")
         await async_client.put(
@@ -1460,7 +1429,9 @@ class TestFolderServiceEdgeCases:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_access_via_general_access_anyone_view(self, async_client: AsyncClient, test_user: User, other_user: User):
+    async def test_access_via_general_access_anyone_view(
+        self, async_client: AsyncClient, test_user: User, other_user: User
+    ):
         async_client.cookies.update(_auth(test_user))
         f = await _create_folder(async_client, "Public View")
         await async_client.put(
@@ -1482,9 +1453,7 @@ class TestFolderBranchCoverage:
         return u
 
     @pytest.mark.asyncio
-    async def test_restore_folder_with_deleted_parent_returns_400(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_restore_folder_with_deleted_parent_returns_400(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "Parent")
         child = await _create_folder(async_client, "Child", parent_id=parent["id"])
@@ -1494,9 +1463,7 @@ class TestFolderBranchCoverage:
         assert "parent is still deleted" in resp.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_trash_listing_excludes_nested_deleted_folders(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_trash_listing_excludes_nested_deleted_folders(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "TrashParent")
         child = await _create_folder(async_client, "TrashChild", parent_id=parent["id"])
@@ -1532,29 +1499,21 @@ class TestFolderBranchCoverage:
         assert "not-a-valid-objectid" not in user_ids
 
     @pytest.mark.asyncio
-    async def test_remove_nonexistent_collaborator_returns_404(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_remove_nonexistent_collaborator_returns_404(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         folder = await _create_folder(async_client, "NoCollab")
-        resp = await async_client.delete(
-            f"/api/folders/{folder['id']}/collaborators/000000000000000000000000"
-        )
+        resp = await async_client.delete(f"/api/folders/{folder['id']}/collaborators/000000000000000000000000")
         assert resp.status_code == 404
         assert "Collaborator access record not found" in resp.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_record_view_with_invalid_folder_id_is_noop(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_record_view_with_invalid_folder_id_is_noop(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         resp = await async_client.post("/api/folders/not-valid-id/view")
         assert resp.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_record_view_with_nonexistent_folder_is_noop(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_record_view_with_nonexistent_folder_is_noop(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         resp = await async_client.post("/api/folders/000000000000000000000000/view")
         assert resp.status_code == 204
@@ -1573,7 +1532,7 @@ class TestFolderBranchCoverage:
         async_client.cookies.update(_auth(other_user))
         await async_client.post(f"/api/folders/{folder_id}/view")
         async_client.cookies.update(_auth(test_user))
-        await async_client.delete(f"/api/folders/{folder_id}/collaborators/{str(other_user.id)}")
+        await async_client.delete(f"/api/folders/{folder_id}/collaborators/{other_user.id!s}")
         async_client.cookies.update(_auth(other_user))
         resp = await async_client.get("/api/folders/recent")
         assert resp.status_code == 200
@@ -1593,6 +1552,7 @@ class TestFolderBranchCoverage:
         )
         from app.models.folder import Folder as FolderModel
         from beanie import PydanticObjectId
+
         db_folder = await FolderModel.get(PydanticObjectId(folder_id))
         db_folder.owner_id = "invalid-owner-id"
         await db_folder.save()
@@ -1605,9 +1565,7 @@ class TestFolderBranchCoverage:
         assert match[0]["owner_name"] == "Unknown"
 
     @pytest.mark.asyncio
-    async def test_find_folder_with_invalid_id_format(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_find_folder_with_invalid_id_format(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         resp = await async_client.get("/api/folders/totally-invalid!!!")
         assert resp.status_code == 404
@@ -1626,7 +1584,8 @@ class TestFolderBranchCoverage:
         )
         async_client.cookies.update(_auth(other_user))
         resp = await async_client.put(
-            f"/api/folders/{folder_id}", json={"name": "Renamed"},
+            f"/api/folders/{folder_id}",
+            json={"name": "Renamed"},
         )
         assert resp.status_code == 403
         assert "view access" in resp.json()["detail"].lower()
@@ -1644,32 +1603,31 @@ class TestFolderBranchCoverage:
         )
         async_client.cookies.update(_auth(other_user))
         resp = await async_client.put(
-            f"/api/folders/{folder_id}", json={"general_access": "anyone_view"},
+            f"/api/folders/{folder_id}",
+            json={"general_access": "anyone_view"},
         )
         assert resp.status_code == 403
         assert "owner" in resp.json()["detail"].lower()
 
     @pytest.mark.asyncio
-    async def test_folder_cannot_be_its_own_parent(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_folder_cannot_be_its_own_parent(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         folder = await _create_folder(async_client, "SelfParent")
         resp = await async_client.put(
-            f"/api/folders/{folder['id']}", json={"parent_id": folder["id"]},
+            f"/api/folders/{folder['id']}",
+            json={"parent_id": folder["id"]},
         )
         assert resp.status_code == 400
         assert "its own parent" in resp.json()["detail"]
 
     @pytest.mark.asyncio
-    async def test_folder_cannot_move_into_descendant(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_folder_cannot_move_into_descendant(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "Ancestor")
         child = await _create_folder(async_client, "Descendant", parent_id=parent["id"])
         resp = await async_client.put(
-            f"/api/folders/{parent['id']}", json={"parent_id": child["id"]},
+            f"/api/folders/{parent['id']}",
+            json={"parent_id": child["id"]},
         )
         assert resp.status_code == 400
         assert "descendants" in resp.json()["detail"].lower()

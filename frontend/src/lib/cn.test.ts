@@ -25,9 +25,7 @@ describe("cn", () => {
   it("handles conditional classes", () => {
     const isActive = true;
     const isDisabled = false;
-    expect(cn("base", isActive && "active", isDisabled && "disabled")).toBe(
-      "base active",
-    );
+    expect(cn("base", isActive && "active", isDisabled && "disabled")).toBe("base active");
   });
 
   it("handles array of classes", () => {

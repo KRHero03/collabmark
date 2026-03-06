@@ -114,9 +114,7 @@ describe("Navbar", () => {
   it("dark mode toggle works on desktop", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
     const { container } = render(<Navbar />);
-    const darkModeButtons = container.querySelectorAll(
-      'button[title="Dark mode"], button[title="Light mode"]',
-    );
+    const darkModeButtons = container.querySelectorAll('button[title="Dark mode"], button[title="Light mode"]');
     const toggleBtn = Array.from(darkModeButtons).find(
       (b) => b.getAttribute("title") === "Dark mode" || b.getAttribute("title") === "Light mode",
     );
@@ -146,9 +144,7 @@ describe("Navbar", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
     document.documentElement.classList.remove("dark");
     const { container } = render(<Navbar />);
-    const toggleBtn = container.querySelector(
-      'button[title="Dark mode"]',
-    ) as HTMLButtonElement;
+    const toggleBtn = container.querySelector('button[title="Dark mode"]') as HTMLButtonElement;
     fireEvent.click(toggleBtn);
     expect(setItem).toHaveBeenCalledWith("theme", "dark");
 
@@ -165,9 +161,7 @@ describe("Navbar", () => {
 
     const sidebar = document.querySelector("[aria-label='Navigation drawer']");
     expect(sidebar).toBeInTheDocument();
-    const darkToggle = sidebar?.querySelector(
-      'button[title="Dark mode"], button[title="Light mode"]',
-    );
+    const darkToggle = sidebar?.querySelector('button[title="Dark mode"], button[title="Light mode"]');
     expect(darkToggle).toBeTruthy();
 
     fireEvent.click(darkToggle!);
@@ -223,9 +217,7 @@ describe("Navbar", () => {
   it("sidebar shows navigation tabs when provided", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
     const onTabChange = vi.fn();
-    const { getByLabelText, getByText } = render(
-      <Navbar activeTab="browse" onTabChange={onTabChange} />,
-    );
+    const { getByLabelText, getByText } = render(<Navbar activeTab="browse" onTabChange={onTabChange} />);
     fireEvent.click(getByLabelText("Open menu"));
 
     expect(getByText("Files")).toBeInTheDocument();
@@ -237,9 +229,7 @@ describe("Navbar", () => {
   it("clicking a navigation tab calls onTabChange and closes sidebar", () => {
     mockUseAuth.mockReturnValue({ user: mockUser, logout: vi.fn() });
     const onTabChange = vi.fn();
-    const { getByLabelText, getByText } = render(
-      <Navbar activeTab="browse" onTabChange={onTabChange} />,
-    );
+    const { getByLabelText, getByText } = render(<Navbar activeTab="browse" onTabChange={onTabChange} />);
     fireEvent.click(getByLabelText("Open menu"));
     fireEvent.click(getByText("Shared with me"));
 

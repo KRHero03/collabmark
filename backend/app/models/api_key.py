@@ -2,7 +2,7 @@
 
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from beanie import Document, Indexed
@@ -19,7 +19,7 @@ class ApiKey(Document):
     key_hash: Indexed(str, unique=True)
     name: str
     is_active: bool = True
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_used_at: Optional[datetime] = None
 
     class Settings:
@@ -27,7 +27,7 @@ class ApiKey(Document):
 
     def record_usage(self) -> None:
         """Update last_used_at to the current UTC timestamp."""
-        self.last_used_at = datetime.now(timezone.utc)
+        self.last_used_at = datetime.now(UTC)
 
     @staticmethod
     def generate_key() -> str:

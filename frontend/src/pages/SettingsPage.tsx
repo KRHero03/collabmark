@@ -12,7 +12,9 @@ export function SettingsPage() {
 
   useEffect(() => {
     document.title = "Settings - CollabMark";
-    return () => { document.title = "CollabMark"; };
+    return () => {
+      document.title = "CollabMark";
+    };
   }, []);
 
   useEffect(() => {
@@ -49,8 +51,8 @@ export function SettingsPage() {
             API Keys
           </h2>
           <p className="mb-4 text-sm text-[var(--color-text-muted)]">
-            Use API keys to access your documents programmatically. Include the
-            key in the <code>X-API-Key</code> header.
+            Use API keys to access your documents programmatically. Include the key in the <code>X-API-Key</code>{" "}
+            header.
           </p>
 
           {createdKey && (
@@ -59,9 +61,7 @@ export function SettingsPage() {
                 API key created! Copy it now -- it won't be shown again.
               </p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 rounded bg-white px-2 py-1 text-xs">
-                  {createdKey}
-                </code>
+                <code className="flex-1 rounded bg-white px-2 py-1 text-xs">{createdKey}</code>
                 <button
                   onClick={() => handleCopy(createdKey)}
                   className="rounded p-1 hover:bg-green-100"
@@ -91,9 +91,7 @@ export function SettingsPage() {
           </div>
 
           {keys.length === 0 ? (
-            <p className="text-center text-sm text-[var(--color-text-muted)]">
-              No API keys yet.
-            </p>
+            <p className="text-center text-sm text-[var(--color-text-muted)]">No API keys yet.</p>
           ) : (
             <ul className="space-y-2">
               {keys.map((k) => (
@@ -105,8 +103,7 @@ export function SettingsPage() {
                     <p className="text-sm font-medium">{k.name}</p>
                     <p className="text-xs text-[var(--color-text-muted)]">
                       Created {formatDateShort(k.created_at)}
-                      {k.last_used_at &&
-                        ` | Last used ${formatDateShort(k.last_used_at)}`}
+                      {k.last_used_at && ` | Last used ${formatDateShort(k.last_used_at)}`}
                     </p>
                   </div>
                   <button

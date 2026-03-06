@@ -5,7 +5,7 @@ domains used for SSO routing and membership rules.  OrgMembership links users
 to their organization with a role (admin or member).
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Optional
 
@@ -27,15 +27,15 @@ class Organization(Document):
     slug: Indexed(str, unique=True)
     verified_domains: list[str] = Field(default_factory=list)
     plan: str = "free"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "organizations"
 
     def touch(self) -> None:
         """Update updated_at to the current UTC timestamp."""
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
 
 class OrgMembership(Document):
@@ -47,7 +47,7 @@ class OrgMembership(Document):
     org_id: Indexed(str)
     user_id: Indexed(str)
     role: OrgRole = OrgRole.MEMBER
-    joined_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    joined_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "org_memberships"
@@ -67,6 +67,7 @@ class OrganizationRead(BaseModel):
 
     @classmethod
     def from_doc(cls, org: Organization, *, member_count: int = 0) -> "OrganizationRead":
+        """Build OrganizationRead from an Organization document with optional member count."""
         return cls(
             id=str(org.id),
             name=org.name,
@@ -107,3 +108,10 @@ class OrganizationUpdate(BaseModel):
     slug: Optional[str] = None
     verified_domains: Optional[list[str]] = None
     plan: Optional[str] = None
+
+
+class AddMemberPayload(BaseModel):
+    """Payload for adding a member to an organization."""
+
+    user_id: str
+    role: OrgRole = OrgRole.MEMBER

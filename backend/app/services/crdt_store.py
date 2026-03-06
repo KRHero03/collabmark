@@ -7,10 +7,10 @@ and later compaction.
 """
 
 import time
+from collections.abc import AsyncIterator, Awaitable, Callable
 from logging import Logger, getLogger
-from typing import AsyncIterator, Callable, Awaitable
 
-from motor.motor_asyncio import AsyncIOMotorDatabase, AsyncIOMotorCollection
+from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
 from pycrdt import Doc
 from pycrdt.store import BaseYStore
 
@@ -67,9 +67,7 @@ class MongoYStore(BaseYStore):
             RuntimeError: If ``set_database`` has not been called.
         """
         if self._db is None:
-            raise RuntimeError(
-                "MongoYStore.set_database() must be called before using the store"
-            )
+            raise RuntimeError("MongoYStore.set_database() must be called before using the store")
         return self._db["crdt_updates"]
 
     async def write(self, data: bytes) -> None:
@@ -116,20 +114,17 @@ class MongoYStore(BaseYStore):
         full_update = doc.get_update()
         metadata = await self.get_metadata()
 
-        async with await self._db.client.start_session() as session:
-            async with session.start_transaction():
-                await self._collection.delete_many(
-                    {"room": self.path}, session=session
-                )
-                await self._collection.insert_one(
-                    {
-                        "room": self.path,
-                        "update": full_update,
-                        "metadata": metadata,
-                        "timestamp": time.time(),
-                        "version": self.version,
-                    },
-                    session=session,
-                )
+        async with await self._db.client.start_session() as session, session.start_transaction():
+            await self._collection.delete_many({"room": self.path}, session=session)
+            await self._collection.insert_one(
+                {
+                    "room": self.path,
+                    "update": full_update,
+                    "metadata": metadata,
+                    "timestamp": time.time(),
+                    "version": self.version,
+                },
+                session=session,
+            )
 
         self.log.info("Compacted CRDT updates for room %s", self.path)

@@ -7,8 +7,8 @@ find-or-create function that works identically for SAML and OIDC flows.
 from dataclasses import dataclass
 from typing import Optional
 
-from app.models.organization import Organization, OrgMembership, OrgRole
 from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
+from app.models.organization import Organization, OrgMembership, OrgRole
 from app.models.user import User
 
 

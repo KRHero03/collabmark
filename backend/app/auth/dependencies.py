@@ -6,11 +6,12 @@ from fastapi import Cookie, Depends, HTTPException, Security, status
 
 from app.auth.api_key import get_user_from_api_key
 from app.auth.jwt import decode_access_token
+from app.config import AUTH_COOKIE_NAME
 from app.models.user import User
 
 
 async def get_current_user(
-    access_token: str | None = Cookie(default=None),
+    access_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_NAME),
     api_key_user: User | None = Security(get_user_from_api_key),
 ) -> User:
     """Authenticate via JWT cookie or API key header. API key takes precedence.

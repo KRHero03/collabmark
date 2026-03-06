@@ -1,6 +1,6 @@
 """Document model and related Pydantic schemas for CRUD and API responses."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from typing import Optional
 
@@ -28,20 +28,20 @@ class Document_(Document):
     general_access: GeneralAccess = GeneralAccess.RESTRICTED
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "documents"
 
     def touch(self) -> None:
         """Update updated_at to the current UTC timestamp."""
-        self.updated_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(UTC)
 
     def soft_delete(self) -> None:
         """Mark document as deleted. Sets is_deleted and deleted_at."""
         self.is_deleted = True
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.now(UTC)
         self.touch()
 
     def restore(self) -> None:
@@ -106,14 +106,14 @@ class DocumentRead(BaseModel):
 class DocumentCreate(BaseModel):
     """Payload for creating a new document. Title and content optional with defaults."""
 
-    title: str = "Untitled"
-    content: str = ""
+    title: str = Field(default="Untitled", max_length=500)
+    content: str = Field(default="", max_length=10_000_000)
     folder_id: Optional[str] = None
 
 
 class DocumentUpdate(BaseModel):
     """Payload for updating a document. All fields optional."""
 
-    title: Optional[str] = None
-    content: Optional[str] = None
+    title: Optional[str] = Field(default=None, max_length=500)
+    content: Optional[str] = Field(default=None, max_length=10_000_000)
     folder_id: Optional[str] = None

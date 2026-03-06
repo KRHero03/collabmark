@@ -38,9 +38,7 @@ describe("LoginPage", () => {
 
   it("renders description text", () => {
     const { getByText } = render(<LoginPage />);
-    expect(
-      getByText("Collaborative Markdown editing, made simple.")
-    ).toBeInTheDocument();
+    expect(getByText("Collaborative Markdown editing, made simple.")).toBeInTheDocument();
   });
 
   it("renders SSOLoginFlow", () => {

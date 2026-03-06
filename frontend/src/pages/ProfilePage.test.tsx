@@ -24,9 +24,7 @@ vi.mock("../components/Layout/Navbar", () => ({
 }));
 
 vi.mock("../components/Layout/UserAvatar", () => ({
-  UserAvatar: ({ name }: { name: string }) => (
-    <div data-testid="user-avatar">{name}</div>
-  ),
+  UserAvatar: ({ name }: { name: string }) => <div data-testid="user-avatar">{name}</div>,
 }));
 
 vi.mock("../lib/dateUtils", () => ({
@@ -69,9 +67,7 @@ describe("ProfilePage", () => {
     render(<ProfilePage />);
     expect(screen.getByDisplayValue("John Doe")).toBeInTheDocument();
     expect(screen.getByDisplayValue("user@example.com")).toBeInTheDocument();
-    expect(
-      screen.getByText("formatted:2026-01-01T00:00:00Z")
-    ).toBeInTheDocument();
+    expect(screen.getByText("formatted:2026-01-01T00:00:00Z")).toBeInTheDocument();
   });
 
   it("updates name on input change", async () => {

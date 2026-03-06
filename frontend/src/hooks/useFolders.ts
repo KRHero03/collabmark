@@ -1,10 +1,5 @@
 import { create } from "zustand";
-import {
-  foldersApi,
-  type Breadcrumb,
-  type FolderItem,
-  type MarkdownDocument,
-} from "../lib/api";
+import { foldersApi, type Breadcrumb, type FolderItem, type MarkdownDocument } from "../lib/api";
 
 export type FolderPermission = "view" | "edit";
 
@@ -49,10 +44,7 @@ export const useFolders = create<FoldersState>((set, get) => ({
     if (folderId) {
       foldersApi.recordView(folderId).catch(() => {});
     }
-    await Promise.all([
-      get().fetchContents(folderId),
-      get().fetchBreadcrumbs(folderId),
-    ]);
+    await Promise.all([get().fetchContents(folderId), get().fetchBreadcrumbs(folderId)]);
   },
 
   fetchContents: async (folderId?: string | null) => {

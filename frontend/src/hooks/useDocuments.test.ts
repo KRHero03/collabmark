@@ -169,7 +169,9 @@ describe("useDocuments store", () => {
 
     it("should set trashLoading to true while fetching", async () => {
       let resolvePromise: (value: unknown) => void;
-      const promise = new Promise((resolve) => { resolvePromise = resolve; });
+      const promise = new Promise((resolve) => {
+        resolvePromise = resolve;
+      });
       vi.mocked(documentsApi.listTrash).mockReturnValue(promise as never);
 
       const fetchPromise = useDocuments.getState().fetchTrash();

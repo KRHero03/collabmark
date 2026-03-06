@@ -2,8 +2,8 @@
 FROM node:22-slim AS frontend-build
 WORKDIR /build
 ENV NODE_OPTIONS="--max-old-space-size=4096"
-COPY frontend/package.json ./
-RUN corepack enable && yarn install
+COPY frontend/package.json frontend/yarn.lock ./
+RUN corepack enable && yarn install --frozen-lockfile
 COPY frontend/ ./
 RUN ./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build
 

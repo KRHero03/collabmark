@@ -29,7 +29,7 @@ async def get_user_from_api_key(
     key_hash = ApiKey.hash_key(api_key)
     record = await ApiKey.find_one(
         ApiKey.key_hash == key_hash,
-        ApiKey.is_active == True,  # noqa: E712
+        ApiKey.is_active == True,
     )
 
     if record is None:

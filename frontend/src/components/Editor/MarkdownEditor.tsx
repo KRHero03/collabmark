@@ -66,10 +66,7 @@ interface MarkdownEditorProps {
 }
 
 function randomColor(): string {
-  const colors = [
-    "#30bced", "#6eeb83", "#ffbc42", "#e84855",
-    "#8ac926", "#ff595e", "#1982c4", "#6a4c93",
-  ];
+  const colors = ["#30bced", "#6eeb83", "#ffbc42", "#e84855", "#8ac926", "#ff595e", "#1982c4", "#6a4c93"];
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
@@ -184,9 +181,7 @@ export function MarkdownEditor({
       }
     });
 
-    const readOnlyExtensions = readOnly
-      ? [EditorState.readOnly.of(true), EditorView.editable.of(false)]
-      : [];
+    const readOnlyExtensions = readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : [];
 
     const state = EditorState.create({
       doc: ytext.toString(),

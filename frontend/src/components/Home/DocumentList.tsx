@@ -10,12 +10,7 @@ interface DocumentListProps {
   onContextMenu?: (e: React.MouseEvent, doc: MarkdownDocument) => void;
 }
 
-export function DocumentList({
-  documents,
-  onDelete,
-  onCreate,
-  onContextMenu,
-}: DocumentListProps) {
+export function DocumentList({ documents, onDelete, onCreate, onContextMenu }: DocumentListProps) {
   const navigate = useNavigate();
 
   return (
@@ -34,9 +29,7 @@ export function DocumentList({
       {documents.length === 0 ? (
         <div className="rounded-lg border border-dashed border-[var(--color-border)] p-12 text-center">
           <FileText className="mx-auto mb-3 h-10 w-10 text-[var(--color-text-muted)]" />
-          <p className="text-[var(--color-text-muted)]">
-            No documents yet. Create your first one!
-          </p>
+          <p className="text-[var(--color-text-muted)]">No documents yet. Create your first one!</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -56,9 +49,7 @@ export function DocumentList({
                 <FileText className="h-5 w-5 text-[var(--color-primary)]" />
                 <div>
                   <p className="font-medium">{doc.title}</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">
-                    Updated {formatDateTime(doc.updated_at)}
-                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">Updated {formatDateTime(doc.updated_at)}</p>
                 </div>
               </div>
               <button

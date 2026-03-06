@@ -13,9 +13,7 @@ describe("LandingPage", () => {
 
   it("renders Google sign-in in navbar and SSOLoginFlow in hero/footer", () => {
     const { getAllByPlaceholderText, getAllByTestId } = render(<LandingPage />);
-    const signInLinks = document.querySelectorAll(
-      'a[href="/api/auth/google/login"]',
-    );
+    const signInLinks = document.querySelectorAll('a[href="/api/auth/google/login"]');
     expect(signInLinks.length).toBeGreaterThanOrEqual(1);
     const emailInputs = getAllByPlaceholderText("Enter your work email");
     expect(emailInputs.length).toBe(2);
@@ -42,9 +40,7 @@ describe("LandingPage", () => {
     ];
     featureTitles.forEach((title) => {
       const all = document.querySelectorAll(`*`);
-      const found = Array.from(all).some((el) =>
-        el.textContent?.includes(title),
-      );
+      const found = Array.from(all).some((el) => el.textContent?.includes(title));
       expect(found).toBe(true);
     });
   });
@@ -61,17 +57,13 @@ describe("LandingPage", () => {
 
   it("renders dot indicators matching the number of features", () => {
     const { container } = render(<LandingPage />);
-    const dotButtons = container.querySelectorAll(
-      '[aria-label^="Go to slide"]',
-    );
+    const dotButtons = container.querySelectorAll('[aria-label^="Go to slide"]');
     expect(dotButtons.length).toBe(6);
   });
 
   it("clicking dot indicators changes the slide", () => {
     const { container } = render(<LandingPage />);
-    const carouselTrack = container.querySelector(
-      ".flex.transition-transform",
-    ) as HTMLElement;
+    const carouselTrack = container.querySelector(".flex.transition-transform") as HTMLElement;
     expect(carouselTrack).toBeInTheDocument();
 
     const dots = container.querySelectorAll('[aria-label^="Go to slide"]');
@@ -87,9 +79,7 @@ describe("LandingPage", () => {
 
   it("clicking prev/next arrows changes the slide", () => {
     const { getByLabelText, container } = render(<LandingPage />);
-    const carouselTrack = container.querySelector(
-      ".flex.transition-transform",
-    ) as HTMLElement;
+    const carouselTrack = container.querySelector(".flex.transition-transform") as HTMLElement;
 
     const prevBtn = getByLabelText("Previous slide");
     const nextBtn = getByLabelText("Next slide");

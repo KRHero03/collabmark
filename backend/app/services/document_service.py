@@ -33,7 +33,7 @@ async def create_document(owner: User, payload: DocumentCreate) -> Document_:
     """
     count = await Document_.find(
         Document_.owner_id == str(owner.id),
-        Document_.is_deleted == False,  # noqa: E712
+        Document_.is_deleted == False,
     ).count()
     if count >= MAX_DOCUMENTS_PER_USER:
         raise HTTPException(
@@ -44,8 +44,14 @@ async def create_document(owner: User, payload: DocumentCreate) -> Document_:
     root_folder_id: str | None = None
     if payload.folder_id is not None:
         from app.services.folder_service import _assert_folder_access, _find_folder
+
         folder = await _find_folder(payload.folder_id)
         await _assert_folder_access(folder, owner, Permission.EDIT)
+        if owner.org_id is not None and getattr(folder, "org_id", None) != owner.org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot create document in a folder from a different organization",
+            )
         root_folder_id = folder.root_folder_id or str(folder.id)
 
     doc = Document_(
@@ -90,13 +96,11 @@ async def list_documents(user: User, include_deleted: bool = False) -> list[Docu
     """
     query = Document_.find(Document_.owner_id == str(user.id))
     if not include_deleted:
-        query = query.find(Document_.is_deleted == False)  # noqa: E712
+        query = query.find(Document_.is_deleted == False)
     return await query.sort("-updated_at").to_list()
 
 
-async def update_document(
-    doc_id: str, user: User, payload: DocumentUpdate
-) -> Document_:
+async def update_document(doc_id: str, user: User, payload: DocumentUpdate) -> Document_:
     """Update a document's title and/or content. Owner or users with EDIT access.
 
     Args:
@@ -120,12 +124,23 @@ async def update_document(
     if payload.content is not None:
         doc.content = payload.content
     if payload.folder_id is not None:
+        from app.services.folder_service import _assert_folder_access, _find_folder
+
+        target_folder = await _find_folder(payload.folder_id)
+        await _assert_folder_access(target_folder, user, Permission.EDIT)
+        if doc.org_id is not None and getattr(target_folder, "org_id", None) != doc.org_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Cannot move document to a folder in a different organization",
+            )
         doc.folder_id = payload.folder_id
+        doc.root_folder_id = target_folder.root_folder_id or str(target_folder.id)
     doc.touch()
     await doc.save()
 
     if content_changed:
         from app.services.version_service import save_snapshot
+
         await save_snapshot(doc_id, user, doc.content)
 
     return doc
@@ -158,10 +173,14 @@ async def list_trash(user: User) -> list[Document_]:
     Returns:
         List of soft-deleted Document_ instances.
     """
-    return await Document_.find(
-        Document_.owner_id == str(user.id),
-        Document_.is_deleted == True,  # noqa: E712
-    ).sort("-deleted_at").to_list()
+    return (
+        await Document_.find(
+            Document_.owner_id == str(user.id),
+            Document_.is_deleted == True,
+        )
+        .sort("-deleted_at")
+        .to_list()
+    )
 
 
 async def hard_delete_document(doc_id: str, user: User) -> None:
@@ -177,6 +196,7 @@ async def hard_delete_document(doc_id: str, user: User) -> None:
     await DocumentView.find(DocumentView.document_id == str_id).delete()
 
     from app.services.crdt_store import MongoYStore
+
     if MongoYStore._db is not None:
         await MongoYStore._db["crdt_updates"].delete_many({"room": str_id})
 
@@ -213,6 +233,7 @@ def _assert_owner(doc: Document_, user: User) -> None:
 async def _assert_can_delete(doc: Document_, user: User) -> None:
     """ACL-aware delete check: root owner or entity owner (for docs, always deletable by owner)."""
     from app.services.acl_service import resolve_effective_permission
+
     perm = await resolve_effective_permission("document", str(doc.id), user)
     if not perm.can_delete:
         raise HTTPException(
@@ -221,9 +242,7 @@ async def _assert_can_delete(doc: Document_, user: User) -> None:
         )
 
 
-async def _assert_access(
-    doc: Document_, user: User, min_permission: Permission
-) -> None:
+async def _assert_access(doc: Document_, user: User, min_permission: Permission) -> None:
     """Check that user is owner, has explicit DocumentAccess, inherits access
     from a parent folder, or is covered by the document's general_access setting.
 
@@ -257,6 +276,7 @@ async def _assert_access(
 
     if doc.folder_id is not None:
         from app.services.folder_service import get_folder_permission
+
         folder_perm = await get_folder_permission(doc.folder_id, user)
         if folder_perm is not None:
             if min_permission == Permission.EDIT and folder_perm == Permission.VIEW:
@@ -267,6 +287,7 @@ async def _assert_access(
             return
 
     from app.services.acl_service import org_allows_general_access
+
     if org_allows_general_access(getattr(doc, "org_id", None), user.org_id):
         ga = doc.general_access
         if ga == GeneralAccess.ANYONE_EDIT:

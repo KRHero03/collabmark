@@ -88,8 +88,7 @@ export function useCommentPositions(
   useEffect(() => {
     if (!containerEl) return;
 
-    const scrollTarget =
-      containerEl.querySelector(".cm-scroller") || containerEl;
+    const scrollTarget = containerEl.querySelector(".cm-scroller") || containerEl;
 
     const onScroll = () => calculate();
     scrollTarget.addEventListener("scroll", onScroll, { passive: true });

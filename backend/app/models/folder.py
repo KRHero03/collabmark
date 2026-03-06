@@ -1,6 +1,6 @@
 """Folder (Space) model and related schemas for organizing documents."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Optional
 
 from beanie import Document, Indexed
@@ -21,21 +21,24 @@ class Folder(Document):
     general_access: GeneralAccess = GeneralAccess.RESTRICTED
     is_deleted: bool = False
     deleted_at: Optional[datetime] = None
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "folders"
 
     def touch(self) -> None:
-        self.updated_at = datetime.now(timezone.utc)
+        """Update updated_at to the current UTC timestamp."""
+        self.updated_at = datetime.now(UTC)
 
     def soft_delete(self) -> None:
+        """Mark the folder as soft-deleted and set deleted_at timestamp."""
         self.is_deleted = True
-        self.deleted_at = datetime.now(timezone.utc)
+        self.deleted_at = datetime.now(UTC)
         self.touch()
 
     def restore(self) -> None:
+        """Restore a soft-deleted folder by clearing is_deleted and deleted_at."""
         self.is_deleted = False
         self.deleted_at = None
         self.touch()
@@ -48,16 +51,14 @@ class FolderAccess(Document):
     user_id: Indexed(str)
     permission: Permission = Permission.VIEW
     granted_by: str
-    granted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    last_accessed_at: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc)
-    )
+    granted_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_accessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "folder_access"
 
     def touch_access(self) -> None:
-        self.last_accessed_at = datetime.now(timezone.utc)
+        self.last_accessed_at = datetime.now(UTC)
 
 
 class FolderRead(BaseModel):
@@ -85,6 +86,7 @@ class FolderRead(BaseModel):
         owner_email: str = "",
         owner_avatar_url: str | None = None,
     ) -> "FolderRead":
+        """Build FolderRead from a Folder document with optional owner metadata."""
         return cls(
             id=str(folder.id),
             name=folder.name,
@@ -106,7 +108,7 @@ class FolderView(Document):
 
     user_id: Indexed(str)
     folder_id: Indexed(str)
-    viewed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    viewed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "folder_views"

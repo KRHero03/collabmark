@@ -1,10 +1,9 @@
 import pytest
-from httpx import AsyncClient
-
 from app.auth.jwt import create_access_token
 from app.models.document import Document_
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
+from httpx import AsyncClient
 
 
 def _auth_cookies(user: User) -> dict[str, str]:
@@ -31,9 +30,7 @@ class TestCreateDocument:
         assert data["owner_id"] == str(test_user.id)
 
     @pytest.mark.asyncio
-    async def test_create_document_defaults(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_create_document_defaults(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         response = await async_client.post("/api/documents", json={})
         assert response.status_code == 201
@@ -41,17 +38,13 @@ class TestCreateDocument:
 
     @pytest.mark.asyncio
     async def test_create_without_auth(self, async_client: AsyncClient):
-        response = await async_client.post(
-            "/api/documents", json={"title": "Sneaky"}
-        )
+        response = await async_client.post("/api/documents", json={"title": "Sneaky"})
         assert response.status_code == 401
 
 
 class TestListDocuments:
     @pytest.mark.asyncio
-    async def test_list_own_documents(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_list_own_documents(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         await async_client.post("/api/documents", json={"title": "Doc A"})
         await async_client.post("/api/documents", json={"title": "Doc B"})
@@ -67,13 +60,9 @@ class TestListDocuments:
 
 class TestGetDocument:
     @pytest.mark.asyncio
-    async def test_get_existing_document(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_get_existing_document(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
-        create_resp = await async_client.post(
-            "/api/documents", json={"title": "Get Me"}
-        )
+        create_resp = await async_client.post("/api/documents", json={"title": "Get Me"})
         doc_id = create_resp.json()["id"]
 
         response = await async_client.get(f"/api/documents/{doc_id}")
@@ -81,25 +70,17 @@ class TestGetDocument:
         assert response.json()["title"] == "Get Me"
 
     @pytest.mark.asyncio
-    async def test_get_nonexistent_document(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_get_nonexistent_document(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
-        response = await async_client.get(
-            "/api/documents/000000000000000000000000"
-        )
+        response = await async_client.get("/api/documents/000000000000000000000000")
         assert response.status_code == 404
 
 
 class TestUpdateDocument:
     @pytest.mark.asyncio
-    async def test_update_title_and_content(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_update_title_and_content(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
-        create_resp = await async_client.post(
-            "/api/documents", json={"title": "Original"}
-        )
+        create_resp = await async_client.post("/api/documents", json={"title": "Original"})
         doc_id = create_resp.json()["id"]
 
         response = await async_client.put(
@@ -114,13 +95,9 @@ class TestUpdateDocument:
 
 class TestSoftDelete:
     @pytest.mark.asyncio
-    async def test_delete_and_restore(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_delete_and_restore(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
-        create_resp = await async_client.post(
-            "/api/documents", json={"title": "Deletable"}
-        )
+        create_resp = await async_client.post("/api/documents", json={"title": "Deletable"})
         doc_id = create_resp.json()["id"]
 
         del_resp = await async_client.delete(f"/api/documents/{doc_id}")
@@ -131,22 +108,16 @@ class TestSoftDelete:
         ids = [d["id"] for d in list_resp.json()]
         assert doc_id not in ids
 
-        restore_resp = await async_client.post(
-            f"/api/documents/{doc_id}/restore"
-        )
+        restore_resp = await async_client.post(f"/api/documents/{doc_id}/restore")
         assert restore_resp.status_code == 200
         assert restore_resp.json()["is_deleted"] is False
 
 
 class TestDocumentRoutesResolveOwner:
-    """Test _resolve_owner with invalid/missing owner returns Unknown."""
+    """Test resolve_owner with invalid/missing owner returns Unknown."""
 
     @pytest.mark.asyncio
-    async def test_get_document_owner_not_found_returns_unknown(
-        self, async_client: AsyncClient, test_user: User
-    ):
-        from app.models.document import Document_
-        from app.models.share_link import DocumentAccess, Permission
+    async def test_get_document_owner_not_found_returns_unknown(self, async_client: AsyncClient, test_user: User):
 
         doc = Document_(
             title="Orphan Doc",

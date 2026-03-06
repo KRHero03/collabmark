@@ -18,21 +18,16 @@ describe("DocumentContextMenu", () => {
     vi.clearAllMocks();
   });
 
-  function renderMenu(actions = getOwnedDocActions({
-    onOpen: vi.fn(),
-    onShare: vi.fn(),
-    onRename: vi.fn(),
-    onTrash: vi.fn(),
-    onInfo: vi.fn(),
-  })) {
-    return render(
-      <DocumentContextMenu
-        x={100}
-        y={200}
-        actions={actions}
-        onClose={onClose}
-      />
-    );
+  function renderMenu(
+    actions = getOwnedDocActions({
+      onOpen: vi.fn(),
+      onShare: vi.fn(),
+      onRename: vi.fn(),
+      onTrash: vi.fn(),
+      onInfo: vi.fn(),
+    }),
+  ) {
+    return render(<DocumentContextMenu x={100} y={200} actions={actions} onClose={onClose} />);
   }
 
   it("renders all owned doc actions", () => {
@@ -124,13 +119,7 @@ describe("getOwnedDocActions", () => {
       onInfo: vi.fn(),
     });
     expect(actions).toHaveLength(5);
-    expect(actions.map((a) => a.label)).toEqual([
-      "Open",
-      "Share",
-      "Rename",
-      "Move to Trash",
-      "Info",
-    ]);
+    expect(actions.map((a) => a.label)).toEqual(["Open", "Share", "Rename", "Move to Trash", "Info"]);
   });
 
   it("marks Move to Trash as danger variant", () => {
@@ -176,11 +165,7 @@ describe("getTrashDocActions", () => {
       onInfo: vi.fn(),
     });
     expect(actions).toHaveLength(3);
-    expect(actions.map((a) => a.label)).toEqual([
-      "Restore",
-      "Delete permanently",
-      "Info",
-    ]);
+    expect(actions.map((a) => a.label)).toEqual(["Restore", "Delete permanently", "Info"]);
   });
 
   it("marks Delete permanently as danger variant", () => {
@@ -204,13 +189,7 @@ describe("getFolderActions", () => {
       onInfo: vi.fn(),
     });
     expect(actions).toHaveLength(5);
-    expect(actions.map((a) => a.label)).toEqual([
-      "Open",
-      "Share",
-      "Rename",
-      "Move to Trash",
-      "Info",
-    ]);
+    expect(actions.map((a) => a.label)).toEqual(["Open", "Share", "Rename", "Move to Trash", "Info"]);
   });
 
   it("marks Move to Trash as danger variant", () => {
@@ -336,11 +315,7 @@ describe("getTrashFolderActions", () => {
       onInfo: vi.fn(),
     });
     expect(actions).toHaveLength(3);
-    expect(actions.map((a) => a.label)).toEqual([
-      "Restore",
-      "Delete permanently",
-      "Info",
-    ]);
+    expect(actions.map((a) => a.label)).toEqual(["Restore", "Delete permanently", "Info"]);
   });
 
   it("marks Delete permanently as danger variant", () => {

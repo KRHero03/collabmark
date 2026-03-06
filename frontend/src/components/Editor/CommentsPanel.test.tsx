@@ -75,9 +75,7 @@ describe("CommentsPanel", () => {
   });
 
   it("returns null when open is false", () => {
-    const { container } = render(
-      <CommentsPanel {...defaultProps} open={false} />,
-    );
+    const { container } = render(<CommentsPanel {...defaultProps} open={false} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -193,17 +191,12 @@ describe("CommentsPanel", () => {
 
     render(<CommentsPanel {...defaultProps} />);
 
-    const spinner = document.querySelector(
-      ".animate-spin.rounded-full.border-2",
-    );
+    const spinner = document.querySelector(".animate-spin.rounded-full.border-2");
     expect(spinner).toBeInTheDocument();
   });
 
   it("shows unresolved count badge when there are unresolved comments", () => {
-    mockComments = [
-      makeComment({ id: "c1", is_resolved: false }),
-      makeComment({ id: "c2", is_resolved: false }),
-    ];
+    mockComments = [makeComment({ id: "c1", is_resolved: false }), makeComment({ id: "c2", is_resolved: false })];
 
     render(<CommentsPanel {...defaultProps} />);
 
@@ -211,9 +204,7 @@ describe("CommentsPanel", () => {
   });
 
   it("does not show unresolved count when all resolved", () => {
-    mockComments = [
-      makeComment({ id: "c1", is_resolved: true }),
-    ];
+    mockComments = [makeComment({ id: "c1", is_resolved: true })];
 
     render(<CommentsPanel {...defaultProps} />);
 
@@ -232,9 +223,7 @@ describe("CommentsPanel", () => {
   });
 
   it("renders doc-level comments in General section", () => {
-    mockComments = [
-      makeComment({ id: "c1", content: "Doc-level comment", anchor_from: null }),
-    ];
+    mockComments = [makeComment({ id: "c1", content: "Doc-level comment", anchor_from: null })];
 
     render(<CommentsPanel {...defaultProps} />);
 
@@ -268,46 +257,24 @@ describe("CommentsPanel", () => {
       }),
     ];
 
-    const anchors = new Map([
-      [
-        "c1",
-        { from: 0, to: 10, status: "exact" as const },
-      ],
-    ]);
-    const positions = [
-      { commentId: "c1", y: 50, idealY: 50, isDisplaced: false },
-    ];
+    const anchors = new Map([["c1", { from: 0, to: 10, status: "exact" as const }]]);
+    const positions = [{ commentId: "c1", y: 50, idealY: 50, isDisplaced: false }];
 
-    render(
-      <CommentsPanel
-        {...defaultProps}
-        anchors={anchors}
-        positions={positions}
-      />,
-    );
+    render(<CommentsPanel {...defaultProps} anchors={anchors} positions={positions} />);
 
     expect(screen.getByText("Inline comment")).toBeInTheDocument();
   });
 
   it("shows selected text preview when selection exists", () => {
-    render(
-      <CommentsPanel
-        {...defaultProps}
-        selectedText="This is the selected text for commenting"
-      />,
-    );
+    render(<CommentsPanel {...defaultProps} selectedText="This is the selected text for commenting" />);
 
-    expect(
-      screen.getByText("This is the selected text for commenting"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("This is the selected text for commenting")).toBeInTheDocument();
   });
 
   it("truncates selected text over 100 chars", () => {
     const longText = "a".repeat(150);
 
-    render(
-      <CommentsPanel {...defaultProps} selectedText={longText} />,
-    );
+    render(<CommentsPanel {...defaultProps} selectedText={longText} />);
 
     expect(screen.getByText(/\.\.\./)).toBeInTheDocument();
   });
@@ -370,20 +337,10 @@ describe("CommentsPanel", () => {
       }),
     ];
 
-    const anchors = new Map([
-      ["c1", { from: 0, to: 10, status: "exact" as const }],
-    ]);
-    const positions = [
-      { commentId: "c1", y: 100, idealY: 50, isDisplaced: true },
-    ];
+    const anchors = new Map([["c1", { from: 0, to: 10, status: "exact" as const }]]);
+    const positions = [{ commentId: "c1", y: 100, idealY: 50, isDisplaced: true }];
 
-    const { container } = render(
-      <CommentsPanel
-        {...defaultProps}
-        anchors={anchors}
-        positions={positions}
-      />,
-    );
+    const { container } = render(<CommentsPanel {...defaultProps} anchors={anchors} positions={positions} />);
 
     expect(screen.getByText("Displaced comment")).toBeInTheDocument();
     const svg = container.querySelector("svg line");
@@ -407,20 +364,10 @@ describe("CommentsPanel", () => {
       }),
     ];
 
-    const anchors = new Map([
-      ["c1", { from: 0, to: 5, status: "exact" as const }],
-    ]);
-    const positions = [
-      { commentId: "c1", y: 50, idealY: 50, isDisplaced: false },
-    ];
+    const anchors = new Map([["c1", { from: 0, to: 5, status: "exact" as const }]]);
+    const positions = [{ commentId: "c1", y: 50, idealY: 50, isDisplaced: false }];
 
-    render(
-      <CommentsPanel
-        {...defaultProps}
-        anchors={anchors}
-        positions={positions}
-      />,
-    );
+    render(<CommentsPanel {...defaultProps} anchors={anchors} positions={positions} />);
 
     expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("Inline")).toBeInTheDocument();

@@ -1,9 +1,7 @@
 """Comprehensive unit tests for version_service (service level)."""
 
 import pytest
-
 from app.models.document import Document_
-from app.models.document_version import DocumentVersion
 from app.models.user import User
 from app.services.version_service import (
     _find_doc_or_404,
@@ -106,6 +104,7 @@ class TestGetVersion:
         doc = Document_(title="D", content="", owner_id=str(test_user.id))
         await doc.insert()
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await get_version(str(doc.id), 99)
         assert exc_info.value.status_code == 404
@@ -123,6 +122,7 @@ class TestFindDocOr404:
     @pytest.mark.asyncio
     async def test_invalid_id_format_raises_404(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await _find_doc_or_404("invalid")
         assert exc_info.value.status_code == 404
@@ -131,6 +131,7 @@ class TestFindDocOr404:
     @pytest.mark.asyncio
     async def test_nonexistent_doc_raises_404(self):
         from fastapi import HTTPException
+
         with pytest.raises(HTTPException) as exc_info:
             await _find_doc_or_404("000000000000000000000001")
         assert exc_info.value.status_code == 404

@@ -3,14 +3,7 @@ import { render, fireEvent, cleanup } from "@testing-library/react";
 import { MobileSidebar } from "./MobileSidebar";
 
 vi.mock("react-router", () => ({
-  Link: ({
-    to,
-    children,
-    ...props
-  }: {
-    to: string;
-    children: React.ReactNode;
-  }) => (
+  Link: ({ to, children, ...props }: { to: string; children: React.ReactNode }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -67,18 +60,14 @@ describe("MobileSidebar", () => {
 
   it("clicking CollabMark title calls onClose", () => {
     const onClose = vi.fn();
-    const { getByText } = render(
-      <MobileSidebar {...defaultProps} onClose={onClose} />,
-    );
+    const { getByText } = render(<MobileSidebar {...defaultProps} onClose={onClose} />);
     fireEvent.click(getByText("CollabMark"));
     expect(onClose).toHaveBeenCalled();
   });
 
   it("navigation tabs render when onTabChange is provided", () => {
     const onTabChange = vi.fn();
-    const { getByText } = render(
-      <MobileSidebar {...defaultProps} onTabChange={onTabChange} />,
-    );
+    const { getByText } = render(<MobileSidebar {...defaultProps} onTabChange={onTabChange} />);
     expect(getByText("Files")).toBeInTheDocument();
     expect(getByText("Shared with me")).toBeInTheDocument();
     expect(getByText("Recently viewed")).toBeInTheDocument();
@@ -94,13 +83,7 @@ describe("MobileSidebar", () => {
   it("clicking a tab calls onTabChange with correct key and calls onClose", () => {
     const onTabChange = vi.fn();
     const onClose = vi.fn();
-    const { getByText } = render(
-      <MobileSidebar
-        {...defaultProps}
-        onTabChange={onTabChange}
-        onClose={onClose}
-      />,
-    );
+    const { getByText } = render(<MobileSidebar {...defaultProps} onTabChange={onTabChange} onClose={onClose} />);
     fireEvent.click(getByText("Shared with me"));
     expect(onTabChange).toHaveBeenCalledWith("shared");
     expect(onClose).toHaveBeenCalled();
@@ -108,13 +91,7 @@ describe("MobileSidebar", () => {
 
   it("active tab has highlighted styling (contains primary bg class)", () => {
     const onTabChange = vi.fn();
-    const { getByText } = render(
-      <MobileSidebar
-        {...defaultProps}
-        activeTab="shared"
-        onTabChange={onTabChange}
-      />,
-    );
+    const { getByText } = render(<MobileSidebar {...defaultProps} activeTab="shared" onTabChange={onTabChange} />);
     const sharedTab = getByText("Shared with me").closest("button");
     expect(sharedTab?.className).toContain("color-primary");
   });
@@ -133,9 +110,7 @@ describe("MobileSidebar", () => {
 
   it("clicking Home link calls onClose", () => {
     const onClose = vi.fn();
-    const { getByText } = render(
-      <MobileSidebar {...defaultProps} onClose={onClose} />,
-    );
+    const { getByText } = render(<MobileSidebar {...defaultProps} onClose={onClose} />);
     fireEvent.click(getByText("Home"));
     expect(onClose).toHaveBeenCalled();
   });
@@ -143,9 +118,7 @@ describe("MobileSidebar", () => {
   it("clicking Sign Out calls onLogout and onClose", () => {
     const onLogout = vi.fn();
     const onClose = vi.fn();
-    const { getByText } = render(
-      <MobileSidebar {...defaultProps} onLogout={onLogout} onClose={onClose} />,
-    );
+    const { getByText } = render(<MobileSidebar {...defaultProps} onLogout={onLogout} onClose={onClose} />);
     fireEvent.click(getByText("Sign Out"));
     expect(onLogout).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
@@ -153,9 +126,7 @@ describe("MobileSidebar", () => {
 
   it("clicking backdrop calls onClose", () => {
     const onClose = vi.fn();
-    const { container } = render(
-      <MobileSidebar {...defaultProps} open={true} onClose={onClose} />,
-    );
+    const { container } = render(<MobileSidebar {...defaultProps} open={true} onClose={onClose} />);
     const backdrop = container.querySelector('[class*="bg-black/40"]');
     expect(backdrop).toBeInTheDocument();
     fireEvent.click(backdrop!);
@@ -164,21 +135,15 @@ describe("MobileSidebar", () => {
 
   it("close button calls onClose", () => {
     const onClose = vi.fn();
-    const { getByLabelText } = render(
-      <MobileSidebar {...defaultProps} onClose={onClose} />,
-    );
+    const { getByLabelText } = render(<MobileSidebar {...defaultProps} onClose={onClose} />);
     fireEvent.click(getByLabelText("Close menu"));
     expect(onClose).toHaveBeenCalled();
   });
 
   it("dark mode toggle button calls onToggleDark", () => {
     const onToggleDark = vi.fn();
-    const { container } = render(
-      <MobileSidebar {...defaultProps} onToggleDark={onToggleDark} />,
-    );
-    const darkToggle = container.querySelector(
-      'button[title="Dark mode"]',
-    ) as HTMLButtonElement;
+    const { container } = render(<MobileSidebar {...defaultProps} onToggleDark={onToggleDark} />);
+    const darkToggle = container.querySelector('button[title="Dark mode"]') as HTMLButtonElement;
     expect(darkToggle).toBeInTheDocument();
     fireEvent.click(darkToggle);
     expect(onToggleDark).toHaveBeenCalled();

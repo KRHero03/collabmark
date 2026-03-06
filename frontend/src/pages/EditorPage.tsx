@@ -19,11 +19,7 @@ import { useParams } from "react-router";
 import * as Y from "yjs";
 import type { EditorView } from "codemirror";
 import { Navbar } from "../components/Layout/Navbar";
-import {
-  MarkdownEditor,
-  type EditorSelection,
-  type CommentRange,
-} from "../components/Editor/MarkdownEditor";
+import { MarkdownEditor, type EditorSelection, type CommentRange } from "../components/Editor/MarkdownEditor";
 import { MarkdownPreview } from "../components/Editor/MarkdownPreview";
 import { EditorToolbar } from "../components/Editor/EditorToolbar";
 import { ShareDialog } from "../components/Editor/ShareDialog";
@@ -106,11 +102,7 @@ export function EditorPage() {
     synced,
   });
 
-  const positions = useCommentPositions(
-    editorView,
-    anchors,
-    editorContainerRef.current,
-  );
+  const positions = useCommentPositions(editorView, anchors, editorContainerRef.current);
 
   const commentRanges: CommentRange[] = useMemo(() => {
     const ranges: CommentRange[] = [];
@@ -125,10 +117,7 @@ export function EditorPage() {
   useEffect(() => {
     if (!id) return;
     setLoadError(null);
-    Promise.all([
-      documentsApi.get(id),
-      sharingApi.getMyPermission(id),
-    ])
+    Promise.all([documentsApi.get(id), sharingApi.getMyPermission(id)])
       .then(([docRes, permRes]) => {
         const data = docRes.data;
         setTitle(data.title);
@@ -171,7 +160,9 @@ export function EditorPage() {
 
   useEffect(() => {
     document.title = title ? `${title} - CollabMark` : "CollabMark";
-    return () => { document.title = "CollabMark"; };
+    return () => {
+      document.title = "CollabMark";
+    };
   }, [title]);
 
   useEffect(() => {
@@ -273,10 +264,9 @@ export function EditorPage() {
         if (now - lastSnapshotTime.current >= AUTO_VERSION_MIN_INTERVAL_MS) {
           navigator.sendBeacon(
             `/api/documents/${id}/versions`,
-            new Blob(
-              [JSON.stringify({ content: currentText, summary: "Auto-saved on exit" })],
-              { type: "application/json" },
-            ),
+            new Blob([JSON.stringify({ content: currentText, summary: "Auto-saved on exit" })], {
+              type: "application/json",
+            }),
           );
         }
       }
@@ -521,7 +511,11 @@ ${previewEl.innerHTML}
       <Navbar />
       <EditorToolbar
         title={title}
-        onTitleChange={(t) => { titleSetByUser.current = true; setTitle(t); saveTitle(t); }}
+        onTitleChange={(t) => {
+          titleSetByUser.current = true;
+          setTitle(t);
+          saveTitle(t);
+        }}
         onExportMd={handleExportMd}
         onExportPdf={handleExportPdf}
         onShare={() => setShareOpen(true)}
@@ -559,10 +553,7 @@ ${previewEl.innerHTML}
               </button>
             )}
             <div ref={previewRef}>
-              <MarkdownPreview
-                content={debouncedContent}
-                className="prose-base"
-              />
+              <MarkdownPreview content={debouncedContent} className="prose-base" />
             </div>
           </div>
         </div>
@@ -591,10 +582,7 @@ ${previewEl.innerHTML}
             </button>
           </div>
           {mobileTab === "editor" ? (
-            <div
-              ref={editorContainerRef}
-              className="min-h-0 flex-1 overflow-auto"
-            >
+            <div ref={editorContainerRef} className="min-h-0 flex-1 overflow-auto">
               {provider && (
                 <MarkdownEditor
                   ytext={ytext}
@@ -631,9 +619,7 @@ ${previewEl.innerHTML}
               onClose={() => setCommentsOpen(false)}
               currentUserId={user?.id || ""}
               selectedText={selection?.text}
-              selectionRange={
-                selection ? { from: selection.from, to: selection.to } : undefined
-              }
+              selectionRange={selection ? { from: selection.from, to: selection.to } : undefined}
               selectionRelative={selectionRelative ?? undefined}
               anchors={anchors}
               positions={positions}
@@ -646,9 +632,7 @@ ${previewEl.innerHTML}
             ref={editorContainerRef}
             className="overflow-auto border-r border-[var(--color-border)]"
             style={{
-              width: commentsOpen
-                ? `calc(${editorWidthPct}% - 180px)`
-                : `${editorWidthPct}%`,
+              width: commentsOpen ? `calc(${editorWidthPct}% - 180px)` : `${editorWidthPct}%`,
             }}
           >
             {provider && (
@@ -675,9 +659,7 @@ ${previewEl.innerHTML}
           <div
             className="relative overflow-auto"
             style={{
-              width: commentsOpen
-                ? `calc(${100 - editorWidthPct}% - 180px)`
-                : `${100 - editorWidthPct}%`,
+              width: commentsOpen ? `calc(${100 - editorWidthPct}% - 180px)` : `${100 - editorWidthPct}%`,
             }}
           >
             {previewStale && (
@@ -700,9 +682,7 @@ ${previewEl.innerHTML}
               onClose={() => setCommentsOpen(false)}
               currentUserId={user?.id || ""}
               selectedText={selection?.text}
-              selectionRange={
-                selection ? { from: selection.from, to: selection.to } : undefined
-              }
+              selectionRange={selection ? { from: selection.from, to: selection.to } : undefined}
               selectionRelative={selectionRelative ?? undefined}
               anchors={anchors}
               positions={positions}
@@ -711,12 +691,7 @@ ${previewEl.innerHTML}
         </div>
       )}
 
-      {historyOpen && (
-        <div
-          className="fixed inset-0 z-30 bg-black/20"
-          onClick={closeAllPanels}
-        />
-      )}
+      {historyOpen && <div className="fixed inset-0 z-30 bg-black/20" onClick={closeAllPanels} />}
 
       {id && (
         <>

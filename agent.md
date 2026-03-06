@@ -164,7 +164,52 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - 30 new backend tests covering: org boundary utility, ACL enforcement on docs/folders, folder inheritance chains, cross-org sharing denial, same-org sharing allowed, personal user backward compatibility
   - Backward compatible: personal users (org_id=None) keep all existing sharing behavior
 
-**Total: 613 backend tests, 806 frontend tests (46 test files), all passing. Backend coverage: 92%, Frontend coverage: 93.77%**
+- **SSO Phase 3b**: Readonly Field Security Audit
+  - Audited all models for mass-assignment vulnerabilities (server-controlled fields like `owner_id`, `org_id`, `is_deleted`, `created_at`)
+  - Confirmed Pydantic schemas (`DocumentCreate`, `DocumentUpdate`, `FolderCreate`, `FolderUpdate`, `UserUpdate`) correctly restrict writable fields
+  - Fixed `document_service.update_document`: now validates EDIT access to target folder and enforces org boundary when moving docs via `folder_id`
+  - Fixed `folder_service.update_folder`: now validates EDIT access to target parent and enforces org boundary when moving via `parent_id`
+  - Fixed `folder_service.create_folder` and `document_service.create_document`: added org boundary checks on parent/folder targets
+  - Replaced raw `dict` payload in `add_member` route with typed `AddMemberPayload` Pydantic schema (proper 422 validation)
+  - 15 new security tests in `test_readonly_fields.py` covering all mass-assignment scenarios
+
+- **SSO Phase 3c**: SSOLoginFlow UX Fix
+  - Fixed silent fallback when SSO is not configured for an email domain
+  - Now shows domain-specific error: `No SSO configured for "domain.com". Your organization may not be onboarded yet.`
+  - Handles `?error=sso_not_configured`, `?error=saml_invalid`, `?error=oidc_config_error` query params from backend redirects
+  - Clears error query params from URL after displaying
+  - 16 SSOLoginFlow tests (up from 10)
+
+- **SSO Phase 4**: Admin UI and Self-Serve Onboarding
+  - Backend: New `GET /api/orgs/my` endpoint for any authenticated user to view their own org
+  - Backend: New `POST /api/orgs/{org_id}/members/invite` endpoint for invite-by-email (finds user, auto-adds membership)
+  - Backend: New `PATCH /api/orgs/{org_id}/members/{user_id}/role` endpoint for changing member roles
+  - Backend: `InviteMemberPayload` and `UpdateRolePayload` Pydantic schemas
+  - Frontend: `SuperAdminPage` at `/admin` — full org management dashboard (create/edit orgs, view members, domain management)
+  - Frontend: `OrgSettingsPage` at `/org/:orgId/settings` — three-tab settings page:
+    - General: edit org name, slug, verified domains, plan
+    - Members: list/invite/remove members, change roles (admin/member)
+    - SSO: configure SAML or OIDC, enable/disable toggle, save configuration
+  - Frontend: Navigation integration — `Building2` icon in Navbar and MobileSidebar for org settings (conditional on `user.org_id`)
+  - Frontend: Routes added to `App.tsx` with `ProtectedRoute` guards
+  - Frontend: `orgsApi` updated with `getMyOrg`, `inviteMember`, `updateMemberRole` methods
+  - 13 new backend org tests (invite, role change, my org endpoint)
+  - 18 SuperAdminPage frontend tests, 28 OrgSettingsPage frontend tests
+
+- **Code Quality & Tooling Phase**: Lint, Format, Build Integration
+  - Backend: ruff (linter + formatter) with comprehensive rule set (pycodestyle, pyflakes, isort, pep8-naming, pyupgrade, bugbear, simplify, bandit security, print, pie, return, type-checking, pathlib)
+  - Backend: pyproject.toml with ruff config and pytest config (asyncio_mode, warning suppression)
+  - Backend: All lint issues fixed (imports sorted, contextlib.suppress, raise-from-except, unused vars, ambiguous names)
+  - Frontend: ESLint 9 flat config (TypeScript, react-hooks, react-refresh, prettier integration)
+  - Frontend: Prettier config (120 print width, double quotes, trailing commas, LF line endings)
+  - Frontend: All ESLint errors fixed (Spinner moved outside render, eqeqeq, Function type casts, react-refresh suppressed for utility-exporting files)
+  - Frontend: Vitest 4.0.18 (latest stable) with coverage via @vitest/coverage-v8
+  - Frontend: vite.config.ts uses `defineConfig` from `vitest/config` for proper type support
+  - Unified Makefile at project root: `make lint`, `make format`, `make test`, `make build`, `make ci` (full pipeline)
+  - Backend: pytest-xdist installed for parallel test option, pytest-cov for coverage
+  - Backend: ruff added to requirements.txt
+
+**Total: 641 backend tests, 860 frontend tests (48 test files), all passing.**
 
 ## Tech Stack
 
@@ -180,8 +225,10 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 | Auth        | Google OAuth2 (authlib), JWT (python-jose), API keys |
 | Diffing     | diff (jsdiff) for version history diff view       |
 | Message Bus | Redis (future: pub/sub for WS horizontal scaling) |
-| Testing BE  | pytest, pytest-asyncio, httpx, mongomock-motor    |
-| Testing FE  | Vitest, React Testing Library, jsdom              |
+| Lint BE     | ruff (lint + format), pyproject.toml config       |
+| Lint FE     | ESLint 9 + Prettier 3                             |
+| Testing BE  | pytest, pytest-asyncio, pytest-xdist, pytest-cov, httpx, mongomock-motor |
+| Testing FE  | Vitest 4, React Testing Library, jsdom, @vitest/coverage-v8 |
 | Deployment  | Docker, Railway (with MongoDB & Redis add-ons), Gunicorn |
 
 ## Project Structure
@@ -201,9 +248,12 @@ collabmark/
         folders.py, ws.py
       services/      # Business logic layer
         document_service.py, share_service.py, version_service.py,
-        comment_service.py, folder_service.py, crdt_store.py
+        comment_service.py, folder_service.py, org_service.py, acl_service.py, crdt_store.py
+      utils/         # Shared utility functions
+        owner_resolver.py  # Centralized user owner info resolution
       ws/            # WebSocket handler (pycrdt rooms)
-    tests/           # Backend test suite (150+ tests)
+    pyproject.toml   # Ruff + pytest config
+    tests/           # Backend test suite (641 tests)
   frontend/          # React SPA (Vite + TypeScript)
     src/
       components/    # Reusable UI components
@@ -229,12 +279,13 @@ collabmark/
       lib/           # API client, utilities
         api.ts       # Axios client with all API methods
         dateUtils.ts # Local time formatting utilities
+  Makefile           # Unified lint/format/test/build/ci commands
   Dockerfile         # Multi-stage (build frontend + bundle with backend)
   docker-compose.yml # MongoDB + Redis for local dev
   docker-compose.prod.yml # Production compose
   railway.toml       # Railway deployment config
   Procfile           # Heroku/Railway process file
-  agent.md           # THIS FILE -- agent reference
+  AGENT.md           # THIS FILE -- agent reference
 ```
 
 ## API Endpoints
@@ -312,6 +363,20 @@ collabmark/
 ### WebSocket
 - `WS /ws/doc/{document_id}` -- CRDT collaboration (VIEW or EDIT access required)
 
+### Organizations
+- `GET /api/orgs/my` -- current user's org (or null for personal users)
+- `POST /api/orgs` -- create organization (super admin)
+- `GET /api/orgs` -- list all organizations (super admin)
+- `GET /api/orgs/{org_id}` -- get org details (org admin)
+- `PUT /api/orgs/{org_id}` -- update org (org admin)
+- `GET /api/orgs/{org_id}/members` -- list members (org admin)
+- `POST /api/orgs/{org_id}/members` -- add member by user_id (org admin)
+- `POST /api/orgs/{org_id}/members/invite` -- invite member by email (org admin)
+- `PATCH /api/orgs/{org_id}/members/{user_id}/role` -- change member role (org admin)
+- `DELETE /api/orgs/{org_id}/members/{user_id}` -- remove member (org admin)
+- `GET /api/orgs/{org_id}/sso` -- get SSO config (org admin)
+- `PUT /api/orgs/{org_id}/sso` -- create/update SSO config (org admin)
+
 ### Frontend Pages
 - `/` -- Home page (Files browser, shared docs, recently viewed, trash)
 - `/login` -- Google OAuth login
@@ -319,6 +384,8 @@ collabmark/
 - `/settings` -- API key management
 - `/profile` -- User profile
 - `/api-docs` -- Interactive API documentation (public, no auth required)
+- `/admin` -- Super admin dashboard (create/manage organizations, view members)
+- `/org/:orgId/settings` -- Organization settings (General, Members, SSO config)
 
 ## Coding Guidelines
 
@@ -336,9 +403,16 @@ collabmark/
 - Never use generic truthy assertions (e.g., avoid `assert response.json()`)
 - Include edge cases: empty inputs, boundary values, auth failures, not-found, concurrent ops
 - Backend: pytest + pytest-asyncio + httpx ASGI transport + mongomock-motor
-- Frontend: Vitest + React Testing Library + jsdom + @testing-library/user-event
+- Frontend: Vitest 4 + React Testing Library + jsdom + @testing-library/user-event
 - Test files mirror source structure: `test_<module>.py` / `<Component>.test.tsx`
 - Frontend: do NOT import `screen` directly from @testing-library/react (CI issue); destructure from `render()` return instead
+
+### Lint & Format Standards
+- **Backend**: `ruff check` for linting, `ruff format` for formatting (config in `pyproject.toml`)
+- **Frontend**: `eslint` for linting, `prettier` for formatting (config in `eslint.config.js` + `.prettierrc`)
+- Run `make lint` to check both; `make lint-fix` to auto-fix; `make format` to format all code
+- Run `make ci` for the full pipeline: lint + format-check + test + build
+- All code must pass `make lint` before committing
 
 ### Backend Conventions
 - Models in `app/models/` are Beanie Documents with `Settings.name` for collection

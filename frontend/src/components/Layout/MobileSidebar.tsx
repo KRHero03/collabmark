@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link } from "react-router";
 import {
   BookOpen,
+  Building2,
   Clock,
   Folder,
   Home,
@@ -21,7 +22,7 @@ export type SidebarTab = "browse" | "shared" | "recent" | "trash";
 interface MobileSidebarProps {
   open: boolean;
   onClose: () => void;
-  user: { name: string; email: string; avatar_url: string | null } | null;
+  user: { name: string; email: string; avatar_url: string | null; org_id?: string | null } | null;
   dark: boolean;
   onToggleDark: () => void;
   onLogout: () => void;
@@ -82,7 +83,9 @@ export function MobileSidebar({
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-          <Link to="/" onClick={onClose} className="text-lg font-bold text-[var(--color-text)] hover:opacity-80">CollabMark</Link>
+          <Link to="/" onClick={onClose} className="text-lg font-bold text-[var(--color-text)] hover:opacity-80">
+            CollabMark
+          </Link>
           <div className="flex items-center gap-2">
             <button
               onClick={onToggleDark}
@@ -107,12 +110,8 @@ export function MobileSidebar({
             <div className="flex items-center gap-3">
               <UserAvatar url={user.avatar_url} name={user.name} size="lg" />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-[var(--color-text)]">
-                  {user.name}
-                </p>
-                <p className="truncate text-xs text-[var(--color-text-muted)]">
-                  {user.email}
-                </p>
+                <p className="truncate text-sm font-semibold text-[var(--color-text)]">{user.name}</p>
+                <p className="truncate text-xs text-[var(--color-text-muted)]">{user.email}</p>
               </div>
             </div>
           </div>
@@ -176,6 +175,16 @@ export function MobileSidebar({
               <BookOpen className="h-4 w-4 flex-shrink-0 text-[var(--color-text-muted)]" />
               API Docs
             </Link>
+            {user?.org_id && (
+              <Link
+                to={`/org/${user.org_id}/settings`}
+                onClick={onClose}
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-[var(--color-text)] hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <Building2 className="h-4 w-4 flex-shrink-0 text-[var(--color-text-muted)]" />
+                Org Settings
+              </Link>
+            )}
             <Link
               to="/settings"
               onClick={onClose}

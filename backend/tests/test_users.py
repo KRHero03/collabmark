@@ -1,8 +1,7 @@
 import pytest
-from httpx import AsyncClient
-
 from app.auth.jwt import create_access_token
 from app.models.user import User
+from httpx import AsyncClient
 
 
 def _auth_cookies(user: User) -> dict[str, str]:
@@ -17,9 +16,7 @@ class TestGetMe:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_get_me_authenticated(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_get_me_authenticated(self, async_client: AsyncClient, test_user: User):
         cookies = _auth_cookies(test_user)
         async_client.cookies.update(cookies)
         response = await async_client.get("/api/users/me")
@@ -62,9 +59,7 @@ class TestUpdateMe:
         assert response.json()["name"] == "Test User"
 
     @pytest.mark.asyncio
-    async def test_update_partial_data_name_and_avatar(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_update_partial_data_name_and_avatar(self, async_client: AsyncClient, test_user: User):
         cookies = _auth_cookies(test_user)
         async_client.cookies.update(cookies)
         response = await async_client.put(
@@ -76,9 +71,7 @@ class TestUpdateMe:
         assert response.json()["avatar_url"] == "https://example.com/avatar.png"
 
     @pytest.mark.asyncio
-    async def test_update_empty_payload_preserves_data(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_update_empty_payload_preserves_data(self, async_client: AsyncClient, test_user: User):
         cookies = _auth_cookies(test_user)
         async_client.cookies.update(cookies)
         response = await async_client.put("/api/users/me", json={})

@@ -1,6 +1,6 @@
 """JWT creation and decoding for session authentication."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from jose import JWTError, jwt
 
@@ -20,7 +20,7 @@ def create_access_token(user_id: str) -> str:
     Returns:
         Encoded JWT string.
     """
-    expire = datetime.now(timezone.utc) + timedelta(minutes=_EXPIRE_MINUTES)
+    expire = datetime.now(UTC) + timedelta(minutes=_EXPIRE_MINUTES)
     payload = {"sub": user_id, "exp": expire}
     return jwt.encode(payload, _SECRET, algorithm=_ALGORITHM)
 

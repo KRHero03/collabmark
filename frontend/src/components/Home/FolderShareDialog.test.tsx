@@ -57,9 +57,7 @@ describe("FolderShareDialog", () => {
   });
 
   it("returns null when open is false", () => {
-    const { container } = render(
-      <FolderShareDialog {...defaultProps} open={false} />,
-    );
+    const { container } = render(<FolderShareDialog {...defaultProps} open={false} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -220,10 +218,7 @@ describe("FolderShareDialog", () => {
     await user.click(removeButton);
 
     await waitFor(() => {
-      expect(foldersApi.removeCollaborator).toHaveBeenCalledWith(
-        "folder-123",
-        "user-456",
-      );
+      expect(foldersApi.removeCollaborator).toHaveBeenCalledWith("folder-123", "user-456");
     });
   });
 
@@ -258,11 +253,8 @@ describe("FolderShareDialog", () => {
     render(<FolderShareDialog {...defaultProps} />);
 
     const generalAccessSelects = screen.getAllByRole("combobox");
-    const gaSelect = generalAccessSelects.find(
-      (s) =>
-        Array.from((s as HTMLSelectElement).options).some(
-          (o) => o.value === "anyone_view",
-        ),
+    const gaSelect = generalAccessSelects.find((s) =>
+      Array.from((s as HTMLSelectElement).options).some((o) => o.value === "anyone_view"),
     ) as HTMLSelectElement;
     fireEvent.change(gaSelect, { target: { value: "anyone_view" } });
 
@@ -274,28 +266,18 @@ describe("FolderShareDialog", () => {
   });
 
   it("general access displayed correctly for restricted", () => {
-    render(
-      <FolderShareDialog {...defaultProps} generalAccess="restricted" />,
-    );
+    render(<FolderShareDialog {...defaultProps} generalAccess="restricted" />);
     expect(screen.getAllByText("Restricted").length).toBeGreaterThan(0);
   });
 
   it("general access displayed correctly for anyone_view", () => {
-    render(
-      <FolderShareDialog {...defaultProps} generalAccess="anyone_view" />,
-    );
-    expect(
-      screen.getAllByText("Anyone with the link can view").length,
-    ).toBeGreaterThan(0);
+    render(<FolderShareDialog {...defaultProps} generalAccess="anyone_view" />);
+    expect(screen.getAllByText("Anyone with the link can view").length).toBeGreaterThan(0);
   });
 
   it("general access displayed correctly for anyone_edit", () => {
-    render(
-      <FolderShareDialog {...defaultProps} generalAccess="anyone_edit" />,
-    );
-    expect(
-      screen.getAllByText("Anyone with the link can edit").length,
-    ).toBeGreaterThan(0);
+    render(<FolderShareDialog {...defaultProps} generalAccess="anyone_edit" />);
+    expect(screen.getAllByText("Anyone with the link can edit").length).toBeGreaterThan(0);
   });
 
   it("non-owner: shows permissions as text spans, no edit controls", async () => {
@@ -324,9 +306,7 @@ describe("FolderShareDialog", () => {
     const copyButton = screen.getByRole("button", { name: /Copy link/i });
     await user.click(copyButton);
 
-    expect(writeText).toHaveBeenCalledWith(
-      `${window.location.origin}/?folder=folder-123`,
-    );
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/?folder=folder-123`);
   });
 
   it("copy link: shows Link copied after click", async () => {
@@ -393,18 +373,13 @@ describe("FolderShareDialog", () => {
     render(<FolderShareDialog {...defaultProps} />);
 
     const generalAccessSelects = screen.getAllByRole("combobox");
-    const gaSelect = generalAccessSelects.find(
-      (s) =>
-        Array.from((s as HTMLSelectElement).options).some(
-          (o) => o.value === "anyone_view",
-        ),
+    const gaSelect = generalAccessSelects.find((s) =>
+      Array.from((s as HTMLSelectElement).options).some((o) => o.value === "anyone_view"),
     ) as HTMLSelectElement;
     fireEvent.change(gaSelect, { target: { value: "anyone_view" } });
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Failed to update access settings"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Failed to update access settings")).toBeInTheDocument();
     });
   });
 
@@ -412,9 +387,7 @@ describe("FolderShareDialog", () => {
     vi.mocked(foldersApi.listCollaborators).mockResolvedValue({
       data: [mockCollaborator],
     } as never);
-    vi.mocked(foldersApi.addCollaborator).mockRejectedValue(
-      new Error("Forbidden"),
-    );
+    vi.mocked(foldersApi.addCollaborator).mockRejectedValue(new Error("Forbidden"));
 
     render(<FolderShareDialog {...defaultProps} />);
 
@@ -427,16 +400,12 @@ describe("FolderShareDialog", () => {
     fireEvent.change(collaboratorSelect!, { target: { value: "edit" } });
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Failed to update permission"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Failed to update permission")).toBeInTheDocument();
     });
   });
 
   it("fetchCollaborators catch: sets empty collaborators when listCollaborators fails", async () => {
-    vi.mocked(foldersApi.listCollaborators).mockRejectedValue(
-      new Error("Network error"),
-    );
+    vi.mocked(foldersApi.listCollaborators).mockRejectedValue(new Error("Network error"));
 
     render(<FolderShareDialog {...defaultProps} />);
 
@@ -451,13 +420,7 @@ describe("FolderShareDialog", () => {
       data: [],
     } as never);
 
-    const { getByTestId } = render(
-      <FolderShareDialog
-        {...defaultProps}
-        ownerName=""
-        ownerEmail="owner@example.com"
-      />,
-    );
+    const { getByTestId } = render(<FolderShareDialog {...defaultProps} ownerName="" ownerEmail="owner@example.com" />);
 
     await waitFor(() => {});
 

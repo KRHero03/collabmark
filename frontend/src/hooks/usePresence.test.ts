@@ -12,10 +12,7 @@ import { usePresence } from "./usePresence";
 
 type ChangeHandler = () => void;
 
-function createMockAwareness(
-  localId: number,
-  states: Map<number, Record<string, unknown>>,
-) {
+function createMockAwareness(localId: number, states: Map<number, Record<string, unknown>>) {
   const listeners = new Map<string, Set<ChangeHandler>>();
 
   return {
@@ -50,9 +47,7 @@ describe("usePresence", () => {
     states.set(1, { user: { name: "Me", color: "#abc" } });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
     expect(result.current).toEqual([]);
   });
 
@@ -67,9 +62,7 @@ describe("usePresence", () => {
     });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
 
     expect(result.current).toHaveLength(2);
     expect(result.current).toEqual([
@@ -89,9 +82,7 @@ describe("usePresence", () => {
     });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
 
     expect(result.current).toHaveLength(1);
     expect(result.current[0].avatarUrl).toBe("https://img/a1.png");
@@ -105,9 +96,7 @@ describe("usePresence", () => {
     states.set(3, { user: { name: "Bob", color: "#0f0" } });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
 
     expect(result.current).toHaveLength(1);
     expect(result.current[0].name).toBe("Bob");
@@ -120,9 +109,7 @@ describe("usePresence", () => {
     states.set(3, { user: { name: "", color: "#0f0" } });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
 
     expect(result.current).toEqual([]);
   });
@@ -133,9 +120,7 @@ describe("usePresence", () => {
     states.set(2, { user: { name: "Alice", color: "#f00" } });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
 
     expect(result.current[0].avatarUrl).toBeNull();
   });
@@ -146,9 +131,7 @@ describe("usePresence", () => {
     states.set(2, { user: { name: "Alice" } });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
 
     expect(result.current[0].color).toBe("#6b7280");
   });
@@ -158,9 +141,7 @@ describe("usePresence", () => {
     states.set(1, { user: { name: "Me" } });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
     expect(result.current).toEqual([]);
     expect(awareness.on).toHaveBeenCalledWith("change", expect.any(Function));
 
@@ -179,13 +160,9 @@ describe("usePresence", () => {
     states.set(1, { user: { name: "Me" } });
     const awareness = createMockAwareness(1, states);
 
-    const { unmount } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { unmount } = renderHook(() => usePresence(awareness as never));
 
-    const registeredFn = awareness.on.mock.calls.find(
-      (c: [string, ChangeHandler]) => c[0] === "change",
-    )?.[1];
+    const registeredFn = awareness.on.mock.calls.find((c: [string, ChangeHandler]) => c[0] === "change")?.[1];
     expect(registeredFn).toBeDefined();
 
     unmount();
@@ -199,10 +176,7 @@ describe("usePresence", () => {
     states.set(2, { user: { name: "Alice", color: "#f00" } });
     const awareness = createMockAwareness(1, states);
 
-    const { result, rerender } = renderHook(
-      ({ a }) => usePresence(a as never),
-      { initialProps: { a: awareness } },
-    );
+    const { result, rerender } = renderHook(({ a }) => usePresence(a as never), { initialProps: { a: awareness } });
 
     expect(result.current).toHaveLength(1);
 
@@ -216,9 +190,7 @@ describe("usePresence", () => {
     states.set(42, { user: { name: "Only Me", color: "#abc" } });
     const awareness = createMockAwareness(42, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
     expect(result.current).toEqual([]);
   });
 
@@ -229,9 +201,7 @@ describe("usePresence", () => {
     states.set(3, { user: { name: "Bob", color: "#0f0" } });
     const awareness = createMockAwareness(1, states);
 
-    const { result } = renderHook(() =>
-      usePresence(awareness as never),
-    );
+    const { result } = renderHook(() => usePresence(awareness as never));
     expect(result.current).toHaveLength(2);
 
     states.delete(3);

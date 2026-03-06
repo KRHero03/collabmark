@@ -7,13 +7,7 @@ describe("ConfirmDialog", () => {
 
   it("renders nothing when open is false", () => {
     const { container } = render(
-      <ConfirmDialog
-        open={false}
-        title="Delete"
-        message="Are you sure?"
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />,
+      <ConfirmDialog open={false} title="Delete" message="Are you sure?" onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );
     expect(container.innerHTML).toBe("");
   });
@@ -34,13 +28,7 @@ describe("ConfirmDialog", () => {
 
   it("renders default confirm label as Delete", () => {
     const { container } = render(
-      <ConfirmDialog
-        open
-        title="Confirm"
-        message="Sure?"
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />,
+      <ConfirmDialog open title="Confirm" message="Sure?" onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );
     const buttons = container.querySelectorAll("button");
     const confirmBtn = buttons[1];
@@ -81,13 +69,7 @@ describe("ConfirmDialog", () => {
   it("calls onCancel when Cancel button is clicked", () => {
     const onCancel = vi.fn();
     const { getByText } = render(
-      <ConfirmDialog
-        open
-        title="Confirm"
-        message="Sure?"
-        onConfirm={vi.fn()}
-        onCancel={onCancel}
-      />,
+      <ConfirmDialog open title="Confirm" message="Sure?" onConfirm={vi.fn()} onCancel={onCancel} />,
     );
     fireEvent.click(getByText("Cancel"));
     expect(onCancel).toHaveBeenCalledTimes(1);
@@ -95,15 +77,7 @@ describe("ConfirmDialog", () => {
 
   it("calls onCancel when Escape is pressed", () => {
     const onCancel = vi.fn();
-    render(
-      <ConfirmDialog
-        open
-        title="Confirm"
-        message="Sure?"
-        onConfirm={vi.fn()}
-        onCancel={onCancel}
-      />,
-    );
+    render(<ConfirmDialog open title="Confirm" message="Sure?" onConfirm={vi.fn()} onCancel={onCancel} />);
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
@@ -111,13 +85,7 @@ describe("ConfirmDialog", () => {
   it("calls onCancel when clicking the backdrop", () => {
     const onCancel = vi.fn();
     const { container } = render(
-      <ConfirmDialog
-        open
-        title="Confirm"
-        message="Sure?"
-        onConfirm={vi.fn()}
-        onCancel={onCancel}
-      />,
+      <ConfirmDialog open title="Confirm" message="Sure?" onConfirm={vi.fn()} onCancel={onCancel} />,
     );
     const backdrop = container.firstChild as HTMLElement;
     fireEvent.click(backdrop);
@@ -127,13 +95,7 @@ describe("ConfirmDialog", () => {
   it("does not call onCancel when clicking inside the dialog", () => {
     const onCancel = vi.fn();
     const { getByText } = render(
-      <ConfirmDialog
-        open
-        title="Confirm"
-        message="Sure?"
-        onConfirm={vi.fn()}
-        onCancel={onCancel}
-      />,
+      <ConfirmDialog open title="Confirm" message="Sure?" onConfirm={vi.fn()} onCancel={onCancel} />,
     );
     fireEvent.click(getByText("Sure?"));
     expect(onCancel).not.toHaveBeenCalled();
@@ -141,14 +103,7 @@ describe("ConfirmDialog", () => {
 
   it("renders danger icon for danger variant", () => {
     const { container } = render(
-      <ConfirmDialog
-        open
-        title="Confirm"
-        message="Sure?"
-        variant="danger"
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />,
+      <ConfirmDialog open title="Confirm" message="Sure?" variant="danger" onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );
     const icon = container.querySelector(".bg-red-100");
     expect(icon).toBeTruthy();
@@ -156,14 +111,7 @@ describe("ConfirmDialog", () => {
 
   it("does not render danger icon for default variant", () => {
     const { container } = render(
-      <ConfirmDialog
-        open
-        title="Confirm"
-        message="Sure?"
-        variant="default"
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />,
+      <ConfirmDialog open title="Confirm" message="Sure?" variant="default" onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );
     const icon = container.querySelector(".bg-red-100");
     expect(icon).toBeNull();

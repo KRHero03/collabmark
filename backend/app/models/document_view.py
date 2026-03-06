@@ -1,6 +1,6 @@
 """Model for tracking document views, powering the 'Recently Viewed' tab."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from beanie import Document, Indexed
 from pydantic import BaseModel, Field
@@ -15,7 +15,7 @@ class DocumentView(Document):
 
     user_id: Indexed(str)
     document_id: Indexed(str)
-    viewed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    viewed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
     class Settings:
         name = "document_views"

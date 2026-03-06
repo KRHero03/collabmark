@@ -57,9 +57,7 @@ class AclEntry:
     inherited_from_name: Optional[str] = None
 
 
-NO_ACCESS = EffectivePermission(
-    can_view=False, can_edit=False, can_delete=False, can_share=False, role="none"
-)
+NO_ACCESS = EffectivePermission(can_view=False, can_edit=False, can_delete=False, can_share=False, role="none")
 
 
 def org_allows_general_access(entity_org_id: str | None, user_org_id: str | None) -> bool:
@@ -77,6 +75,7 @@ def org_allows_general_access(entity_org_id: str | None, user_org_id: str | None
 # ---------------------------------------------------------------------------
 # Hierarchy helpers (O(1) via denormalized root_folder_id)
 # ---------------------------------------------------------------------------
+
 
 async def _get_folder(fid: str) -> Folder | None:
     try:
@@ -126,18 +125,14 @@ async def get_root_owner_id(entity: Document_ | Folder, entity_type: Literal["do
 
 async def all_children_owned_by(folder_id: str, user_id: str) -> bool:
     """Recursively check that every sub-folder and document is owned by user_id."""
-    child_folders = await Folder.find(
-        {"parent_id": folder_id, "is_deleted": False}
-    ).to_list()
+    child_folders = await Folder.find({"parent_id": folder_id, "is_deleted": False}).to_list()
     for cf in child_folders:
         if cf.owner_id != user_id:
             return False
         if not await all_children_owned_by(str(cf.id), user_id):
             return False
 
-    child_docs = await Document_.find(
-        {"folder_id": folder_id, "is_deleted": False}
-    ).to_list()
+    child_docs = await Document_.find({"folder_id": folder_id, "is_deleted": False}).to_list()
     for doc in child_docs:
         if doc.owner_id != user_id:
             return False
@@ -149,9 +144,8 @@ async def all_children_owned_by(folder_id: str, user_id: str) -> bool:
 # Low-level access resolution (view/edit only, no delete logic)
 # ---------------------------------------------------------------------------
 
-async def _get_inherited_permission(
-    folder_id: str, user_id: str, user_org_id: str | None = None
-) -> Permission | None:
+
+async def _get_inherited_permission(folder_id: str, user_id: str, user_org_id: str | None = None) -> Permission | None:
     """Walk up the folder chain looking for an explicit FolderAccess or general_access.
 
     Org boundary is enforced on general_access: if a folder belongs to an org,
@@ -264,6 +258,7 @@ async def get_base_permission(
 # Core: resolve_effective_permission
 # ---------------------------------------------------------------------------
 
+
 async def resolve_effective_permission(
     entity_type: Literal["document", "folder"],
     entity_id: str,
@@ -309,14 +304,20 @@ async def resolve_effective_permission(
     # 1. Root folder owner (not the entity owner) -> full control
     if is_root_owner and not is_entity_owner:
         return EffectivePermission(
-            can_view=True, can_edit=True, can_delete=True, can_share=True,
+            can_view=True,
+            can_edit=True,
+            can_delete=True,
+            can_share=True,
             role="root_owner",
         )
 
     # 2. Entity owner who IS also the root owner, or entity lives at root level
     if is_entity_owner and (is_root_owner or parent_folder_id is None):
         return EffectivePermission(
-            can_view=True, can_edit=True, can_delete=True, can_share=True,
+            can_view=True,
+            can_edit=True,
+            can_delete=True,
+            can_share=True,
             role="owner",
         )
 
@@ -326,7 +327,10 @@ async def resolve_effective_permission(
         if entity_type == "folder":
             can_delete = await all_children_owned_by(entity_id, user_id)
         return EffectivePermission(
-            can_view=True, can_edit=True, can_delete=can_delete, can_share=True,
+            can_view=True,
+            can_edit=True,
+            can_delete=can_delete,
+            can_share=True,
             role="owner",
         )
 
@@ -335,13 +339,19 @@ async def resolve_effective_permission(
 
     if base_perm == Permission.EDIT:
         return EffectivePermission(
-            can_view=True, can_edit=True, can_delete=False, can_share=False,
+            can_view=True,
+            can_edit=True,
+            can_delete=False,
+            can_share=False,
             role="editor",
         )
 
     if base_perm == Permission.VIEW:
         return EffectivePermission(
-            can_view=True, can_edit=False, can_delete=False, can_share=False,
+            can_view=True,
+            can_edit=False,
+            can_delete=False,
+            can_share=False,
             role="viewer",
         )
 
@@ -352,6 +362,7 @@ async def resolve_effective_permission(
 # ---------------------------------------------------------------------------
 # ACL summary for the consolidated view
 # ---------------------------------------------------------------------------
+
 
 async def get_acl_summary(
     entity_type: Literal["document", "folder"],
@@ -397,19 +408,21 @@ async def get_acl_summary(
         if u is None:
             return
         perm = await resolve_effective_permission(entity_type, entity_id, u)
-        entries.append(AclEntry(
-            user_id=uid,
-            user_name=u.name or "Unknown",
-            user_email=u.email or "",
-            avatar_url=u.avatar_url,
-            can_view=perm.can_view,
-            can_edit=perm.can_edit,
-            can_delete=perm.can_delete,
-            can_share=perm.can_share,
-            role=perm.role,
-            inherited_from_id=inherited_id,
-            inherited_from_name=inherited_name,
-        ))
+        entries.append(
+            AclEntry(
+                user_id=uid,
+                user_name=u.name or "Unknown",
+                user_email=u.email or "",
+                avatar_url=u.avatar_url,
+                can_view=perm.can_view,
+                can_edit=perm.can_edit,
+                can_delete=perm.can_delete,
+                can_share=perm.can_share,
+                role=perm.role,
+                inherited_from_id=inherited_id,
+                inherited_from_name=inherited_name,
+            )
+        )
 
     await _add_user(entity_owner_id)
 
@@ -417,22 +430,16 @@ async def get_acl_summary(
         await _add_user(root_owner_id)
 
     if entity_type == "document":
-        accesses = await DocumentAccess.find(
-            DocumentAccess.document_id == entity_id
-        ).to_list()
+        accesses = await DocumentAccess.find(DocumentAccess.document_id == entity_id).to_list()
         for a in accesses:
             await _add_user(a.user_id)
     else:
-        accesses = await FolderAccess.find(
-            FolderAccess.folder_id == entity_id
-        ).to_list()
+        accesses = await FolderAccess.find(FolderAccess.folder_id == entity_id).to_list()
         for a in accesses:
             await _add_user(a.user_id)
 
     if parent_folder_id:
-        await _collect_folder_chain_users(
-            parent_folder_id, seen_user_ids, entity_type, entity_id, entries
-        )
+        await _collect_folder_chain_users(parent_folder_id, seen_user_ids, entity_type, entity_id, entries)
 
     return entries
 
@@ -464,23 +471,23 @@ async def _collect_folder_chain_users(
                 u = None
             if u:
                 perm = await resolve_effective_permission(entity_type, entity_id, u)
-                entries.append(AclEntry(
-                    user_id=folder.owner_id,
-                    user_name=u.name or "Unknown",
-                    user_email=u.email or "",
-                    avatar_url=u.avatar_url,
-                    can_view=perm.can_view,
-                    can_edit=perm.can_edit,
-                    can_delete=perm.can_delete,
-                    can_share=perm.can_share,
-                    role=perm.role,
-                    inherited_from_id=folder_str_id,
-                    inherited_from_name=folder.name,
-                ))
+                entries.append(
+                    AclEntry(
+                        user_id=folder.owner_id,
+                        user_name=u.name or "Unknown",
+                        user_email=u.email or "",
+                        avatar_url=u.avatar_url,
+                        can_view=perm.can_view,
+                        can_edit=perm.can_edit,
+                        can_delete=perm.can_delete,
+                        can_share=perm.can_share,
+                        role=perm.role,
+                        inherited_from_id=folder_str_id,
+                        inherited_from_name=folder.name,
+                    )
+                )
 
-        chain_accesses = await FolderAccess.find(
-            FolderAccess.folder_id == current_id
-        ).to_list()
+        chain_accesses = await FolderAccess.find(FolderAccess.folder_id == current_id).to_list()
         for a in chain_accesses:
             if a.user_id not in seen:
                 seen.add(a.user_id)
@@ -491,18 +498,20 @@ async def _collect_folder_chain_users(
                 if u is None:
                     continue
                 perm = await resolve_effective_permission(entity_type, entity_id, u)
-                entries.append(AclEntry(
-                    user_id=a.user_id,
-                    user_name=u.name or "Unknown",
-                    user_email=u.email or "",
-                    avatar_url=u.avatar_url,
-                    can_view=perm.can_view,
-                    can_edit=perm.can_edit,
-                    can_delete=perm.can_delete,
-                    can_share=perm.can_share,
-                    role=perm.role,
-                    inherited_from_id=folder_str_id,
-                    inherited_from_name=folder.name,
-                ))
+                entries.append(
+                    AclEntry(
+                        user_id=a.user_id,
+                        user_name=u.name or "Unknown",
+                        user_email=u.email or "",
+                        avatar_url=u.avatar_url,
+                        can_view=perm.can_view,
+                        can_edit=perm.can_edit,
+                        can_delete=perm.can_delete,
+                        can_share=perm.can_share,
+                        role=perm.role,
+                        inherited_from_id=folder_str_id,
+                        inherited_from_name=folder.name,
+                    )
+                )
 
         current_id = folder.parent_id

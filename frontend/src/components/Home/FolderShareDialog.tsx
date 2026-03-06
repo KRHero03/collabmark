@@ -65,8 +65,7 @@ export function FolderShareDialog({
       await fetchCollaborators();
     } catch (err: unknown) {
       const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail ?? "Failed to add collaborator";
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "Failed to add collaborator";
       setError(msg);
     } finally {
       setLoading(false);
@@ -78,10 +77,7 @@ export function FolderShareDialog({
     setCollaborators((prev) => prev.filter((c) => c.user_id !== userId));
   };
 
-  const handlePermissionChange = async (
-    collaborator: Collaborator,
-    newPerm: "view" | "edit",
-  ) => {
+  const handlePermissionChange = async (collaborator: Collaborator, newPerm: "view" | "edit") => {
     if (newPerm === collaborator.permission) return;
     try {
       await foldersApi.addCollaborator(folderId, {
@@ -89,11 +85,7 @@ export function FolderShareDialog({
         permission: newPerm,
       });
       setCollaborators((prev) =>
-        prev.map((c) =>
-          c.user_id === collaborator.user_id
-            ? { ...c, permission: newPerm }
-            : c,
-        ),
+        prev.map((c) => (c.user_id === collaborator.user_id ? { ...c, permission: newPerm } : c)),
       );
     } catch {
       setError("Failed to update permission");
@@ -110,9 +102,7 @@ export function FolderShareDialog({
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(
-      `${window.location.origin}/?folder=${folderId}`,
-    );
+    navigator.clipboard.writeText(`${window.location.origin}/?folder=${folderId}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -130,9 +120,7 @@ export function FolderShareDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="w-[calc(100%-2rem)] max-w-lg rounded-xl bg-[var(--color-surface)] p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[var(--color-text)]">
-            Share folder
-          </h2>
+          <h2 className="text-lg font-semibold text-[var(--color-text)]">Share folder</h2>
           <button
             onClick={onClose}
             className="rounded p-1 text-[var(--color-text-muted)] hover:bg-[var(--color-hover)]"
@@ -158,9 +146,7 @@ export function FolderShareDialog({
               />
               <select
                 value={permission}
-                onChange={(e) =>
-                  setPermission(e.target.value as "view" | "edit")
-                }
+                onChange={(e) => setPermission(e.target.value as "view" | "edit")}
                 className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-2 text-sm text-[var(--color-text)] outline-none"
               >
                 <option value="view">Viewer</option>
@@ -174,30 +160,21 @@ export function FolderShareDialog({
                 Add
               </button>
             </div>
-            {error && (
-              <p className="mt-1 text-xs text-red-500">{error}</p>
-            )}
+            {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
           </div>
         )}
 
         <div className="mb-5">
-          <h3 className="mb-2 text-sm font-medium text-[var(--color-text)]">
-            People with access
-          </h3>
+          <h3 className="mb-2 text-sm font-medium text-[var(--color-text)]">People with access</h3>
           <ul className="max-h-48 space-y-1 overflow-auto">
             <li className="flex items-center justify-between rounded-md px-3 py-2">
               <div className="flex items-center gap-3">
                 <UserAvatar url={ownerAvatarUrl} name={ownerName || "?"} size="md" />
                 <div>
                   <p className="text-sm font-medium text-[var(--color-text)]">
-                    {ownerName}{" "}
-                    <span className="text-[var(--color-text-muted)]">
-                      (Owner)
-                    </span>
+                    {ownerName} <span className="text-[var(--color-text-muted)]">(Owner)</span>
                   </p>
-                  <p className="text-xs text-[var(--color-text-muted)]">
-                    {ownerEmail}
-                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">{ownerEmail}</p>
                 </div>
               </div>
             </li>
@@ -210,24 +187,15 @@ export function FolderShareDialog({
                 <div className="flex items-center gap-3">
                   <UserAvatar url={c.avatar_url} name={c.name || "?"} size="md" />
                   <div>
-                    <p className="text-sm font-medium text-[var(--color-text)]">
-                      {c.name}
-                    </p>
-                    <p className="text-xs text-[var(--color-text-muted)]">
-                      {c.email}
-                    </p>
+                    <p className="text-sm font-medium text-[var(--color-text)]">{c.name}</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">{c.email}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {isOwner ? (
                     <select
                       value={c.permission}
-                      onChange={(e) =>
-                        handlePermissionChange(
-                          c,
-                          e.target.value as "view" | "edit",
-                        )
-                      }
+                      onChange={(e) => handlePermissionChange(c, e.target.value as "view" | "edit")}
                       className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-2 py-0.5 text-xs font-medium text-[var(--color-text)] outline-none"
                     >
                       <option value="view">Viewer</option>
@@ -256,42 +224,26 @@ export function FolderShareDialog({
         {isOwner && (
           <div className="mb-5 rounded-lg border border-[var(--color-border)] p-4">
             <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--color-text)]">
-              {generalAccess === "restricted" ? (
-                <Lock className="h-4 w-4" />
-              ) : (
-                <Globe className="h-4 w-4" />
-              )}
+              {generalAccess === "restricted" ? <Lock className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
               General access
             </h3>
             <select
               value={generalAccess}
-              onChange={(e) =>
-                handleGeneralAccessChange(e.target.value as GeneralAccess)
-              }
+              onChange={(e) => handleGeneralAccessChange(e.target.value as GeneralAccess)}
               className="w-full rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text)] outline-none"
             >
               <option value="restricted">Restricted</option>
-              <option value="anyone_view">
-                {scope} with the link can view
-              </option>
-              <option value="anyone_edit">
-                {scope} with the link can edit
-              </option>
+              <option value="anyone_view">{scope} with the link can view</option>
+              <option value="anyone_edit">{scope} with the link can edit</option>
             </select>
-            <p className="mt-1 text-xs text-[var(--color-text-muted)]">
-              {gaLabel[generalAccess]}
-            </p>
+            <p className="mt-1 text-xs text-[var(--color-text-muted)]">{gaLabel[generalAccess]}</p>
           </div>
         )}
 
         {!isOwner && (
           <div className="mb-5 rounded-lg border border-[var(--color-border)] p-4">
             <p className="flex items-center gap-2 text-sm text-[var(--color-text-muted)]">
-              {generalAccess === "restricted" ? (
-                <Lock className="h-4 w-4" />
-              ) : (
-                <Globe className="h-4 w-4" />
-              )}
+              {generalAccess === "restricted" ? <Lock className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
               {gaLabel[generalAccess]}
             </p>
           </div>

@@ -31,17 +31,13 @@ export const useToast = create<ToastState>((set, get) => ({
 
     setTimeout(() => {
       set({
-        toasts: get().toasts.map((t) =>
-          t.id === id ? { ...t, phase: "visible" as ToastPhase } : t,
-        ),
+        toasts: get().toasts.map((t) => (t.id === id ? { ...t, phase: "visible" as ToastPhase } : t)),
       });
     }, ENTER_DELAY_MS);
 
     setTimeout(() => {
       set({
-        toasts: get().toasts.map((t) =>
-          t.id === id ? { ...t, phase: "exiting" as ToastPhase } : t,
-        ),
+        toasts: get().toasts.map((t) => (t.id === id ? { ...t, phase: "exiting" as ToastPhase } : t)),
       });
       setTimeout(() => {
         set({ toasts: get().toasts.filter((t) => t.id !== id) });
@@ -54,9 +50,7 @@ export const useToast = create<ToastState>((set, get) => ({
     if (!toast || toast.phase === "exiting") return;
 
     set({
-      toasts: get().toasts.map((t) =>
-        t.id === id ? { ...t, phase: "exiting" as ToastPhase } : t,
-      ),
+      toasts: get().toasts.map((t) => (t.id === id ? { ...t, phase: "exiting" as ToastPhase } : t)),
     });
     setTimeout(() => {
       set({ toasts: get().toasts.filter((t) => t.id !== id) });

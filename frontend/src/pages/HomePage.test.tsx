@@ -8,14 +8,7 @@ const mockSearchParams = new URLSearchParams();
 const mockSetSearchParams = vi.fn();
 
 vi.mock("react-router", () => ({
-  Link: ({
-    to,
-    children,
-    ...props
-  }: {
-    to: string;
-    children: React.ReactNode;
-  }) => (
+  Link: ({ to, children, ...props }: { to: string; children: React.ReactNode }) => (
     <a href={to} {...props}>
       {children}
     </a>
@@ -109,22 +102,18 @@ vi.mock("../lib/api", async (importOriginal) => {
     foldersApi: {
       ...(actual.foldersApi as object),
       listShared: (...args: unknown[]) => mockFoldersApiListShared(...args),
-      listRecentlyViewed: (...args: unknown[]) =>
-        mockFoldersApiListRecentlyViewed(...args),
+      listRecentlyViewed: (...args: unknown[]) => mockFoldersApiListRecentlyViewed(...args),
     },
     sharingApi: {
       ...(actual.sharingApi as object),
       listShared: (...args: unknown[]) => mockSharingApiListShared(...args),
-      listRecentlyViewed: (...args: unknown[]) =>
-        mockSharingApiListRecentlyViewed(...args),
+      listRecentlyViewed: (...args: unknown[]) => mockSharingApiListRecentlyViewed(...args),
     },
   };
 });
 
 vi.mock("../components/Layout/Navbar", () => ({
-  Navbar: (props: any) => (
-    <div data-testid="navbar" data-active-tab={props.activeTab} />
-  ),
+  Navbar: (props: any) => <div data-testid="navbar" data-active-tab={props.activeTab} />,
 }));
 vi.mock("../components/Home/FolderBreadcrumbs", () => ({
   FolderBreadcrumbs: (props: {
@@ -173,10 +162,7 @@ vi.mock("../components/Home/FolderShareDialog", () => ({
         <button data-testid="folder-share-close" onClick={props.onClose}>
           Close
         </button>
-        <button
-          data-testid="folder-share-change-access"
-          onClick={() => props.onGeneralAccessChange?.("anyone_edit")}
-        >
+        <button data-testid="folder-share-change-access" onClick={() => props.onGeneralAccessChange?.("anyone_edit")}>
           Change Access
         </button>
       </div>
@@ -189,10 +175,7 @@ vi.mock("../components/Editor/ShareDialog", () => ({
         <button data-testid="share-dialog-close" onClick={props.onClose}>
           Close
         </button>
-        <button
-          data-testid="share-dialog-change-access"
-          onClick={() => props.onGeneralAccessChange?.("anyone_view")}
-        >
+        <button data-testid="share-dialog-change-access" onClick={() => props.onGeneralAccessChange?.("anyone_view")}>
           Change Access
         </button>
       </div>
@@ -227,7 +210,13 @@ vi.mock("../components/Home/DocumentContextMenu", async (importOriginal) => {
     DocumentContextMenu: (props: { actions: { label: string; onClick: () => void }[]; onClose: () => void }) => (
       <div data-testid="context-menu" role="menu">
         {props.actions?.map((action) => (
-          <button key={action.label} onClick={() => { action.onClick(); props.onClose(); }}>
+          <button
+            key={action.label}
+            onClick={() => {
+              action.onClick();
+              props.onClose();
+            }}
+          >
             {action.label}
           </button>
         ))}
@@ -395,11 +384,7 @@ describe("HomePage", () => {
 
   it("shows empty state when no folders/documents", () => {
     const { getByText } = render(<HomePage />);
-    expect(
-      getByText(
-        "This folder is empty. Create a folder or document to get started!",
-      ),
-    ).toBeInTheDocument();
+    expect(getByText("This folder is empty. Create a folder or document to get started!")).toBeInTheDocument();
   });
 
   it("shows view-only empty state when permission is view", () => {
@@ -548,9 +533,7 @@ describe("HomePage", () => {
     fireEvent.click(getByText("Recently viewed"));
 
     await waitFor(() => {
-      expect(
-        getByText("No recently viewed items yet."),
-      ).toBeInTheDocument();
+      expect(getByText("No recently viewed items yet.")).toBeInTheDocument();
     });
   });
 
@@ -1286,10 +1269,7 @@ describe("HomePage", () => {
     fireEvent.click(getByText("New Document"));
 
     await waitFor(() => {
-      expect(mockAddToast).toHaveBeenCalledWith(
-        "Failed to create document. Please try again.",
-        "error",
-      );
+      expect(mockAddToast).toHaveBeenCalledWith("Failed to create document. Please try again.", "error");
     });
   });
 
@@ -1302,10 +1282,7 @@ describe("HomePage", () => {
     fireEvent.click(getByTestId("create-folder-submit"));
 
     await waitFor(() => {
-      expect(mockAddToast).toHaveBeenCalledWith(
-        "Failed to create folder. Please try again.",
-        "error",
-      );
+      expect(mockAddToast).toHaveBeenCalledWith("Failed to create folder. Please try again.", "error");
     });
   });
 
