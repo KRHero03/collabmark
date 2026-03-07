@@ -1,18 +1,9 @@
-import axios, { AxiosError } from "axios";
+import axios from "axios";
 
 const api = axios.create({
   baseURL: "/api",
   withCredentials: true,
 });
-
-/** Extract a human-readable message from an Axios error response. */
-export function extractErrorDetail(err: unknown, fallback: string): string {
-  if (err instanceof AxiosError) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === "string") return detail;
-  }
-  return fallback;
-}
 
 export interface UserProfile {
   id: string;
