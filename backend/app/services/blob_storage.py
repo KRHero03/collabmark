@@ -1,6 +1,6 @@
 """S3-compatible blob storage service using boto3.
 
-Provides upload, delete, and URL generation for binary objects stored in
+Provides upload, prefix-delete, and URL generation for binary objects stored in
 MinIO (local) or any S3-compatible provider (production). The bucket is
 auto-created on first use if it does not already exist.
 """
@@ -61,16 +61,6 @@ def upload(key: str, data: bytes, content_type: str = "application/octet-stream"
     )
     logger.info("Uploaded blob: %s (%d bytes)", key, len(data))
     return key
-
-
-def delete(key: str) -> None:
-    """Delete an object from S3 by key. No-op if the key doesn't exist."""
-    client = _get_s3_client()
-    try:
-        client.delete_object(Bucket=settings.s3_bucket, Key=key)
-        logger.info("Deleted blob: %s", key)
-    except ClientError:
-        logger.warning("Failed to delete blob: %s", key)
 
 
 def delete_prefix(prefix: str) -> None:

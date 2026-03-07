@@ -217,14 +217,6 @@ export interface AclEntry {
   inherited_from_name: string | null;
 }
 
-export interface EffectivePermission {
-  can_view: boolean;
-  can_edit: boolean;
-  can_delete: boolean;
-  can_share: boolean;
-  role: string;
-}
-
 export const aclApi = {
   getDocumentAcl: (docId: string) => api.get<AclEntry[]>(`/documents/${docId}/acl`),
   getFolderAcl: (folderId: string) => api.get<AclEntry[]>(`/folders/${folderId}/acl`),

@@ -93,7 +93,32 @@ make build        # frontend production build (vite build)
   docker compose -f docker-compose.prod.yml build
   ```
 
-## 5. Final CI Gate
+## 5. Dead Code & Unused Test Cleanup
+
+Scan for and remove dead code before committing. This is NOT optional.
+
+### What to look for
+- **Unused imports**: `ruff check --select F401` (backend), TypeScript compiler warnings (frontend).
+- **Unused functions/variables**: Functions defined but never called from production code. Private helpers (`_foo`) with zero callers. Exported hooks/components/interfaces never imported elsewhere.
+- **Unused test cases**: Tests that exercise functions or endpoints that no longer exist.
+- **Stale test-only code**: Functions/exports that exist solely for test imports but have no production purpose — move the logic into the test file or delete.
+- **Commented-out code**: Remove it; version control is the history.
+
+### Commands
+```bash
+cd backend && .venv/bin/ruff check app/ tests/ --select F401,F811,F841,RUF059   # unused imports/vars
+```
+
+### Checklist
+```
+- [ ] No unused imports (ruff F401 clean)
+- [ ] No unused private functions (grep for def _foo, verify callers exist)
+- [ ] No unused exported interfaces/hooks/components (frontend)
+- [ ] No tests for removed functions/endpoints
+- [ ] No commented-out code blocks
+```
+
+## 6. Final CI Gate
 
 Run the full CI pipeline to catch anything missed:
 
@@ -112,4 +137,5 @@ All four stages must pass. Only then proceed to commit.
 | Security | Manual review | All checklist items checked |
 | Tests | `make test-cov` | >90% coverage, 0 failures |
 | Build | `make build` | Exit code 0, 0 warnings |
+| Dead code | `ruff check --select F401,F811,F841,RUF059` + manual | No unused code |
 | CI | `make ci` | All stages green |

@@ -465,23 +465,6 @@ class TestModelFields:
 
 class TestOrgServiceUnit:
     @pytest.mark.asyncio
-    async def test_is_same_org_fast_both_none(self):
-        assert org_service.is_same_org_fast(None, None) is True
-
-    @pytest.mark.asyncio
-    async def test_is_same_org_fast_same_org(self):
-        assert org_service.is_same_org_fast("org-123", "org-123") is True
-
-    @pytest.mark.asyncio
-    async def test_is_same_org_fast_different_org(self):
-        assert org_service.is_same_org_fast("org-123", "org-456") is False
-
-    @pytest.mark.asyncio
-    async def test_is_same_org_fast_one_none_one_not(self):
-        assert org_service.is_same_org_fast(None, "org-123") is False
-        assert org_service.is_same_org_fast("org-123", None) is False
-
-    @pytest.mark.asyncio
     async def test_is_org_admin_admin_returns_true(self, test_user: User):
         org = Organization(name="Test", slug="is-org-admin-test")
         await org.insert()

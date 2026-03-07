@@ -11,7 +11,6 @@ from app.models.folder import Folder, FolderAccess
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 from app.services.document_service import (
-    _assert_owner,
     _find_doc,
     create_document,
     get_document,
@@ -629,19 +628,3 @@ class TestHardDeleteDocumentCrdtSkip:
             assert await Document_.get(doc.id) is None
         finally:
             MongoYStore._db = original_db
-
-
-class TestAssertOwner:
-    """Test _assert_owner directly for non-owner case."""
-
-    @pytest.mark.asyncio
-    async def test_assert_owner_non_owner_raises_403(self, test_user: User):
-        other = User(google_id="other", email="other@x.com", name="Other")
-        await other.insert()
-        doc = Document_(title="D", content="", owner_id=str(other.id))
-        await doc.insert()
-
-        with pytest.raises(HTTPException) as exc_info:
-            _assert_owner(doc, test_user)
-        assert exc_info.value.status_code == 403
-        assert "Not authorized" in exc_info.value.detail

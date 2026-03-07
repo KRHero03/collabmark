@@ -285,17 +285,6 @@ async def get_user_org(user_id: str) -> Optional[Organization]:
         return None
 
 
-def is_same_org_fast(user_a_org_id: Optional[str], user_b_org_id: Optional[str]) -> bool:
-    """O(1) org comparison using denormalized org_id fields.
-
-    Both None (personal users) is considered same-context for backward
-    compatibility — personal users can share with anyone.
-    """
-    if user_a_org_id is None and user_b_org_id is None:
-        return True
-    return user_a_org_id == user_b_org_id
-
-
 async def is_org_admin(user_id: str, org_id: str) -> bool:
     """Check whether a user is an admin of the given organization."""
     membership = await OrgMembership.find_one(

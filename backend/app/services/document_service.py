@@ -259,14 +259,6 @@ async def _find_doc(doc_id: str) -> Document_:
     return doc
 
 
-def _assert_owner(doc: Document_, user: User) -> None:
-    if doc.owner_id != str(user.id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not authorized to access this document",
-        )
-
-
 async def _assert_can_delete(doc: Document_, user: User) -> None:
     """ACL-aware delete check: root owner or entity owner (for docs, always deletable by owner)."""
     from app.services.acl_service import resolve_effective_permission

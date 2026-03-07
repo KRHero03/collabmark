@@ -658,8 +658,10 @@ def group_to_scim(group: Group, org_id: str, members: list[GroupMembership] | No
     }
     if group.external_id:
         resource["externalId"] = group.external_id
-    if members is not None:
-        resource["members"] = [{"value": m.user_id, "$ref": f"/scim/v2/Users/{m.user_id}"} for m in members]
+    if group.scim_members:
+        resource["members"] = group.scim_members
+    elif members:
+        resource["members"] = [{"value": m.user_id} for m in members]
     return resource
 
 
@@ -667,24 +669,20 @@ async def _sync_group_members(group: Group, org_id: str, members_data: list[dict
     """Sync group membership from SCIM members array. Returns final membership list."""
     group_id = str(group.id)
 
-    desired_user_ids = set()
-    for m in members_data:
-        uid = m.get("value")
-        if uid:
-            desired_user_ids.add(uid)
+    group.scim_members = [{"value": m["value"]} for m in members_data if m.get("value")]
+    await group.save()
+
+    desired_user_ids = {m.get("value") for m in members_data if m.get("value")}
 
     existing = await GroupMembership.find(GroupMembership.group_id == group_id).to_list()
     existing_map = {m.user_id: m for m in existing}
 
-    # Remove members no longer in the list
     for uid, membership in existing_map.items():
         if uid not in desired_user_ids:
             await membership.delete()
 
-    # Add new members
     for uid in desired_user_ids:
         if uid not in existing_map:
-            # Verify user exists and belongs to the org
             try:
                 u = await User.get(PydanticObjectId(uid))
             except (InvalidId, ValueError):
@@ -694,7 +692,6 @@ async def _sync_group_members(group: Group, org_id: str, members_data: list[dict
             gm = GroupMembership(group_id=group_id, user_id=uid)
             await gm.insert()
 
-    # Apply role mapping
     await _apply_role_mapping(org_id, group.name)
 
     return await GroupMembership.find(GroupMembership.group_id == group_id).to_list()
@@ -837,15 +834,21 @@ async def replace_scim_group(org_id: str, group_id: str, resource: dict[str, Any
 
 async def _handle_group_member_add(group: Group, org_id: str, members: list[dict]) -> None:
     """Add members to a group from SCIM PATCH add operation."""
+    current = list(group.scim_members or [])
+    existing_vals = {m.get("value") for m in current}
+
     for m in members:
         uid = m.get("value")
-        if not uid:
+        if not uid or uid in existing_vals:
             continue
-        existing = await GroupMembership.find_one(
+        current.append({"value": uid})
+        existing_vals.add(uid)
+
+        existing_gm = await GroupMembership.find_one(
             GroupMembership.group_id == str(group.id),
             GroupMembership.user_id == uid,
         )
-        if not existing:
+        if not existing_gm:
             try:
                 u = await User.get(PydanticObjectId(uid))
             except (InvalidId, ValueError):
@@ -853,29 +856,40 @@ async def _handle_group_member_add(group: Group, org_id: str, members: list[dict
             if u and u.org_id == org_id:
                 gm = GroupMembership(group_id=str(group.id), user_id=uid)
                 await gm.insert()
+
+    group.scim_members = current
     await _apply_role_mapping(org_id, group.name)
 
 
 async def _handle_group_member_remove(group: Group, members: list[dict] | None = None, uid: str | None = None) -> None:
     """Remove members from a group. Either pass a list of member dicts or a single uid."""
+    uids_to_remove: set[str] = set()
     if uid:
+        uids_to_remove.add(uid)
+    elif members:
+        for m in members:
+            v = m.get("value")
+            if v:
+                uids_to_remove.add(v)
+
+    for remove_uid in uids_to_remove:
         gm = await GroupMembership.find_one(
             GroupMembership.group_id == str(group.id),
-            GroupMembership.user_id == uid,
+            GroupMembership.user_id == remove_uid,
         )
         if gm:
             await gm.delete()
-        return
-    if members:
-        for m in members:
-            member_uid = m.get("value")
-            if member_uid:
-                gm = await GroupMembership.find_one(
-                    GroupMembership.group_id == str(group.id),
-                    GroupMembership.user_id == member_uid,
-                )
-                if gm:
-                    await gm.delete()
+
+    if group.scim_members:
+        remaining = [m for m in group.scim_members if m.get("value") not in uids_to_remove]
+        group.scim_members = remaining or None
+
+
+async def _remove_all_group_members(group: Group) -> None:
+    """Remove all memberships from a group."""
+    memberships = await GroupMembership.find(GroupMembership.group_id == str(group.id)).to_list()
+    for m in memberships:
+        await m.delete()
 
 
 async def update_scim_group(org_id: str, group_id: str, payload: dict[str, Any]) -> Group:
@@ -893,14 +907,34 @@ async def update_scim_group(org_id: str, group_id: str, payload: dict[str, Any])
                 group.name = value
             elif path == "externalid" and isinstance(value, str):
                 group.external_id = value
-            elif not path and isinstance(value, dict) and "displayName" in value:
-                group.name = value["displayName"]
+            elif path == "members" and isinstance(value, list):
+                await _sync_group_members(group, org_id, value)
+            elif not path and isinstance(value, dict):
+                if "displayName" in value:
+                    group.name = value["displayName"]
+                if "externalId" in value:
+                    group.external_id = value["externalId"]
+                if "members" in value and isinstance(value["members"], list):
+                    await _sync_group_members(group, org_id, value["members"])
         elif operation == "add":
-            if path == "members" and isinstance(value, list):
+            if path == "externalid" and isinstance(value, str):
+                group.external_id = value
+            elif path == "members" and isinstance(value, list):
                 await _handle_group_member_add(group, org_id, value)
+            elif not path and isinstance(value, dict):
+                if "externalId" in value:
+                    group.external_id = value["externalId"]
+                if "members" in value and isinstance(value["members"], list):
+                    await _handle_group_member_add(group, org_id, value["members"])
         elif operation == "remove":
-            if path == "members" and isinstance(value, list):
-                await _handle_group_member_remove(group, members=value)
+            if path == "externalid":
+                group.external_id = None
+            elif path == "members":
+                if isinstance(value, list):
+                    await _handle_group_member_remove(group, members=value)
+                else:
+                    group.scim_members = None
+                    await _remove_all_group_members(group)
             elif path.startswith("members[value eq"):
                 match = re.search(r'"([^"]+)"', path)
                 if match:

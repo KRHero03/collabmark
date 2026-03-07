@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -32,6 +33,20 @@ async def async_client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+@pytest.fixture(autouse=True)
+def _mock_blob_storage():
+    """Prevent all tests from hitting real S3/MinIO.
+
+    `get_public_url` is left unpatched since it's pure string formatting.
+    """
+    with (
+        patch("app.services.blob_storage.upload", side_effect=lambda key, *a, **kw: key),
+        patch("app.services.blob_storage.delete_prefix"),
+        patch("app.services.blob_storage._ensure_bucket"),
+    ):
+        yield
 
 
 @pytest_asyncio.fixture

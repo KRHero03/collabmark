@@ -20,6 +20,7 @@ class Group(Document):
     org_id: Indexed(str)
     external_id: Optional[str] = None
     scim_synced: bool = False
+    scim_members: Optional[list] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
