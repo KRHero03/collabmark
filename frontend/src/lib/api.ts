@@ -126,9 +126,7 @@ export const documentsApi = {
   uploadImage: (docId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    return api.post<{ url: string; name: string }>(`/documents/${docId}/images`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return api.post<{ url: string; name: string }>(`/documents/${docId}/images`, formData);
   },
 };
 
@@ -400,9 +398,7 @@ export const orgsApi = {
   uploadLogo: (orgId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);
-    return api.post<Organization>(`/orgs/${orgId}/logo`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return api.post<Organization>(`/orgs/${orgId}/logo`, formData);
   },
   deleteLogo: (orgId: string) => api.delete(`/orgs/${orgId}/logo`),
 };
