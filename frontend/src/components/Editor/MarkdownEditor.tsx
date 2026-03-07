@@ -26,7 +26,7 @@ import * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 import type { AnchorStatus } from "../../hooks/useCommentAnchors";
 import { markdownKeymap } from "./markdownShortcuts";
-import { documentsApi } from "../../lib/api";
+import { documentsApi, extractErrorDetail } from "../../lib/api";
 import { useToast } from "../../hooks/useToast";
 
 /** Selection range in absolute character offsets. */
@@ -227,13 +227,13 @@ export function MarkdownEditor({
             }
             addToastRef.current("Image uploaded successfully", "success");
           })
-          .catch(() => {
+          .catch((err) => {
             const doc = view.state.doc.toString();
             const idx = doc.indexOf(placeholder);
             if (idx !== -1) {
               view.dispatch({ changes: { from: idx, to: idx + placeholder.length } });
             }
-            addToastRef.current("Failed to upload image", "error");
+            addToastRef.current(extractErrorDetail(err, "Failed to upload image"), "error");
           });
 
         return true;

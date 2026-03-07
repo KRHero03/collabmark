@@ -16,7 +16,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
-import { type Organization, type OrgMember, type OrgSSOConfig, orgsApi } from "../lib/api";
+import { type Organization, type OrgMember, type OrgSSOConfig, orgsApi, extractErrorDetail } from "../lib/api";
 import { UserAvatar } from "../components/Layout/UserAvatar";
 import { Navbar } from "../components/Layout/Navbar";
 import { useAuth } from "../hooks/useAuth";
@@ -173,8 +173,8 @@ export function OrgSettingsPage() {
       const { data } = await orgsApi.uploadLogo(orgId, file);
       setOrg(data);
       showToast("success", "Logo uploaded");
-    } catch {
-      showToast("error", "Failed to upload logo");
+    } catch (err) {
+      showToast("error", extractErrorDetail(err, "Failed to upload logo"));
     }
   };
 
