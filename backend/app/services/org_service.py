@@ -7,14 +7,12 @@ org relationships.  All DB operations go through Beanie document methods.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import Optional
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
-from app.config import settings as app_settings
 from app.models.organization import (
     Organization,
     OrganizationCreate,
@@ -23,46 +21,8 @@ from app.models.organization import (
     OrgRole,
 )
 from app.models.user import User
-from app.services import blob_storage
 
 logger = logging.getLogger(__name__)
-
-ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
-MAX_LOGO_SIZE = 2 * 1024 * 1024  # 2MB
-
-
-async def upload_org_logo(org_id: str, filename: str, contents: bytes) -> Organization:
-    """Validate and save an organization logo to S3. Returns updated org."""
-    ext = Path(filename).suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
-        )
-    if len(contents) > MAX_LOGO_SIZE:
-        raise HTTPException(status_code=400, detail="File too large. Maximum size is 2MB.")
-
-    org = await get_org(org_id)
-
-    blob_storage.delete_prefix(f"logos/{org_id}.")
-
-    content_type = blob_storage.MIME_TYPES.get(ext, "application/octet-stream")
-    key = f"logos/{org_id}{ext}"
-    blob_storage.upload(key, contents, content_type)
-
-    org.logo_url = blob_storage.get_public_url(key)
-    org.touch()
-    await org.save()
-    return org
-
-
-async def delete_org_logo(org_id: str) -> None:
-    """Remove the organization's logo from S3 and clear the DB field."""
-    org = await get_org(org_id)
-    blob_storage.delete_prefix(f"logos/{org_id}.")
-    org.logo_url = None
-    org.touch()
-    await org.save()
 
 
 async def create_org(payload: OrganizationCreate, creator: User) -> Organization:
@@ -167,8 +127,6 @@ async def update_org(org_id: str, payload: OrganizationUpdate) -> Organization:
         org.verified_domains = payload.verified_domains
     if payload.plan is not None:
         org.plan = payload.plan
-    if payload.admin_group_name is not None:
-        org.admin_group_name = payload.admin_group_name
 
     org.touch()
     await org.save()
@@ -216,8 +174,7 @@ async def add_member(org_id: str, user_id: str, role: OrgRole = OrgRole.MEMBER) 
             detail="User is already a member of this organization",
         )
 
-    is_super = user.email in app_settings.super_admin_emails
-    if not is_super and user.org_id is not None and user.org_id != org_id:
+    if user.org_id is not None and user.org_id != org_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="User already belongs to another organization",
@@ -226,10 +183,9 @@ async def add_member(org_id: str, user_id: str, role: OrgRole = OrgRole.MEMBER) 
     membership = OrgMembership(org_id=org_id, user_id=user_id, role=role)
     await membership.insert()
 
-    if not is_super:
-        user.org_id = org_id
-        user.touch()
-        await user.save()
+    user.org_id = org_id
+    user.touch()
+    await user.save()
 
     return membership
 

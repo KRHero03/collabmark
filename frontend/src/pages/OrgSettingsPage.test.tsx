@@ -148,7 +148,7 @@ describe("OrgSettingsPage", () => {
 
   describe("2. Tab switching", () => {
     it("switches between General, Members, and SSO tabs", async () => {
-      const { getByTestId, getByText, getByRole, getAllByText } = renderPage();
+      const { getByTestId, getByText, getByRole } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.get).toHaveBeenCalled();
@@ -162,11 +162,8 @@ describe("OrgSettingsPage", () => {
       expect(getByText("Bob")).toBeInTheDocument();
 
       fireEvent.click(getByTestId("tab-sso"));
-      expect(getByRole("heading", { name: /sso configuration/i })).toBeInTheDocument();
-      // SSO is enabled, so form is hidden behind Edit toggle
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[0]);
       expect(getByTestId("sso-form")).toBeInTheDocument();
+      expect(getByRole("heading", { name: /sso configuration/i })).toBeInTheDocument();
 
       fireEvent.click(getByTestId("tab-general"));
       expect(getByText("Organization Name")).toBeInTheDocument();
@@ -489,18 +486,15 @@ describe("OrgSettingsPage", () => {
 
   describe("9. SSO tab: renders current config", () => {
     it("renders SSO config status and form with OIDC values", async () => {
-      const { getByTestId, getByText, getByDisplayValue, getAllByText } = renderPage();
+      const { getByTestId, getByText, getByDisplayValue } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
+
       expect(getByText("Configured & Enabled")).toBeInTheDocument();
-
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[0]);
-
       expect(getByDisplayValue("https://idp.test.com/.well-known")).toBeInTheDocument();
       expect(getByDisplayValue("client-id")).toBeInTheDocument();
     });
@@ -522,15 +516,13 @@ describe("OrgSettingsPage", () => {
 
   describe("10. SSO tab: toggle between SAML and OIDC", () => {
     it("shows SAML fields when SAML is selected", async () => {
-      const { getByTestId, getByDisplayValue, getByText, getAllByText } = renderPage();
+      const { getByTestId, getByDisplayValue, getByText } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[0]);
 
       const protocolSelect = getByDisplayValue("OIDC");
       fireEvent.change(protocolSelect, { target: { value: "saml" } });
@@ -546,15 +538,13 @@ describe("OrgSettingsPage", () => {
         data: { ...mockSSOConfig, protocol: "saml" },
       });
 
-      const { getByTestId, getByDisplayValue, getByText, getAllByText } = renderPage();
+      const { getByTestId, getByDisplayValue, getByText } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[0]);
 
       const protocolSelect = getByDisplayValue("SAML 2.0");
       fireEvent.change(protocolSelect, { target: { value: "oidc" } });
@@ -570,15 +560,13 @@ describe("OrgSettingsPage", () => {
       const savedConfig = { ...mockSSOConfig, updated_at: "2024-01-02" };
       mockOrgsApi.updateSSOConfig.mockResolvedValue({ data: savedConfig });
 
-      const { getByTestId, getByText, getAllByText } = renderPage();
+      const { getByTestId, getByText } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[0]);
       fireEvent.submit(getByTestId("sso-form"));
 
       await waitFor(() => {
@@ -599,15 +587,13 @@ describe("OrgSettingsPage", () => {
       });
       mockOrgsApi.updateSSOConfig.mockResolvedValue({ data: mockSSOConfig });
 
-      const { getByTestId, getByDisplayValue, getByPlaceholderText, getAllByText } = renderPage();
+      const { getByTestId, getByDisplayValue, getByPlaceholderText } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[0]);
 
       const protocolSelect = getByDisplayValue("SAML 2.0");
       expect(protocolSelect).toBeInTheDocument();
@@ -637,15 +623,13 @@ describe("OrgSettingsPage", () => {
     it("shows error toast when SSO save fails", async () => {
       mockOrgsApi.updateSSOConfig.mockRejectedValue(new Error("Save failed"));
 
-      const { getByTestId, getByText, getAllByText } = renderPage();
+      const { getByTestId, getByText } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[0]);
       fireEvent.submit(getByTestId("sso-form"));
 
       await waitFor(() => {
@@ -656,15 +640,13 @@ describe("OrgSettingsPage", () => {
 
   describe("12. SSO tab: enable/disable toggle", () => {
     it("toggles SSO enabled checkbox", async () => {
-      const { getByTestId, getByRole, getAllByText } = renderPage();
+      const { getByTestId, getByRole } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[0]);
 
       const enableCheckbox = getByRole("checkbox", { name: /enable sso/i });
       expect(enableCheckbox).toBeChecked();
@@ -831,15 +813,13 @@ describe("OrgSettingsPage", () => {
         data: { ...mockSSOConfig, scim_enabled: true },
       });
 
-      const { getByTestId, getByText, getAllByText } = renderPage();
+      const { getByTestId, getByText } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[editButtons.length - 1]);
 
       expect(getByText("Regenerate Token")).toBeInTheDocument();
       expect(getByTestId("revoke-scim-token")).toBeInTheDocument();
@@ -866,6 +846,8 @@ describe("OrgSettingsPage", () => {
       });
 
       expect(getByText("SCIM token generated")).toBeInTheDocument();
+      expect(getByTestId("scim-token-display")).toBeInTheDocument();
+      expect(getByText("scim-secret-token-abc123")).toBeInTheDocument();
     });
 
     it("shows error toast when generation fails", async () => {
@@ -893,15 +875,13 @@ describe("OrgSettingsPage", () => {
       });
       mockOrgsApi.revokeScimToken.mockResolvedValue(undefined);
 
-      const { getByTestId, getByText, getAllByText } = renderPage();
+      const { getByTestId, getByText } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[editButtons.length - 1]);
       fireEvent.click(getByTestId("revoke-scim-token"));
 
       await waitFor(() => {
@@ -918,15 +898,13 @@ describe("OrgSettingsPage", () => {
       });
       mockOrgsApi.revokeScimToken.mockRejectedValue(new Error("Failed"));
 
-      const { getByTestId, getByText, getAllByText } = renderPage();
+      const { getByTestId, getByText } = renderPage();
 
       await waitFor(() => {
         expect(mockOrgsApi.getSSOConfig).toHaveBeenCalled();
       });
 
       fireEvent.click(getByTestId("tab-sso"));
-      const editButtons = getAllByText("Edit");
-      fireEvent.click(editButtons[editButtons.length - 1]);
       fireEvent.click(getByTestId("revoke-scim-token"));
 
       await waitFor(() => {

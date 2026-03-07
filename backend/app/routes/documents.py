@@ -1,6 +1,6 @@
-"""Document CRUD routes: create, list, get, update, delete, restore, trash, hard-delete, ACL, image upload."""
+"""Document CRUD routes: create, list, get, update, delete, restore, trash, hard-delete, ACL."""
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import get_current_user
 from app.models.document import DocumentCreate, DocumentRead, DocumentUpdate
@@ -77,21 +77,6 @@ async def list_trash(
         )
         for d in docs
     ]
-
-
-@router.post("/{doc_id}/images")
-async def upload_image(
-    doc_id: str,
-    file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
-):
-    """Upload an image for a document. Requires EDIT permission.
-
-    The image is stored in S3 with an unguessable UUID-based key
-    and served via the /media proxy route.
-    """
-    contents = await file.read()
-    return await document_service.upload_document_image(doc_id, user, file.filename or "image.png", contents)
 
 
 @router.get("/{doc_id}", response_model=DocumentRead)

@@ -5,17 +5,14 @@ Org admin routes require the user to be an admin of the target organization.
 Member routes only require the user to belong to the target organization.
 """
 
-import re
 import secrets
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 
 from app.auth.dependencies import get_current_user, get_org_admin_user, get_super_admin_user
 from app.auth.scim_auth import hash_scim_token
-from app.config import settings
-from app.models.group import Group, GroupMembership, GroupRead
 from app.models.org_sso_config import OrgSSOConfig, OrgSSOConfigRead, OrgSSOConfigUpdate
 from app.models.organization import (
     AddMemberPayload,
@@ -89,32 +86,6 @@ async def list_orgs(user: User = Depends(get_super_admin_user)):
     return result
 
 
-@router.get("/{org_id}/groups", response_model=list[GroupRead])
-async def search_groups(
-    org_id: str,
-    q: str = "",
-    user: User = Depends(get_current_user),
-):
-    """Search groups by name within an organization. Any org member can search."""
-    if user.org_id != org_id:
-        raise HTTPException(status_code=403, detail="Not a member of this organization")
-
-    if q:
-        escaped = re.escape(q)
-        groups = await Group.find(
-            Group.org_id == org_id,
-            {"name": {"$regex": escaped, "$options": "i"}},
-        ).to_list()
-    else:
-        groups = await Group.find(Group.org_id == org_id).to_list()
-
-    result = []
-    for g in groups:
-        count = await GroupMembership.find(GroupMembership.group_id == str(g.id)).count()
-        result.append(GroupRead.from_doc(g, member_count=count))
-    return result
-
-
 @router.get("/{org_id}", response_model=OrganizationRead)
 async def get_org(org_id: str, user: User = Depends(get_org_admin_user)):
     """Get organization details. Org admin only (must be admin of this org)."""
@@ -161,8 +132,6 @@ async def list_members(org_id: str, user: User = Depends(get_org_admin_user)):
                 avatar_url=u.avatar_url,
                 role=m.role,
                 joined_at=m.joined_at,
-                is_super_admin=u.email in settings.super_admin_emails,
-                auth_provider=u.auth_provider,
             )
         )
     return result
@@ -352,30 +321,3 @@ async def revoke_scim_token(
     cfg.scim_enabled = False
     cfg.touch()
     await cfg.save()
-
-
-# ---------------------------------------------------------------------------
-# Logo upload/delete (org admin)
-# ---------------------------------------------------------------------------
-
-
-@router.post("/{org_id}/logo", response_model=OrganizationRead)
-async def upload_logo(
-    org_id: str,
-    file: UploadFile = File(...),
-    user: User = Depends(get_org_admin_user),
-):
-    """Upload or replace the organization logo. Max 2MB. PNG/JPG/SVG/WebP."""
-    contents = await file.read()
-    org = await org_service.upload_org_logo(org_id, file.filename or "logo.png", contents)
-    count = await org_service.get_org_member_count(org_id)
-    return OrganizationRead.from_doc(org, member_count=count)
-
-
-@router.delete("/{org_id}/logo", status_code=204)
-async def delete_logo(
-    org_id: str,
-    user: User = Depends(get_org_admin_user),
-):
-    """Remove the organization logo."""
-    await org_service.delete_org_logo(org_id)

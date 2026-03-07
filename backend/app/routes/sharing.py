@@ -1,12 +1,10 @@
 """Sharing routes: collaborator management, general access, shared/recent docs list."""
 
-from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user
-from app.models.document import Document_, DocumentRead
+from app.models.document import DocumentRead
 from app.models.document_view import RecentlyViewedRead
-from app.models.group import AddGroupCollaboratorPayload, GroupCollaboratorRead
 from app.models.share_link import (
     CollaboratorAdd,
     CollaboratorRead,
@@ -14,7 +12,7 @@ from app.models.share_link import (
     SharedDocumentRead,
 )
 from app.models.user import User
-from app.services import group_sharing_service, share_service
+from app.services import share_service
 
 router = APIRouter(tags=["sharing"])
 
@@ -215,64 +213,3 @@ async def list_recently_viewed(
         )
         for item in items
     ]
-
-
-# ---------------------------------------------------------------------------
-# Group collaborators (documents)
-# ---------------------------------------------------------------------------
-
-
-@router.post(
-    "/api/documents/{doc_id}/group-collaborators",
-    response_model=GroupCollaboratorRead,
-    status_code=201,
-)
-async def add_document_group_collaborator(
-    doc_id: str,
-    payload: AddGroupCollaboratorPayload,
-    user: User = Depends(get_current_user),
-):
-    """Add a group as a collaborator on a document. Owner only."""
-    doc = await Document_.get(PydanticObjectId(doc_id))
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    return await group_sharing_service.add_group_collaborator(
-        "document", doc_id, doc.owner_id, user, payload.group_id, payload.permission
-    )
-
-
-@router.get(
-    "/api/documents/{doc_id}/group-collaborators",
-    response_model=list[GroupCollaboratorRead],
-)
-async def list_document_group_collaborators(
-    doc_id: str,
-    user: User = Depends(get_current_user),
-):
-    """List groups that have access to a document. Requires VIEW access."""
-    doc = await Document_.get(PydanticObjectId(doc_id))
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    perm = await share_service.get_user_permission(doc_id, user)
-    if perm is None:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No access to this document",
-        )
-    return await group_sharing_service.list_group_collaborators("document", doc_id)
-
-
-@router.delete(
-    "/api/documents/{doc_id}/group-collaborators/{group_id}",
-    status_code=204,
-)
-async def remove_document_group_collaborator(
-    doc_id: str,
-    group_id: str,
-    user: User = Depends(get_current_user),
-):
-    """Remove a group's access to a document. Owner only."""
-    doc = await Document_.get(PydanticObjectId(doc_id))
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    await group_sharing_service.remove_group_collaborator("document", doc_id, doc.owner_id, str(user.id), group_id)

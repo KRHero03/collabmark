@@ -46,9 +46,7 @@ vi.mock("../hooks/useAuth", () => ({ useAuth: () => ({ user: mockUser }) }));
 
 // Mock useToast
 const mockAddToast = vi.fn();
-vi.mock("../hooks/useToast", () => ({
-  useToast: () => ({ toasts: [], addToast: mockAddToast, removeToast: vi.fn() }),
-}));
+vi.mock("../hooks/useToast", () => ({ useToast: () => ({ addToast: mockAddToast }) }));
 
 // Mock usePresence
 vi.mock("../hooks/usePresence", () => ({ usePresence: () => [] }));

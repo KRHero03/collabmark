@@ -13,10 +13,9 @@ from app.models.folder import (
     RecentlyViewedFolderRead,
     SharedFolderRead,
 )
-from app.models.group import AddGroupCollaboratorPayload, GroupCollaboratorRead
 from app.models.share_link import CollaboratorAdd, CollaboratorRead
 from app.models.user import User
-from app.services import folder_service, group_sharing_service
+from app.services import folder_service
 from app.services.acl_service import get_acl_summary
 from app.utils.owner_resolver import resolve_owner
 
@@ -277,52 +276,3 @@ async def get_folder_acl(
         }
         for e in entries
     ]
-
-
-# ---------------------------------------------------------------------------
-# Group collaborators (folders)
-# ---------------------------------------------------------------------------
-
-
-@router.post(
-    "/{folder_id}/group-collaborators",
-    response_model=GroupCollaboratorRead,
-    status_code=201,
-)
-async def add_folder_group_collaborator(
-    folder_id: str,
-    payload: AddGroupCollaboratorPayload,
-    user: User = Depends(get_current_user),
-):
-    """Add a group as a collaborator on a folder. Owner only."""
-    folder = await folder_service.get_folder(folder_id, user)
-    return await group_sharing_service.add_group_collaborator(
-        "folder", folder_id, folder.owner_id, user, payload.group_id, payload.permission
-    )
-
-
-@router.get(
-    "/{folder_id}/group-collaborators",
-    response_model=list[GroupCollaboratorRead],
-)
-async def list_folder_group_collaborators(
-    folder_id: str,
-    user: User = Depends(get_current_user),
-):
-    """List groups that have access to a folder. Requires VIEW access."""
-    await folder_service.get_folder(folder_id, user)
-    return await group_sharing_service.list_group_collaborators("folder", folder_id)
-
-
-@router.delete(
-    "/{folder_id}/group-collaborators/{group_id}",
-    status_code=204,
-)
-async def remove_folder_group_collaborator(
-    folder_id: str,
-    group_id: str,
-    user: User = Depends(get_current_user),
-):
-    """Remove a group's access to a folder. Owner only."""
-    folder = await folder_service.get_folder(folder_id, user)
-    await group_sharing_service.remove_group_collaborator("folder", folder_id, folder.owner_id, str(user.id), group_id)

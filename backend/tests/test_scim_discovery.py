@@ -71,11 +71,9 @@ class TestResourceTypes:
         response = await async_client.get("/scim/v2/ResourceTypes")
         assert response.status_code == 200
         data = response.json()
-        assert data["totalResults"] == 2
-        assert len(data["Resources"]) == 2
-        names = {r["name"] for r in data["Resources"]}
-        assert "User" in names
-        assert "Group" in names
+        assert data["totalResults"] == 1
+        assert len(data["Resources"]) == 1
+        assert data["Resources"][0]["name"] == "User"
 
     @pytest.mark.asyncio
     async def test_list_no_auth_required(self, async_client: AsyncClient):
@@ -95,20 +93,8 @@ class TestResourceTypes:
         assert data["meta"]["location"] == "/scim/v2/ResourceTypes/User"
 
     @pytest.mark.asyncio
-    async def test_get_group_resource_type(self, async_client: AsyncClient):
-        response = await async_client.get("/scim/v2/ResourceTypes/Group")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["id"] == "Group"
-        assert data["name"] == "Group"
-        assert data["endpoint"] == "/Groups"
-        assert data["schema"] == "urn:ietf:params:scim:schemas:core:2.0:Group"
-        assert data["meta"]["resourceType"] == "ResourceType"
-        assert data["meta"]["location"] == "/scim/v2/ResourceTypes/Group"
-
-    @pytest.mark.asyncio
     async def test_get_unknown_resource_type_returns_404(self, async_client: AsyncClient):
-        response = await async_client.get("/scim/v2/ResourceTypes/UnknownResource")
+        response = await async_client.get("/scim/v2/ResourceTypes/Group")
         assert response.status_code == 404
         data = response.json()
         assert "urn:ietf:params:scim:api:messages:2.0:Error" in data["schemas"]
@@ -131,11 +117,9 @@ class TestSchemas:
         response = await async_client.get("/scim/v2/Schemas")
         assert response.status_code == 200
         data = response.json()
-        assert data["totalResults"] == 2
-        assert len(data["Resources"]) == 2
-        schema_ids = {r["id"] for r in data["Resources"]}
-        assert USER_SCHEMA_URN in schema_ids
-        assert "urn:ietf:params:scim:schemas:core:2.0:Group" in schema_ids
+        assert data["totalResults"] == 1
+        assert len(data["Resources"]) == 1
+        assert data["Resources"][0]["id"] == USER_SCHEMA_URN
 
     @pytest.mark.asyncio
     async def test_list_no_auth_required(self, async_client: AsyncClient):
@@ -165,22 +149,8 @@ class TestSchemas:
         assert data["meta"]["location"] == f"/scim/v2/Schemas/{USER_SCHEMA_URN}"
 
     @pytest.mark.asyncio
-    async def test_get_group_schema(self, async_client: AsyncClient):
-        group_schema_urn = "urn:ietf:params:scim:schemas:core:2.0:Group"
-        response = await async_client.get(f"/scim/v2/Schemas/{group_schema_urn}")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["id"] == group_schema_urn
-        assert data["name"] == "Group"
-        assert "attributes" in data
-        attr_names = {a["name"] for a in data["attributes"]}
-        assert "displayName" in attr_names
-        assert "members" in attr_names
-        assert "externalId" in attr_names
-
-    @pytest.mark.asyncio
     async def test_get_unknown_schema_returns_404(self, async_client: AsyncClient):
-        response = await async_client.get("/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:Unknown")
+        response = await async_client.get("/scim/v2/Schemas/urn:ietf:params:scim:schemas:core:2.0:Group")
         assert response.status_code == 404
         data = response.json()
         assert "urn:ietf:params:scim:api:messages:2.0:Error" in data["schemas"]

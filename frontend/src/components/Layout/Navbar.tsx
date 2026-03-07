@@ -55,16 +55,6 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
             <Link to="/" className="flex items-center gap-2 text-lg font-bold">
               <FileText className="h-6 w-6 text-[var(--color-primary)]" />
               <span className="hidden sm:inline">CollabMark</span>
-              {user?.org_name && !user?.is_super_admin && (
-                <span className="hidden items-center gap-1.5 text-sm text-[var(--color-text-muted)] sm:flex">
-                  <span className="text-[var(--color-border)]">|</span>
-                  {user.org_logo_url ? (
-                    <img src={user.org_logo_url} alt={user.org_name} className="h-6 w-6 rounded object-cover" />
-                  ) : (
-                    <span>{user.org_name}</span>
-                  )}
-                </span>
-              )}
             </Link>
           </div>
 
@@ -88,7 +78,7 @@ export function Navbar({ activeTab, onTabChange }: NavbarProps) {
                   API Docs
                 </Link>
 
-                {user.org_id && user.org_role === "admin" && !user.is_super_admin && (
+                {user.org_id && (
                   <Link
                     to={`/org/${user.org_id}/settings`}
                     className="flex items-center gap-1 text-sm text-[var(--color-text-muted)] hover:text-[var(--color-text)]"

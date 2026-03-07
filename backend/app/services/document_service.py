@@ -1,8 +1,6 @@
 """Document CRUD business logic: create, get, list, update, soft-delete, restore, hard-delete."""
 
 import logging
-import uuid
-from pathlib import Path
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
@@ -14,13 +12,10 @@ from app.models.document_version import DocumentVersion
 from app.models.document_view import DocumentView
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
-from app.services import blob_storage
 
 logger = logging.getLogger(__name__)
 
 MAX_DOCUMENTS_PER_USER = 10_000
-IMAGE_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
-IMAGE_MAX_SIZE = 5 * 1024 * 1024  # 5MB
 
 
 async def create_document(owner: User, payload: DocumentCreate) -> Document_:
@@ -69,36 +64,6 @@ async def create_document(owner: User, payload: DocumentCreate) -> Document_:
     )
     await doc.insert()
     return doc
-
-
-async def upload_document_image(doc_id: str, user: User, filename: str, contents: bytes) -> dict[str, str]:
-    """Upload an image for a document. Requires EDIT permission.
-
-    Returns:
-        Dict with "url" and "name" of the stored image.
-
-    Raises:
-        HTTPException: 400 for invalid file type/size, 403/404 for access.
-    """
-    ext = Path(filename).suffix.lower()
-    if ext not in IMAGE_ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported image type. Allowed: {', '.join(IMAGE_ALLOWED_EXTENSIONS)}",
-        )
-    if len(contents) > IMAGE_MAX_SIZE:
-        raise HTTPException(status_code=400, detail="Image too large. Maximum size is 5MB.")
-
-    doc = await _find_doc(doc_id)
-    await _assert_access(doc, user, Permission.EDIT)
-
-    image_name = f"{uuid.uuid4().hex}{ext}"
-    key = f"documents/{doc_id}/{image_name}"
-    content_type = blob_storage.MIME_TYPES.get(ext, "application/octet-stream")
-    blob_storage.upload(key, contents, content_type)
-
-    url = blob_storage.get_public_url(key)
-    return {"url": url, "name": image_name}
 
 
 async def get_document(doc_id: str, user: User) -> Document_:
@@ -234,8 +199,6 @@ async def hard_delete_document(doc_id: str, user: User) -> None:
 
     if MongoYStore._db is not None:
         await MongoYStore._db["crdt_updates"].delete_many({"room": str_id})
-
-    blob_storage.delete_prefix(f"documents/{str_id}/")
 
     await doc.delete()
     logger.info("Hard-deleted document %s and related data", str_id)

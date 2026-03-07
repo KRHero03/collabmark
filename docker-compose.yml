@@ -11,18 +11,6 @@ services:
     ports:
       - "6379:6379"
 
-  minio:
-    image: minio/minio:latest
-    ports:
-      - "9002:9000"
-      - "9003:9001"
-    volumes:
-      - minio_data:/data
-    environment:
-      MINIO_ROOT_USER: collabmark
-      MINIO_ROOT_PASSWORD: collabmark-secret
-    command: server /data --console-address ":9001"
-
   app:
     build: .
     ports:
@@ -30,17 +18,11 @@ services:
     depends_on:
       - mongodb
       - redis
-      - minio
     env_file:
       - .env
     environment:
       - MONGODB_URL=mongodb://mongodb:27017
       - REDIS_URL=redis://redis:6379
-      - S3_ENDPOINT_URL=http://minio:9000
-      - S3_ACCESS_KEY=collabmark
-      - S3_SECRET_KEY=collabmark-secret
-      - S3_BUCKET=collabmark-media
 
 volumes:
   mongo_data:
-  minio_data:

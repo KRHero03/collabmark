@@ -43,10 +43,6 @@ class UserRead(BaseModel):
     org_id: Optional[str] = None
     auth_provider: str = "google"
     created_at: datetime
-    org_role: Optional[str] = None
-    org_name: Optional[str] = None
-    org_logo_url: Optional[str] = None
-    is_super_admin: bool = False
 
     @classmethod
     def from_doc(cls, user: User) -> "UserRead":

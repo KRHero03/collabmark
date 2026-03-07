@@ -26,8 +26,6 @@ import * as Y from "yjs";
 import type { Awareness } from "y-protocols/awareness";
 import type { AnchorStatus } from "../../hooks/useCommentAnchors";
 import { markdownKeymap } from "./markdownShortcuts";
-import { documentsApi } from "../../lib/api";
-import { useToast } from "../../hooks/useToast";
 
 /** Selection range in absolute character offsets. */
 export interface EditorSelection {
@@ -49,8 +47,6 @@ interface MarkdownEditorProps {
   ytext: Y.Text;
   /** The Yjs awareness instance for cursor presence. */
   awareness: Awareness;
-  /** Document ID for image uploads. */
-  docId?: string;
   /** The current user's display name (shown in remote cursors). */
   userName?: string;
   /** The current user's avatar URL for presence display. */
@@ -115,7 +111,6 @@ function buildDecorations(ranges: CommentRange[], docLength: number): Decoration
 export function MarkdownEditor({
   ytext,
   awareness,
-  docId,
   userName = "Anonymous",
   userAvatarUrl,
   userColor,
@@ -132,12 +127,6 @@ export function MarkdownEditor({
     y: number;
     selection: EditorSelection;
   } | null>(null);
-  const { addToast } = useToast();
-
-  const docIdRef = useRef(docId);
-  docIdRef.current = docId;
-  const addToastRef = useRef(addToast);
-  addToastRef.current = addToast;
 
   const onSelectionChangeRef = useRef(onSelectionChange);
   onSelectionChangeRef.current = onSelectionChange;
@@ -194,59 +183,13 @@ export function MarkdownEditor({
 
     const readOnlyExtensions = readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : [];
 
-    const imagePasteHandler = EditorView.domEventHandlers({
-      paste(event, view) {
-        const items = event.clipboardData?.items;
-        if (!items) return false;
-
-        let imageFile: File | null = null;
-        for (let i = 0; i < items.length; i++) {
-          if (items[i].type.startsWith("image/")) {
-            imageFile = items[i].getAsFile();
-            break;
-          }
-        }
-        if (!imageFile || !docIdRef.current) return false;
-
-        event.preventDefault();
-
-        const placeholder = "![Uploading image...]()";
-        const pos = view.state.selection.main.head;
-        view.dispatch({ changes: { from: pos, insert: placeholder } });
-
-        const file = imageFile;
-        const currentDocId = docIdRef.current;
-        documentsApi
-          .uploadImage(currentDocId, file)
-          .then(({ data }) => {
-            const doc = view.state.doc.toString();
-            const idx = doc.indexOf(placeholder);
-            if (idx !== -1) {
-              const replacement = `![image](${data.url})`;
-              view.dispatch({ changes: { from: idx, to: idx + placeholder.length, insert: replacement } });
-            }
-            addToastRef.current("Image uploaded successfully", "success");
-          })
-          .catch(() => {
-            const doc = view.state.doc.toString();
-            const idx = doc.indexOf(placeholder);
-            if (idx !== -1) {
-              view.dispatch({ changes: { from: idx, to: idx + placeholder.length } });
-            }
-            addToastRef.current("Failed to upload image", "error");
-          });
-
-        return true;
-      },
-    });
-
     const state = EditorState.create({
       doc: ytext.toString(),
       extensions: [
         basicSetup,
         markdown({ codeLanguages: languages }),
         EditorView.lineWrapping,
-        ...(!readOnly ? [markdownKeymap, imagePasteHandler] : []),
+        ...(!readOnly ? [markdownKeymap] : []),
         yCollab(ytext, awareness),
         commentDecoField,
         selectionListener,
