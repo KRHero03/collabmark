@@ -35,6 +35,7 @@ import { useCommentPositions } from "../hooks/useCommentPositions";
 import { useToast } from "../hooks/useToast";
 import { usePresence } from "../hooks/usePresence";
 import { detectNeedsLandscape } from "../lib/pdfExport";
+import { ToastContainer } from "../components/Home/ToastContainer";
 
 /** Encode a Uint8Array to a Base64 string. */
 function uint8ToBase64(bytes: Uint8Array): string {
@@ -575,6 +576,7 @@ ${previewEl.innerHTML}
                 <MarkdownEditor
                   ytext={ytext}
                   awareness={provider.awareness}
+                  docId={id}
                   userName={user?.name}
                   userAvatarUrl={user?.avatar_url}
                   onViewReady={setEditorView}
@@ -627,6 +629,7 @@ ${previewEl.innerHTML}
               <MarkdownEditor
                 ytext={ytext}
                 awareness={provider.awareness}
+                docId={id}
                 userName={user?.name}
                 userAvatarUrl={user?.avatar_url}
                 onViewReady={setEditorView}
@@ -693,6 +696,8 @@ ${previewEl.innerHTML}
             ownerName={ownerName}
             ownerAvatarUrl={ownerAvatarUrl}
             onGeneralAccessChange={setGeneralAccess}
+            orgName={user?.org_name}
+            orgId={user?.org_id}
           />
           <VersionHistory
             docId={id}
@@ -703,6 +708,7 @@ ${previewEl.innerHTML}
           />
         </>
       )}
+      <ToastContainer />
     </div>
   );
 }

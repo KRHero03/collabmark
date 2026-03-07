@@ -229,10 +229,11 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 | Editor      | CodeMirror 6 (core API + yCollab)                 |
 | Auth        | Google OAuth2 (authlib), JWT (python-jose), API keys |
 | Diffing     | diff (jsdiff) for version history diff view       |
+| Blob Storage| MinIO (S3-compatible), boto3 client                |
 | Message Bus | Redis (future: pub/sub for WS horizontal scaling) |
 | Testing BE  | pytest, pytest-asyncio, httpx, mongomock-motor    |
 | Testing FE  | Vitest, React Testing Library, jsdom              |
-| Deployment  | Docker, Railway (with MongoDB & Redis add-ons), Gunicorn |
+| Deployment  | Docker, Railway (with MongoDB, Redis & MinIO/S3 add-ons), Gunicorn |
 
 ## Project Structure
 
@@ -533,3 +534,14 @@ are shown in a separate "Orphaned" section at the bottom of the panel.
 
 ### CRDT & Real-time
 - **Content persistence on deploy**: `pycrdt-websocket`'s `YRoom` must explicitly load existing data from `MongoYStore` when a room is opened. Without this, deployments cause content loss until the room is re-opened by a client with local state.
+
+### Blob Storage (S3/MinIO)
+- **Local dev**: MinIO container in `docker-compose.yml` (API: port 9002, Console: port 9003). Default credentials: `collabmark` / `collabmark-secret`.
+- **Production (Railway)**: Add an S3-compatible storage service. Required environment variables:
+  - `S3_ENDPOINT_URL` -- MinIO or S3-compatible endpoint (e.g. `https://minio-production.railway.internal:9000` or AWS S3 URL)
+  - `S3_ACCESS_KEY` -- Access key / AWS access key ID
+  - `S3_SECRET_KEY` -- Secret key / AWS secret access key
+  - `S3_BUCKET` -- Bucket name (default: `collabmark-media`)
+  - `S3_REGION` -- Region (default: `us-east-1`)
+- **Architecture**: `blob_storage.py` service wraps boto3. Uploads go to S3, served via `/media/{key}` proxy route in `main.py`. Bucket is auto-created if missing.
+- **MinIO console**: Accessible at `http://localhost:9003` for local debugging.

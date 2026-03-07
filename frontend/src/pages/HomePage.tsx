@@ -934,6 +934,8 @@ export function HomePage() {
           ownerName={shareDoc.owner_name}
           ownerAvatarUrl={shareDoc.owner_avatar_url}
           onGeneralAccessChange={(ga) => setShareDoc((prev) => (prev ? { ...prev, general_access: ga } : prev))}
+          orgName={user?.org_name}
+          orgId={user?.org_id}
         />
       )}
 
@@ -948,6 +950,8 @@ export function HomePage() {
           ownerName={shareFolder.owner_name}
           ownerAvatarUrl={shareFolder.owner_avatar_url}
           onGeneralAccessChange={(ga) => setShareFolder((prev) => (prev ? { ...prev, general_access: ga } : prev))}
+          orgName={user?.org_name}
+          orgId={user?.org_id}
         />
       )}
 

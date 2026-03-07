@@ -21,7 +21,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 def _error_redirect(code: str) -> RedirectResponse:
     """Build a redirect to the frontend with a generic error query param."""
-    return RedirectResponse(url=f"{settings.frontend_url}?error={code}")
+    return RedirectResponse(url=f"{settings.frontend_url}?error={code}", status_code=302)
 
 
 async def _get_enabled_sso_config(org_id: str) -> OrgSSOConfig | None:
@@ -206,7 +206,7 @@ async def saml_callback(request: Request):
     user = await find_or_create_sso_user(result, org, SSOProtocol.SAML)
     access_token = create_access_token(str(user.id))
 
-    response = RedirectResponse(url=settings.frontend_url)
+    response = RedirectResponse(url=settings.frontend_url, status_code=302)
     set_auth_cookie(response, access_token)
     return response
 
@@ -294,6 +294,6 @@ async def oidc_callback(request: Request, code: str = Query(default=""), state: 
     user = await find_or_create_sso_user(result, org, SSOProtocol.OIDC)
     access_token = create_access_token(str(user.id))
 
-    response = RedirectResponse(url=settings.frontend_url)
+    response = RedirectResponse(url=settings.frontend_url, status_code=302)
     set_auth_cookie(response, access_token)
     return response

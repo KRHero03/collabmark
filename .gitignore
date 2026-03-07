@@ -4,6 +4,7 @@ __pycache__/
 .env
 .env.local
 .env.*.local
+.env.authentik
 .venv/
 venv/
 node_modules/

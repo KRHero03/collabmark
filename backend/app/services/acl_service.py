@@ -25,6 +25,7 @@ from bson.errors import InvalidId
 
 from app.models.document import Document_, GeneralAccess
 from app.models.folder import Folder, FolderAccess
+from app.models.group import DocumentGroupAccess, FolderGroupAccess, GroupMembership
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 
@@ -145,7 +146,20 @@ async def all_children_owned_by(folder_id: str, user_id: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-async def _get_inherited_permission(folder_id: str, user_id: str, user_org_id: str | None = None) -> Permission | None:
+async def get_user_group_ids(user_id: str, org_id: str | None = None) -> list[str]:
+    """Return all group IDs the user belongs to within the given org."""
+    if not org_id:
+        return []
+    memberships = await GroupMembership.find(GroupMembership.user_id == user_id).to_list()
+    return [m.group_id for m in memberships]
+
+
+async def _get_inherited_permission(
+    folder_id: str,
+    user_id: str,
+    user_org_id: str | None = None,
+    group_ids: list[str] | None = None,
+) -> Permission | None:
     """Walk up the folder chain looking for an explicit FolderAccess or general_access.
 
     Org boundary is enforced on general_access: if a folder belongs to an org,
@@ -169,6 +183,19 @@ async def _get_inherited_permission(folder_id: str, user_id: str, user_org_id: s
         )
         if access is not None:
             return access.permission
+
+        # Check FolderGroupAccess for user's groups at this folder level
+        if group_ids is None:
+            group_ids = await get_user_group_ids(user_id, user_org_id)
+        if group_ids:
+            group_accesses = await FolderGroupAccess.find(
+                FolderGroupAccess.folder_id == current_id,
+                {"group_id": {"$in": group_ids}},
+            ).to_list()
+            if group_accesses:
+                if any(ga.permission == Permission.EDIT for ga in group_accesses):
+                    return Permission.EDIT
+                return Permission.VIEW
 
         if org_allows_general_access(getattr(folder, "org_id", None), user_org_id):
             if folder.general_access == GeneralAccess.ANYONE_EDIT:
@@ -211,8 +238,20 @@ async def get_base_permission(
         if da is not None:
             return da.permission
 
+        # Check DocumentGroupAccess for user's groups
+        group_ids = await get_user_group_ids(user_id, user_org_id) if user_org_id else []
+        if group_ids:
+            group_accesses = await DocumentGroupAccess.find(
+                DocumentGroupAccess.document_id == entity_id,
+                {"group_id": {"$in": group_ids}},
+            ).to_list()
+            if group_accesses:
+                if any(ga.permission == Permission.EDIT for ga in group_accesses):
+                    return Permission.EDIT
+                return Permission.VIEW
+
         if doc.folder_id is not None:
-            perm = await _get_inherited_permission(doc.folder_id, user_id, user_org_id)
+            perm = await _get_inherited_permission(doc.folder_id, user_id, user_org_id, group_ids)
             if perm is not None:
                 return perm
 
@@ -242,8 +281,20 @@ async def get_base_permission(
     if fa is not None:
         return fa.permission
 
+    # Check FolderGroupAccess for user's groups
+    group_ids = await get_user_group_ids(user_id, user_org_id) if user_org_id else []
+    if group_ids:
+        group_accesses = await FolderGroupAccess.find(
+            FolderGroupAccess.folder_id == entity_id,
+            {"group_id": {"$in": group_ids}},
+        ).to_list()
+        if group_accesses:
+            if any(ga.permission == Permission.EDIT for ga in group_accesses):
+                return Permission.EDIT
+            return Permission.VIEW
+
     if folder.parent_id is not None:
-        return await _get_inherited_permission(folder.parent_id, user_id, user_org_id)
+        return await _get_inherited_permission(folder.parent_id, user_id, user_org_id, group_ids)
 
     if org_allows_general_access(getattr(folder, "org_id", None), user_org_id):
         if folder.general_access == GeneralAccess.ANYONE_EDIT:
@@ -433,10 +484,22 @@ async def get_acl_summary(
         accesses = await DocumentAccess.find(DocumentAccess.document_id == entity_id).to_list()
         for a in accesses:
             await _add_user(a.user_id)
+        # Collect group-based access
+        group_accesses = await DocumentGroupAccess.find(DocumentGroupAccess.document_id == entity_id).to_list()
+        for ga in group_accesses:
+            group_members = await GroupMembership.find(GroupMembership.group_id == ga.group_id).to_list()
+            for gm in group_members:
+                await _add_user(gm.user_id)
     else:
         accesses = await FolderAccess.find(FolderAccess.folder_id == entity_id).to_list()
         for a in accesses:
             await _add_user(a.user_id)
+        # Collect group-based access
+        group_accesses = await FolderGroupAccess.find(FolderGroupAccess.folder_id == entity_id).to_list()
+        for ga in group_accesses:
+            group_members = await GroupMembership.find(GroupMembership.group_id == ga.group_id).to_list()
+            for gm in group_members:
+                await _add_user(gm.user_id)
 
     if parent_folder_id:
         await _collect_folder_chain_users(parent_folder_id, seen_user_ids, entity_type, entity_id, entries)
