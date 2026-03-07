@@ -37,10 +37,11 @@ async def upload_org_logo(org_id: str, filename: str, contents: bytes) -> Organi
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}",
+            detail=f"Unsupported file type '{ext or '(none)'}'. Allowed formats: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
+    size_mb = len(contents) / (1024 * 1024)
     if len(contents) > MAX_LOGO_SIZE:
-        raise HTTPException(status_code=400, detail="File too large. Maximum size is 2MB.")
+        raise HTTPException(status_code=400, detail=f"File too large ({size_mb:.1f}MB). Maximum logo size is 2MB.")
 
     org = await get_org(org_id)
 
@@ -48,7 +49,13 @@ async def upload_org_logo(org_id: str, filename: str, contents: bytes) -> Organi
 
     content_type = blob_storage.MIME_TYPES.get(ext, "application/octet-stream")
     key = f"logos/{org_id}{ext}"
-    blob_storage.upload(key, contents, content_type)
+    try:
+        blob_storage.upload(key, contents, content_type)
+    except Exception:
+        logger.exception("S3 upload failed for key %s", key)
+        raise HTTPException(
+            status_code=502, detail="Image storage is temporarily unavailable. Please try again later."
+        ) from None
 
     org.logo_url = blob_storage.get_public_url(key)
     org.touch()

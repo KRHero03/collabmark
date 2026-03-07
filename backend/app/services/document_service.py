@@ -84,10 +84,11 @@ async def upload_document_image(doc_id: str, user: User, filename: str, contents
     if ext not in IMAGE_ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported image type. Allowed: {', '.join(IMAGE_ALLOWED_EXTENSIONS)}",
+            detail=f"Unsupported image type '{ext or '(none)'}'. Allowed formats: {', '.join(sorted(IMAGE_ALLOWED_EXTENSIONS))}",
         )
+    size_mb = len(contents) / (1024 * 1024)
     if len(contents) > IMAGE_MAX_SIZE:
-        raise HTTPException(status_code=400, detail="Image too large. Maximum size is 5MB.")
+        raise HTTPException(status_code=400, detail=f"Image too large ({size_mb:.1f}MB). Maximum size is 5MB.")
 
     doc = await _find_doc(doc_id)
     await _assert_access(doc, user, Permission.EDIT)
@@ -95,7 +96,13 @@ async def upload_document_image(doc_id: str, user: User, filename: str, contents
     image_name = f"{uuid.uuid4().hex}{ext}"
     key = f"documents/{doc_id}/{image_name}"
     content_type = blob_storage.MIME_TYPES.get(ext, "application/octet-stream")
-    blob_storage.upload(key, contents, content_type)
+    try:
+        blob_storage.upload(key, contents, content_type)
+    except Exception:
+        logger.exception("S3 upload failed for key %s", key)
+        raise HTTPException(
+            status_code=502, detail="Image storage is temporarily unavailable. Please try again later."
+        ) from None
 
     url = blob_storage.get_public_url(key)
     return {"url": url, "name": image_name}
