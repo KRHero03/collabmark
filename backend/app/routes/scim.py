@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from app.auth.scim_auth import get_scim_org
+from app.models.group import GroupMembership
 from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization
 from app.services import scim_service
@@ -84,6 +85,7 @@ def _scim_response(
 # ========================================================================
 
 SCIM_USER_SCHEMA_URN = "urn:ietf:params:scim:schemas:core:2.0:User"
+SCIM_GROUP_SCHEMA_URN = "urn:ietf:params:scim:schemas:core:2.0:Group"
 SCIM_SP_CONFIG_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:ServiceProviderConfig"
 SCIM_RESOURCE_TYPE_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:ResourceType"
 SCIM_SCHEMA_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Schema"
@@ -256,6 +258,54 @@ _USER_SCHEMA_ATTRIBUTES = [
     },
 ]
 
+_GROUP_SCHEMA_ATTRIBUTES = [
+    {
+        "name": "displayName",
+        "type": "string",
+        "multiValued": False,
+        "required": True,
+        "caseExact": False,
+        "mutability": "readWrite",
+        "returned": "always",
+        "uniqueness": "none",
+        "description": "Group display name.",
+    },
+    {
+        "name": "members",
+        "type": "complex",
+        "multiValued": True,
+        "required": False,
+        "mutability": "readWrite",
+        "returned": "default",
+        "uniqueness": "none",
+        "description": "Group members (user references).",
+        "subAttributes": [
+            {
+                "name": "value",
+                "type": "string",
+                "multiValued": False,
+                "required": True,
+                "caseExact": False,
+                "mutability": "readWrite",
+                "returned": "default",
+                "uniqueness": "none",
+                "description": "User ID.",
+            },
+        ],
+    },
+    {
+        "name": "externalId",
+        "type": "string",
+        "multiValued": False,
+        "required": False,
+        "caseExact": True,
+        "mutability": "readWrite",
+        "returned": "default",
+        "uniqueness": "none",
+        "description": "Identifier from the provisioning client (IdP).",
+    },
+]
+
 _SERVICE_PROVIDER_CONFIG: dict[str, Any] = {
     "schemas": [SCIM_SP_CONFIG_SCHEMA],
     "documentationUri": "https://tools.ietf.org/html/rfc7644",
@@ -293,6 +343,19 @@ _USER_RESOURCE_TYPE: dict[str, Any] = {
     },
 }
 
+_GROUP_RESOURCE_TYPE: dict[str, Any] = {
+    "schemas": [SCIM_RESOURCE_TYPE_SCHEMA],
+    "id": "Group",
+    "name": "Group",
+    "endpoint": "/Groups",
+    "description": "Group",
+    "schema": SCIM_GROUP_SCHEMA_URN,
+    "meta": {
+        "resourceType": "ResourceType",
+        "location": "/scim/v2/ResourceTypes/Group",
+    },
+}
+
 _USER_SCHEMA_DEF: dict[str, Any] = {
     "schemas": [SCIM_SCHEMA_SCHEMA],
     "id": SCIM_USER_SCHEMA_URN,
@@ -302,6 +365,18 @@ _USER_SCHEMA_DEF: dict[str, Any] = {
     "meta": {
         "resourceType": "Schema",
         "location": f"/scim/v2/Schemas/{SCIM_USER_SCHEMA_URN}",
+    },
+}
+
+_GROUP_SCHEMA_DEF: dict[str, Any] = {
+    "schemas": [SCIM_SCHEMA_SCHEMA],
+    "id": SCIM_GROUP_SCHEMA_URN,
+    "name": "Group",
+    "description": "Group",
+    "attributes": _GROUP_SCHEMA_ATTRIBUTES,
+    "meta": {
+        "resourceType": "Schema",
+        "location": f"/scim/v2/Schemas/{SCIM_GROUP_SCHEMA_URN}",
     },
 }
 
@@ -318,8 +393,8 @@ async def scim_resource_types() -> JSONResponse:
     return _scim_response(
         {
             "schemas": [scim_service.SCIM_LIST_SCHEMA],
-            "totalResults": 1,
-            "Resources": [_USER_RESOURCE_TYPE],
+            "totalResults": 2,
+            "Resources": [_USER_RESOURCE_TYPE, _GROUP_RESOURCE_TYPE],
         }
     )
 
@@ -329,6 +404,8 @@ async def scim_resource_type(resource_type: str) -> JSONResponse:
     """Return a single resource type by name."""
     if resource_type == "User":
         return _scim_response(_USER_RESOURCE_TYPE)
+    if resource_type == "Group":
+        return _scim_response(_GROUP_RESOURCE_TYPE)
     raise SCIMError(404, f"ResourceType '{resource_type}' not found")
 
 
@@ -338,8 +415,8 @@ async def scim_schemas() -> JSONResponse:
     return _scim_response(
         {
             "schemas": [scim_service.SCIM_LIST_SCHEMA],
-            "totalResults": 1,
-            "Resources": [_USER_SCHEMA_DEF],
+            "totalResults": 2,
+            "Resources": [_USER_SCHEMA_DEF, _GROUP_SCHEMA_DEF],
         }
     )
 
@@ -349,6 +426,8 @@ async def scim_schema(schema_id: str) -> JSONResponse:
     """Return a single schema by its URN."""
     if schema_id == SCIM_USER_SCHEMA_URN:
         return _scim_response(_USER_SCHEMA_DEF)
+    if schema_id == SCIM_GROUP_SCHEMA_URN:
+        return _scim_response(_GROUP_SCHEMA_DEF)
     raise SCIMError(404, f"Schema '{schema_id}' not found")
 
 
@@ -484,6 +563,133 @@ async def scim_delete_user(
     org, _cfg = org_ctx
     org_id = str(org.id)
     await scim_service.delete_scim_user(org_id, user_id)
+
+
+# ========================================================================
+# Group CRUD endpoints
+# ========================================================================
+
+
+@router.post("/Groups")
+async def scim_create_group(
+    request: Request,
+    org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
+) -> JSONResponse:
+    """Provision a new group in the organization.
+
+    Returns:
+        201 with SCIM Group resource + Location header on success.
+    """
+    org, _cfg = org_ctx
+    org_id = str(org.id)
+
+    body = await request.json()
+    group = await scim_service.create_scim_group(org_id, body)
+    members = await GroupMembership.find(GroupMembership.group_id == str(group.id)).to_list()
+    resource = scim_service.group_to_scim(group, org_id, members)
+    location = resource["meta"]["location"]
+    return _scim_response(resource, status_code=201, headers={"Location": location})
+
+
+@router.get("/Groups")
+async def scim_list_groups(
+    request: Request,
+    org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
+) -> JSONResponse:
+    """List or filter groups provisioned in the organization.
+
+    Supports SCIM query parameters: filter, startIndex, count.
+    """
+    org, _cfg = org_ctx
+    org_id = str(org.id)
+
+    params = request.query_params
+    filter_str = params.get("filter")
+    start_index = int(params.get("startIndex", "1"))
+    count = int(params.get("count", "100"))
+
+    result = await scim_service.list_scim_groups(
+        org_id,
+        filter_str=filter_str,
+        start_index=start_index,
+        count=count,
+    )
+    return _scim_response(result)
+
+
+@router.get("/Groups/{group_id}")
+async def scim_get_group(
+    group_id: str,
+    org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
+) -> JSONResponse:
+    """Retrieve a single SCIM group by ID."""
+    org, _cfg = org_ctx
+    org_id = str(org.id)
+
+    group = await scim_service.get_scim_group(org_id, group_id)
+    members = await GroupMembership.find(GroupMembership.group_id == str(group.id)).to_list()
+    resource = scim_service.group_to_scim(group, org_id, members)
+    location = resource.get("meta", {}).get("location", f"/scim/v2/Groups/{group_id}")
+    return _scim_response(resource, headers={"Content-Location": location})
+
+
+@router.put("/Groups/{group_id}")
+async def scim_replace_group(
+    group_id: str,
+    request: Request,
+    org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
+) -> JSONResponse:
+    """Full replacement of a group resource (RFC 7644 Section 3.5.1).
+
+    Returns:
+        200 with updated SCIM Group resource + Content-Location header.
+    """
+    org, _cfg = org_ctx
+    org_id = str(org.id)
+
+    body = await request.json()
+    group = await scim_service.replace_scim_group(org_id, group_id, body)
+    members = await GroupMembership.find(GroupMembership.group_id == str(group.id)).to_list()
+    resource = scim_service.group_to_scim(group, org_id, members)
+    location = resource["meta"]["location"]
+    return _scim_response(resource, headers={"Content-Location": location})
+
+
+@router.patch("/Groups/{group_id}")
+async def scim_update_group(
+    group_id: str,
+    request: Request,
+    org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
+) -> JSONResponse:
+    """Update group attributes via SCIM PATCH operations.
+
+    Returns:
+        Updated SCIM Group resource + Content-Location header.
+    """
+    org, _cfg = org_ctx
+    org_id = str(org.id)
+
+    body = await request.json()
+    group = await scim_service.update_scim_group(org_id, group_id, body)
+    members = await GroupMembership.find(GroupMembership.group_id == str(group.id)).to_list()
+    resource = scim_service.group_to_scim(group, org_id, members)
+    location = resource["meta"]["location"]
+    return _scim_response(resource, headers={"Content-Location": location})
+
+
+@router.delete("/Groups/{group_id}", status_code=204)
+async def scim_delete_group(
+    group_id: str,
+    org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
+) -> None:
+    """Delete a group and all its memberships.
+
+    Returns:
+        204 No Content on success.
+    """
+    org, _cfg = org_ctx
+    org_id = str(org.id)
+    await scim_service.delete_scim_group(org_id, group_id)
 
 
 # ========================================================================

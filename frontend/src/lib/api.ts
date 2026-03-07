@@ -11,6 +11,10 @@ export interface UserProfile {
   name: string;
   avatar_url: string | null;
   org_id?: string | null;
+  org_role?: string | null;
+  org_name?: string | null;
+  org_logo_url?: string | null;
+  is_super_admin?: boolean;
   auth_provider?: string;
   created_at: string;
 }
@@ -119,6 +123,13 @@ export const documentsApi = {
   restore: (id: string) => api.post<MarkdownDocument>(`/documents/${id}/restore`),
   listTrash: () => api.get<MarkdownDocument[]>("/documents/trash"),
   hardDelete: (id: string) => api.delete(`/documents/${id}/permanent`),
+  uploadImage: (docId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string; name: string }>(`/documents/${docId}/images`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
 };
 
 export const foldersApi = {
@@ -145,6 +156,12 @@ export const foldersApi = {
     api.post<Collaborator>(`/folders/${folderId}/collaborators`, data),
   listCollaborators: (folderId: string) => api.get<Collaborator[]>(`/folders/${folderId}/collaborators`),
   removeCollaborator: (folderId: string, userId: string) => api.delete(`/folders/${folderId}/collaborators/${userId}`),
+  addGroupCollaborator: (folderId: string, data: { group_id: string; permission: "view" | "edit" }) =>
+    api.post<GroupCollaborator>(`/folders/${folderId}/group-collaborators`, data),
+  listGroupCollaborators: (folderId: string) =>
+    api.get<GroupCollaborator[]>(`/folders/${folderId}/group-collaborators`),
+  removeGroupCollaborator: (folderId: string, groupId: string) =>
+    api.delete(`/folders/${folderId}/group-collaborators/${groupId}`),
 };
 
 export interface Collaborator {
@@ -153,6 +170,24 @@ export interface Collaborator {
   email: string;
   name: string;
   avatar_url: string | null;
+  permission: "view" | "edit";
+  granted_at: string;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  org_id: string;
+  member_count: number;
+  scim_synced: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupCollaborator {
+  id: string;
+  group_id: string;
+  group_name: string;
   permission: "view" | "edit";
   granted_at: string;
 }
@@ -239,6 +274,11 @@ export const sharingApi = {
     api.post<Collaborator>(`/documents/${docId}/collaborators`, data),
   listCollaborators: (docId: string) => api.get<Collaborator[]>(`/documents/${docId}/collaborators`),
   removeCollaborator: (docId: string, userId: string) => api.delete(`/documents/${docId}/collaborators/${userId}`),
+  addGroupCollaborator: (docId: string, data: { group_id: string; permission: "view" | "edit" }) =>
+    api.post<GroupCollaborator>(`/documents/${docId}/group-collaborators`, data),
+  listGroupCollaborators: (docId: string) => api.get<GroupCollaborator[]>(`/documents/${docId}/group-collaborators`),
+  removeGroupCollaborator: (docId: string, groupId: string) =>
+    api.delete(`/documents/${docId}/group-collaborators/${groupId}`),
   listShared: () => api.get<SharedDocument[]>("/documents/shared"),
   recordView: (docId: string) => api.post(`/documents/${docId}/view`),
   listRecentlyViewed: () => api.get<RecentlyViewedDocument[]>("/documents/recent"),
@@ -300,6 +340,8 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
+  logo_url?: string | null;
+  admin_group_name?: string | null;
   verified_domains: string[];
   plan: string;
   member_count: number;
@@ -315,6 +357,8 @@ export interface OrgMember {
   avatar_url: string | null;
   role: "admin" | "member";
   joined_at: string;
+  is_super_admin?: boolean;
+  auth_provider?: string;
 }
 
 export interface OrgSSOConfig {
@@ -339,8 +383,16 @@ export const orgsApi = {
   list: () => api.get<Organization[]>("/orgs"),
   get: (orgId: string) => api.get<Organization>(`/orgs/${orgId}`),
   getMyOrg: () => api.get<Organization | null>("/orgs/my"),
-  update: (orgId: string, data: { name?: string; slug?: string; verified_domains?: string[]; plan?: string }) =>
-    api.put<Organization>(`/orgs/${orgId}`, data),
+  update: (
+    orgId: string,
+    data: {
+      name?: string;
+      slug?: string;
+      verified_domains?: string[];
+      plan?: string;
+      admin_group_name?: string | null;
+    },
+  ) => api.put<Organization>(`/orgs/${orgId}`, data),
   listMembers: (orgId: string) => api.get<OrgMember[]>(`/orgs/${orgId}/members`),
   addMember: (orgId: string, data: { user_id: string; role?: string }) =>
     api.post<OrgMember>(`/orgs/${orgId}/members`, data),
@@ -353,6 +405,18 @@ export const orgsApi = {
   updateSSOConfig: (orgId: string, data: Record<string, unknown>) => api.put<OrgSSOConfig>(`/orgs/${orgId}/sso`, data),
   generateScimToken: (orgId: string) => api.post<{ token: string; scim_enabled: boolean }>(`/orgs/${orgId}/scim/token`),
   revokeScimToken: (orgId: string) => api.delete(`/orgs/${orgId}/scim/token`),
+  uploadLogo: (orgId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<Organization>(`/orgs/${orgId}/logo`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  deleteLogo: (orgId: string) => api.delete(`/orgs/${orgId}/logo`),
+};
+
+export const groupsApi = {
+  search: (orgId: string, query: string) => api.get<Group[]>(`/orgs/${orgId}/groups`, { params: { q: query } }),
 };
 
 export default api;

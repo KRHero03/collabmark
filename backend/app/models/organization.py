@@ -27,6 +27,8 @@ class Organization(Document):
     slug: Indexed(str, unique=True)
     verified_domains: list[str] = Field(default_factory=list)
     plan: str = "free"
+    logo_url: Optional[str] = None
+    admin_group_name: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
@@ -61,6 +63,8 @@ class OrganizationRead(BaseModel):
     slug: str
     verified_domains: list[str]
     plan: str
+    logo_url: Optional[str] = None
+    admin_group_name: Optional[str] = None
     member_count: int = 0
     created_at: datetime
     updated_at: datetime
@@ -74,6 +78,8 @@ class OrganizationRead(BaseModel):
             slug=org.slug,
             verified_domains=org.verified_domains,
             plan=org.plan,
+            logo_url=org.logo_url,
+            admin_group_name=org.admin_group_name,
             member_count=member_count,
             created_at=org.created_at,
             updated_at=org.updated_at,
@@ -90,6 +96,8 @@ class OrgMemberRead(BaseModel):
     avatar_url: Optional[str] = None
     role: OrgRole
     joined_at: datetime
+    is_super_admin: bool = False
+    auth_provider: str = "google"
 
 
 class OrganizationCreate(BaseModel):
@@ -108,6 +116,7 @@ class OrganizationUpdate(BaseModel):
     slug: Optional[str] = None
     verified_domains: Optional[list[str]] = None
     plan: Optional[str] = None
+    admin_group_name: Optional[str] = None
 
 
 class AddMemberPayload(BaseModel):

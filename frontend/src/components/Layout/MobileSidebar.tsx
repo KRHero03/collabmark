@@ -22,7 +22,14 @@ export type SidebarTab = "browse" | "shared" | "recent" | "trash";
 interface MobileSidebarProps {
   open: boolean;
   onClose: () => void;
-  user: { name: string; email: string; avatar_url: string | null; org_id?: string | null } | null;
+  user: {
+    name: string;
+    email: string;
+    avatar_url: string | null;
+    org_id?: string | null;
+    org_role?: string | null;
+    is_super_admin?: boolean;
+  } | null;
   dark: boolean;
   onToggleDark: () => void;
   onLogout: () => void;
@@ -175,7 +182,7 @@ export function MobileSidebar({
               <BookOpen className="h-4 w-4 flex-shrink-0 text-[var(--color-text-muted)]" />
               API Docs
             </Link>
-            {user?.org_id && (
+            {user?.org_id && user?.org_role === "admin" && !user?.is_super_admin && (
               <Link
                 to={`/org/${user.org_id}/settings`}
                 onClick={onClose}

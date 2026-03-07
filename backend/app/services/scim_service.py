@@ -20,12 +20,14 @@ from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from pymongo.errors import DuplicateKeyError
 
-from app.models.organization import OrgMembership, OrgRole
+from app.models.group import Group, GroupMembership
+from app.models.organization import Organization, OrgMembership, OrgRole
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
 SCIM_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User"
+SCIM_GROUP_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:Group"
 SCIM_LIST_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
 SCIM_ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error"
 
@@ -634,3 +636,288 @@ async def delete_scim_user(org_id: str, user_id: str) -> None:
     await user.save()
 
     logger.info("SCIM: Deactivated user %s (%s) from org %s", user.id, user.email, org_id)
+
+
+# ---------------------------------------------------------------------------
+# SCIM Group operations
+# ---------------------------------------------------------------------------
+
+
+def group_to_scim(group: Group, org_id: str, members: list[GroupMembership] | None = None) -> dict[str, Any]:
+    """Convert a Group document to a SCIM Group resource."""
+    resource: dict[str, Any] = {
+        "schemas": [SCIM_GROUP_SCHEMA],
+        "id": str(group.id),
+        "displayName": group.name,
+        "meta": {
+            "resourceType": "Group",
+            "created": group.created_at.isoformat(),
+            "lastModified": group.updated_at.isoformat(),
+            "location": f"/scim/v2/Groups/{group.id}",
+        },
+    }
+    if group.external_id:
+        resource["externalId"] = group.external_id
+    if members is not None:
+        resource["members"] = [{"value": m.user_id, "$ref": f"/scim/v2/Users/{m.user_id}"} for m in members]
+    return resource
+
+
+async def _sync_group_members(group: Group, org_id: str, members_data: list[dict[str, Any]]) -> list[GroupMembership]:
+    """Sync group membership from SCIM members array. Returns final membership list."""
+    group_id = str(group.id)
+
+    desired_user_ids = set()
+    for m in members_data:
+        uid = m.get("value")
+        if uid:
+            desired_user_ids.add(uid)
+
+    existing = await GroupMembership.find(GroupMembership.group_id == group_id).to_list()
+    existing_map = {m.user_id: m for m in existing}
+
+    # Remove members no longer in the list
+    for uid, membership in existing_map.items():
+        if uid not in desired_user_ids:
+            await membership.delete()
+
+    # Add new members
+    for uid in desired_user_ids:
+        if uid not in existing_map:
+            # Verify user exists and belongs to the org
+            try:
+                u = await User.get(PydanticObjectId(uid))
+            except (InvalidId, ValueError):
+                continue
+            if u is None or u.org_id != org_id:
+                continue
+            gm = GroupMembership(group_id=group_id, user_id=uid)
+            await gm.insert()
+
+    # Apply role mapping
+    await _apply_role_mapping(org_id, group.name)
+
+    return await GroupMembership.find(GroupMembership.group_id == group_id).to_list()
+
+
+async def _apply_role_mapping(org_id: str, group_name: str) -> None:
+    """If group matches org's admin_group_name, set members to ADMIN role."""
+    try:
+        org = await Organization.get(PydanticObjectId(org_id))
+    except (InvalidId, ValueError):
+        return
+    if org is None or not org.admin_group_name:
+        return
+    if group_name != org.admin_group_name:
+        return
+
+    group = await Group.find_one(Group.org_id == org_id, Group.name == group_name)
+    if group is None:
+        return
+
+    memberships = await GroupMembership.find(GroupMembership.group_id == str(group.id)).to_list()
+    for gm in memberships:
+        org_membership = await OrgMembership.find_one(
+            OrgMembership.org_id == org_id,
+            OrgMembership.user_id == gm.user_id,
+        )
+        if org_membership and org_membership.role != OrgRole.ADMIN:
+            org_membership.role = OrgRole.ADMIN
+            await org_membership.save()
+
+
+async def create_scim_group(org_id: str, resource: dict[str, Any]) -> Group:
+    """Provision a new group via SCIM."""
+    display_name = resource.get("displayName")
+    if not display_name:
+        raise SCIMError(400, "displayName is required")
+
+    existing = await Group.find_one(Group.org_id == org_id, Group.name == display_name)
+    if existing:
+        raise SCIMError(409, f"Group '{display_name}' already exists", scim_type="uniqueness")
+
+    group = Group(
+        name=display_name,
+        org_id=org_id,
+        external_id=resource.get("externalId"),
+        scim_synced=True,
+    )
+    await group.insert()
+
+    members_data = resource.get("members", [])
+    if members_data:
+        await _sync_group_members(group, org_id, members_data)
+
+    logger.info("SCIM: Created group %s (%s) in org %s", group.id, group.name, org_id)
+    return group
+
+
+async def list_scim_groups(
+    org_id: str,
+    filter_str: str | None = None,
+    start_index: int = 1,
+    count: int = 100,
+) -> dict[str, Any]:
+    """List SCIM groups with pagination and filtering."""
+    if start_index < 1:
+        start_index = 1
+    if count < 0:
+        count = 0
+
+    all_groups = await Group.find(Group.org_id == org_id).to_list()
+
+    if filter_str:
+        parsed = _parse_scim_filter(filter_str)
+        filtered: list[Group] = []
+        for g in all_groups:
+            attr = parsed[0].lower()
+            if attr == "displayname":
+                val = g.name
+            elif attr == "externalid":
+                val = g.external_id
+            else:
+                val = None
+
+            if len(parsed) == 2 and parsed[1] == "pr":
+                if val is not None and val != "":
+                    filtered.append(g)
+            elif len(parsed) == 3 and val is not None:
+                _, op, fval = parsed
+                if _apply_string_filter(str(val), op, fval):
+                    filtered.append(g)
+        all_groups = filtered
+
+    total = len(all_groups)
+    skip = max(0, start_index - 1)
+    page = all_groups[skip : skip + count]
+
+    resources = []
+    for g in page:
+        members = await GroupMembership.find(GroupMembership.group_id == str(g.id)).to_list()
+        resources.append(group_to_scim(g, org_id, members))
+
+    return {
+        "schemas": [SCIM_LIST_SCHEMA],
+        "totalResults": total,
+        "startIndex": start_index,
+        "itemsPerPage": len(page),
+        "Resources": resources,
+    }
+
+
+async def get_scim_group(org_id: str, group_id: str) -> Group:
+    """Fetch a single SCIM group, verifying org membership."""
+    try:
+        group = await Group.get(PydanticObjectId(group_id))
+    except (InvalidId, ValueError):
+        group = None
+    if group is None or group.org_id != org_id:
+        raise SCIMError(404, "Group not found")
+    return group
+
+
+async def replace_scim_group(org_id: str, group_id: str, resource: dict[str, Any]) -> Group:
+    """Full replacement of a SCIM group."""
+    group = await get_scim_group(org_id, group_id)
+
+    display_name = resource.get("displayName")
+    if not display_name:
+        raise SCIMError(400, "displayName is required")
+
+    group.name = display_name
+    group.external_id = resource.get("externalId")
+    group.touch()
+    await group.save()
+
+    members_data = resource.get("members", [])
+    await _sync_group_members(group, org_id, members_data)
+
+    return group
+
+
+async def _handle_group_member_add(group: Group, org_id: str, members: list[dict]) -> None:
+    """Add members to a group from SCIM PATCH add operation."""
+    for m in members:
+        uid = m.get("value")
+        if not uid:
+            continue
+        existing = await GroupMembership.find_one(
+            GroupMembership.group_id == str(group.id),
+            GroupMembership.user_id == uid,
+        )
+        if not existing:
+            try:
+                u = await User.get(PydanticObjectId(uid))
+            except (InvalidId, ValueError):
+                continue
+            if u and u.org_id == org_id:
+                gm = GroupMembership(group_id=str(group.id), user_id=uid)
+                await gm.insert()
+    await _apply_role_mapping(org_id, group.name)
+
+
+async def _handle_group_member_remove(group: Group, members: list[dict] | None = None, uid: str | None = None) -> None:
+    """Remove members from a group. Either pass a list of member dicts or a single uid."""
+    if uid:
+        gm = await GroupMembership.find_one(
+            GroupMembership.group_id == str(group.id),
+            GroupMembership.user_id == uid,
+        )
+        if gm:
+            await gm.delete()
+        return
+    if members:
+        for m in members:
+            member_uid = m.get("value")
+            if member_uid:
+                gm = await GroupMembership.find_one(
+                    GroupMembership.group_id == str(group.id),
+                    GroupMembership.user_id == member_uid,
+                )
+                if gm:
+                    await gm.delete()
+
+
+async def update_scim_group(org_id: str, group_id: str, payload: dict[str, Any]) -> Group:
+    """Update a SCIM group via PATCH operations."""
+    group = await get_scim_group(org_id, group_id)
+
+    operations = payload.get("Operations", [])
+    for op in operations:
+        operation = op.get("op", "").lower()
+        path = (op.get("path") or "").lower()
+        value = op.get("value")
+
+        if operation == "replace":
+            if path == "displayname" and isinstance(value, str):
+                group.name = value
+            elif path == "externalid" and isinstance(value, str):
+                group.external_id = value
+            elif not path and isinstance(value, dict) and "displayName" in value:
+                group.name = value["displayName"]
+        elif operation == "add":
+            if path == "members" and isinstance(value, list):
+                await _handle_group_member_add(group, org_id, value)
+        elif operation == "remove":
+            if path == "members" and isinstance(value, list):
+                await _handle_group_member_remove(group, members=value)
+            elif path.startswith("members[value eq"):
+                match = re.search(r'"([^"]+)"', path)
+                if match:
+                    await _handle_group_member_remove(group, uid=match.group(1))
+
+    group.touch()
+    await group.save()
+    return group
+
+
+async def delete_scim_group(org_id: str, group_id: str) -> None:
+    """Delete a SCIM group and all its memberships."""
+    group = await get_scim_group(org_id, group_id)
+
+    memberships = await GroupMembership.find(GroupMembership.group_id == str(group.id)).to_list()
+    for m in memberships:
+        await m.delete()
+
+    await group.delete()
+    logger.info("SCIM: Deleted group %s (%s) from org %s", group.id, group.name, org_id)

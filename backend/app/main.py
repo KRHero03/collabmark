@@ -8,7 +8,7 @@ from pathlib import Path
 from beanie import init_beanie
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 from starlette.middleware.sessions import SessionMiddleware
@@ -25,6 +25,7 @@ from app.models.document import Document_
 from app.models.document_version import DocumentVersion
 from app.models.document_view import DocumentView
 from app.models.folder import Folder, FolderAccess, FolderView
+from app.models.group import DocumentGroupAccess, FolderGroupAccess, Group, GroupMembership
 from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization, OrgMembership
 from app.models.share_link import DocumentAccess, ShareLink
@@ -48,6 +49,10 @@ DOCUMENT_MODELS = [
     Organization,
     OrgMembership,
     OrgSSOConfig,
+    Group,
+    GroupMembership,
+    DocumentGroupAccess,
+    FolderGroupAccess,
 ]
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
@@ -120,6 +125,33 @@ async def health():
         "service": "collabmark",
         "version": "1.0.0",
     }
+
+
+@app.get("/media/{file_path:path}")
+async def serve_media(file_path: str):
+    """Proxy media files from S3-compatible blob storage.
+
+    Streams the object and sets appropriate Content-Type and cache headers.
+    Returns 404 if the object does not exist.
+    """
+    from botocore.exceptions import ClientError
+
+    from app.services.blob_storage import MIME_TYPES, _get_s3_client
+
+    client = _get_s3_client()
+    try:
+        obj = client.get_object(Bucket=settings.s3_bucket, Key=file_path)
+    except ClientError:
+        return Response(status_code=404)
+
+    ext = Path(file_path).suffix.lower()
+    content_type = MIME_TYPES.get(ext, obj.get("ContentType", "application/octet-stream"))
+    body = obj["Body"].read()
+    return Response(
+        content=body,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 if STATIC_DIR.is_dir():
