@@ -4,19 +4,24 @@ from datetime import UTC, datetime
 from typing import Optional
 
 from beanie import Document, Indexed
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 class User(Document):
     """Beanie document for a user. Key fields: google_id, email, name, avatar_url, org_id, auth_provider."""
 
     google_id: Optional[str] = None
-    email: Indexed(EmailStr, unique=True)
+    email: Indexed(str, unique=True)
     name: str
+    given_name: Optional[str] = None
+    family_name: Optional[str] = None
     avatar_url: Optional[str] = None
+    photos: list[str] = Field(default_factory=list)
     org_id: Optional[str] = None
     auth_provider: str = "google"
     external_id: Optional[str] = None
+    scim_emails: Optional[list] = None
+    scim_photos: Optional[list] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

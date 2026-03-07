@@ -1,5 +1,6 @@
 """CollabMark FastAPI application: lifespan, CORS, routes, static frontend."""
 
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -62,6 +63,11 @@ async def lifespan(app: FastAPI):
     )
     db = client[settings.mongodb_db_name]
     await init_beanie(database=db, document_models=DOCUMENT_MODELS, skip_indexes=True)
+
+    # Drop stale unique index on google_id that blocks SCIM users (google_id=null)
+    with contextlib.suppress(Exception):
+        await db["users"].drop_index("google_id_1")
+
     MongoYStore.set_database(db)
     await start_websocket_server()
     yield

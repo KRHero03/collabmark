@@ -44,6 +44,21 @@ def register_scim_error_handler(app: Any) -> None:
             media_type=SCIM_CONTENT_TYPE,
         )
 
+    @app.middleware("http")
+    async def _scim_500_middleware(request: Request, call_next):  # type: ignore[no-untyped-def]
+        """Catch unhandled exceptions on /scim/v2/ paths and return SCIM JSON."""
+        if not request.url.path.startswith("/scim/v2"):
+            return await call_next(request)
+        try:
+            return await call_next(request)
+        except Exception:
+            import logging
+            import traceback
+
+            logging.getLogger("scim").error("Unhandled SCIM error:\n%s", traceback.format_exc())
+            body = SCIMError(500, "Internal server error").to_dict()
+            return JSONResponse(content=body, status_code=500, media_type=SCIM_CONTENT_TYPE)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -82,30 +97,30 @@ _USER_SCHEMA_ATTRIBUTES = [
         "required": True,
         "caseExact": False,
         "mutability": "readWrite",
-        "returned": "default",
+        "returned": "always",
         "uniqueness": "server",
-        "description": "Unique identifier for the User, typically used by the user to directly authenticate.",
+        "description": "User email address used as the unique login identifier.",
     },
     {
         "name": "name",
         "type": "complex",
         "multiValued": False,
-        "required": False,
+        "required": True,
         "mutability": "readWrite",
-        "returned": "default",
+        "returned": "always",
         "uniqueness": "none",
-        "description": "The components of the user's real name.",
+        "description": "The components of the user's real name. Required for display in the UI.",
         "subAttributes": [
             {
                 "name": "formatted",
                 "type": "string",
                 "multiValued": False,
-                "required": False,
+                "required": True,
                 "caseExact": False,
                 "mutability": "readWrite",
                 "returned": "default",
                 "uniqueness": "none",
-                "description": "The full name.",
+                "description": "The full display name.",
             },
             {
                 "name": "givenName",
@@ -135,28 +150,28 @@ _USER_SCHEMA_ATTRIBUTES = [
         "name": "displayName",
         "type": "string",
         "multiValued": False,
-        "required": False,
+        "required": True,
         "caseExact": False,
         "mutability": "readWrite",
-        "returned": "default",
+        "returned": "always",
         "uniqueness": "none",
-        "description": "The name of the User suitable for display.",
+        "description": "Display name shown in comments, sharing dialogs, and cursor presence.",
     },
     {
         "name": "emails",
         "type": "complex",
         "multiValued": True,
-        "required": False,
+        "required": True,
         "mutability": "readWrite",
-        "returned": "default",
+        "returned": "always",
         "uniqueness": "none",
-        "description": "Email addresses for the user.",
+        "description": "Email addresses. At least one is required for login and email-based sharing.",
         "subAttributes": [
             {
                 "name": "value",
                 "type": "string",
                 "multiValued": False,
-                "required": False,
+                "required": True,
                 "caseExact": False,
                 "mutability": "readWrite",
                 "returned": "default",
@@ -192,7 +207,7 @@ _USER_SCHEMA_ATTRIBUTES = [
         "mutability": "readWrite",
         "returned": "default",
         "uniqueness": "none",
-        "description": "URLs of photos of the User.",
+        "description": "User avatar URLs. Optional; a default avatar is used when absent.",
         "subAttributes": [
             {
                 "name": "value",
@@ -224,9 +239,9 @@ _USER_SCHEMA_ATTRIBUTES = [
         "multiValued": False,
         "required": False,
         "mutability": "readOnly",
-        "returned": "default",
+        "returned": "always",
         "uniqueness": "none",
-        "description": "Whether the user is active (has org membership).",
+        "description": "Derived from organization membership. Cannot be set directly.",
     },
     {
         "name": "externalId",

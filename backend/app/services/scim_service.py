@@ -18,6 +18,7 @@ from typing import Any, Optional
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
+from pymongo.errors import DuplicateKeyError
 
 from app.models.organization import OrgMembership, OrgRole
 from app.models.user import User
@@ -27,7 +28,6 @@ logger = logging.getLogger(__name__)
 SCIM_USER_SCHEMA = "urn:ietf:params:scim:schemas:core:2.0:User"
 SCIM_LIST_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:ListResponse"
 SCIM_ERROR_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:Error"
-SCIM_PATCH_OP_SCHEMA = "urn:ietf:params:scim:api:messages:2.0:PatchOp"
 
 
 # ---------------------------------------------------------------------------
@@ -67,67 +67,92 @@ _ALWAYS_RETURNED = {"schemas", "id"}
 def scim_to_user_fields(resource: dict[str, Any]) -> dict[str, Any]:
     """Extract internal User fields from a SCIM User resource.
 
-    Handles both ``userName`` (used as email) and the ``emails`` array.
-    Display name is resolved from ``displayName``, ``name.formatted``,
-    or ``name.givenName``+``name.familyName``.
-
-    Returns:
-        Dict with keys ``email``, ``name``, and optionally ``avatar_url``
-        and ``external_id``.
+    Resolves email from ``userName`` or the ``emails`` array.
+    Resolves display name from ``displayName``, ``name.formatted``,
+    or ``givenName``+``familyName``, falling back to the email local part.
 
     Raises:
-        SCIMError: 400 if required fields are missing.
+        SCIMError: 400 if no email can be resolved.
     """
-    email = resource.get("userName")
-    if not email:
-        emails_list = resource.get("emails", [])
-        for entry in emails_list:
-            if isinstance(entry, dict) and entry.get("primary"):
-                email = entry.get("value")
-                break
-        if not email and emails_list:
-            first = emails_list[0]
-            email = first.get("value") if isinstance(first, dict) else None
+    email = _extract_email(resource)
+    name_obj = resource.get("name") if isinstance(resource.get("name"), dict) else {}
+    given_name = name_obj.get("givenName")
+    family_name = name_obj.get("familyName")
 
-    if not email:
-        raise SCIMError(400, "userName or emails[].value is required")
-
-    name = resource.get("displayName") or ""
-    if not name:
-        name_obj = resource.get("name", {})
-        if isinstance(name_obj, dict):
-            name = name_obj.get("formatted") or ""
-            if not name:
-                given = name_obj.get("givenName", "")
-                family = name_obj.get("familyName", "")
-                name = f"{given} {family}".strip()
-
-    if not name:
-        name = email.split("@")[0]
+    display_name = resource.get("displayName") or ""
+    if not display_name:
+        display_name = name_obj.get("formatted") or ""
+    if not display_name and (given_name or family_name):
+        display_name = f"{given_name or ''} {family_name or ''}".strip()
+    if not display_name:
+        display_name = email.split("@")[0]
 
     avatar_url = None
     photos = resource.get("photos", [])
     if photos and isinstance(photos[0], dict):
         avatar_url = photos[0].get("value")
 
-    result: dict[str, Any] = {"email": email, "name": name, "avatar_url": avatar_url}
+    result: dict[str, Any] = {
+        "email": email,
+        "name": display_name,
+        "avatar_url": avatar_url,
+        "given_name": given_name,
+        "family_name": family_name,
+        "scim_emails": resource.get("emails"),
+        "scim_photos": resource.get("photos"),
+    }
     if "externalId" in resource:
         result["external_id"] = resource["externalId"]
     return result
+
+
+def _extract_email(resource: dict[str, Any]) -> str:
+    """Resolve email from userName or the emails array.
+
+    Raises:
+        SCIMError: 400 if no email can be found.
+    """
+    email = resource.get("userName")
+    if email:
+        return email
+
+    emails_list = resource.get("emails", [])
+    for entry in emails_list:
+        if isinstance(entry, dict) and entry.get("primary"):
+            email = entry.get("value")
+            if email:
+                return email
+
+    if emails_list and isinstance(emails_list[0], dict):
+        email = emails_list[0].get("value")
+        if email:
+            return email
+
+    raise SCIMError(400, "userName or emails[].value is required")
 
 
 def user_to_scim(user: User, org_id: str) -> dict[str, Any]:
     """Convert an internal User document to a SCIM User resource."""
     active = user.org_id == org_id
 
+    name_obj: dict[str, Any] = {"formatted": user.name}
+    if user.given_name is not None:
+        name_obj["givenName"] = user.given_name
+    if user.family_name is not None:
+        name_obj["familyName"] = user.family_name
+
+    if user.scim_emails is not None:
+        emails = user.scim_emails
+    else:
+        emails = [{"value": user.email, "primary": True, "type": "work"}]
+
     resource: dict[str, Any] = {
         "schemas": [SCIM_USER_SCHEMA],
         "id": str(user.id),
         "userName": user.email,
-        "name": {"formatted": user.name},
+        "name": name_obj,
         "displayName": user.name,
-        "emails": [{"value": user.email, "primary": True, "type": "work"}],
-        "photos": [{"value": user.avatar_url, "type": "photo"}] if user.avatar_url else [],
+        "emails": emails,
         "active": active,
         "meta": {
             "resourceType": "User",
@@ -136,6 +161,12 @@ def user_to_scim(user: User, org_id: str) -> dict[str, Any]:
             "location": f"/scim/v2/Users/{user.id}",
         },
     }
+
+    if user.scim_photos is not None:
+        if user.scim_photos:
+            resource["photos"] = user.scim_photos
+    elif user.avatar_url:
+        resource["photos"] = [{"value": user.avatar_url, "type": "photo"}]
     if user.external_id is not None:
         resource["externalId"] = user.external_id
     return resource
@@ -192,12 +223,18 @@ async def create_scim_user(org_id: str, resource: dict[str, Any]) -> User:
     user = User(
         email=fields["email"],
         name=fields["name"],
-        avatar_url=fields.get("avatar_url"),
         org_id=org_id,
         auth_provider="scim",
-        external_id=fields.get("external_id"),
     )
-    await user.insert()
+    _apply_fields_to_user(user, fields)
+    try:
+        await user.insert()
+    except DuplicateKeyError as exc:
+        raise SCIMError(
+            409,
+            f"User with identifier '{fields['email']}' already exists",
+            scim_type="uniqueness",
+        ) from exc
 
     membership = OrgMembership(
         org_id=org_id,
@@ -364,8 +401,7 @@ async def replace_scim_user(org_id: str, user_id: str, resource: dict[str, Any])
 
     user.email = fields["email"]
     user.name = fields["name"]
-    user.avatar_url = fields.get("avatar_url")
-    user.external_id = fields.get("external_id")
+    _apply_fields_to_user(user, fields)
 
     user.touch()
     await user.save()
@@ -410,58 +446,62 @@ def _apply_patch_op(user: User, org_id: str, op: dict[str, Any]) -> None:
     if operation == "replace":
         _patch_replace(user, org_id, path_lower, value)
     elif operation == "add":
-        _patch_add(user, path_lower, value)
+        _patch_add(user, org_id, path_lower, value)
     elif operation == "remove":
         _patch_remove(user, path_lower)
     else:
         raise SCIMError(400, f"Unsupported PATCH op: {operation}")
 
 
-def _patch_replace(user: User, org_id: str, path: str, value: Any) -> None:
-    """Handle PATCH replace operation."""
-    if path == "username" or path == 'emails[type eq "work"].value':
+def _set_attr_by_path(user: User, path: str, value: Any) -> None:
+    """Set a single user attribute by its lowercased SCIM path.
+
+    Shared by both PATCH add and PATCH replace operations since the
+    path-based logic is identical for both (RFC 7644 Section 3.5.2).
+    """
+    if path in ("username", 'emails[type eq "work"].value'):
         if isinstance(value, str):
             user.email = value
-    elif path == "displayname" or path == "name.formatted":
+    elif path in ("displayname", "name.formatted"):
         if isinstance(value, str):
             user.name = value
     elif path == "name":
         if isinstance(value, dict):
             _set_name_from_dict(user, value)
+    elif path == "name.givenname":
+        if isinstance(value, str):
+            user.given_name = value
+    elif path == "name.familyname":
+        if isinstance(value, str):
+            user.family_name = value
     elif path == "externalid":
         user.external_id = value if isinstance(value, str) else None
-    elif path == "active":
-        pass  # active is derived from org membership
-    elif not path and isinstance(value, dict):
-        _apply_direct_attrs(user, org_id, value)
-
-
-def _patch_add(user: User, path: str, value: Any) -> None:
-    """Handle PATCH add operation (RFC 7644 Section 3.5.2.1)."""
-    if not path and isinstance(value, dict):
-        if "userName" in value and isinstance(value["userName"], str):
-            user.email = value["userName"]
-        if "displayName" in value and isinstance(value["displayName"], str):
-            user.name = value["displayName"]
-        if "externalId" in value:
-            user.external_id = value["externalId"]
-        if "name" in value and isinstance(value["name"], dict):
-            _set_name_from_dict(user, value["name"])
-        return
-
-    if path == "username":
-        if isinstance(value, str):
-            user.email = value
-    elif path == "displayname" or path == "name.formatted":
-        if isinstance(value, str):
-            user.name = value
-    elif path == "externalid":
-        user.external_id = value if isinstance(value, str) else None
-    elif path == "name":
-        if isinstance(value, dict):
-            _set_name_from_dict(user, value)
+    elif path == "emails":
+        if isinstance(value, list):
+            user.scim_emails = value
+            _sync_primary_email(user, value)
+    elif path == "photos":
+        if isinstance(value, list):
+            user.scim_photos = value
+            _sync_avatar_url(user, value)
     elif path == "active":
         pass
+
+
+def _patch_replace(user: User, org_id: str, path: str, value: Any) -> None:
+    """Handle PATCH replace operation."""
+    if not path and isinstance(value, dict):
+        _apply_direct_attrs(user, org_id, value)
+    else:
+        _set_attr_by_path(user, path, value)
+
+
+def _patch_add(user: User, org_id: str, path: str, value: Any) -> None:
+    """Handle PATCH add operation (RFC 7644 Section 3.5.2.1)."""
+    if not path and isinstance(value, dict):
+        _apply_direct_attrs(user, org_id, value)
+    else:
+        _set_attr_by_path(user, path, value)
 
 
 def _patch_remove(user: User, path: str) -> None:
@@ -475,20 +515,71 @@ def _patch_remove(user: User, path: str) -> None:
 
     if path == "username":
         raise SCIMError(400, "Cannot remove required attribute 'userName'", scim_type="mutability")
-    if path == "displayname" or path == "name.formatted":
+
+    if path in ("displayname", "name.formatted"):
         user.name = ""
     elif path == "externalid":
         user.external_id = None
     elif path == "name":
         user.name = ""
+        user.given_name = None
+        user.family_name = None
+    elif path == "name.givenname":
+        user.given_name = None
+    elif path == "name.familyname":
+        user.family_name = None
+    elif path == "emails":
+        user.scim_emails = []
+    elif path == "photos":
+        user.scim_photos = []
+        user.avatar_url = None
     elif path == "active":
         pass
     else:
         raise SCIMError(400, f"No attribute found for path '{path}'", scim_type="noTarget")
 
 
+def _apply_fields_to_user(user: User, fields: dict[str, Any]) -> None:
+    """Apply optional SCIM-derived fields to a User document.
+
+    Used by both create and replace to avoid duplicating field assignments.
+    Required fields (email, name) are set by the caller since create uses
+    the constructor while replace uses direct assignment.
+    """
+    user.given_name = fields.get("given_name")
+    user.family_name = fields.get("family_name")
+    user.avatar_url = fields.get("avatar_url")
+    user.external_id = fields.get("external_id")
+    user.scim_emails = fields.get("scim_emails")
+    user.scim_photos = fields.get("scim_photos")
+
+
+def _sync_primary_email(user: User, emails: list[Any]) -> None:
+    """Sync user.email from a SCIM emails array (primary or first entry)."""
+    for entry in emails:
+        if isinstance(entry, dict) and entry.get("primary"):
+            if entry.get("value"):
+                user.email = entry["value"]
+            return
+    if emails and isinstance(emails[0], dict) and emails[0].get("value"):
+        user.email = emails[0]["value"]
+
+
+def _sync_avatar_url(user: User, photos: list[Any]) -> None:
+    """Sync user.avatar_url from a SCIM photos array (first entry)."""
+    if photos and isinstance(photos[0], dict):
+        user.avatar_url = photos[0].get("value")
+    else:
+        user.avatar_url = None
+
+
 def _set_name_from_dict(user: User, name_obj: dict[str, Any]) -> None:
-    """Set user name from a SCIM name object."""
+    """Set user name from a SCIM name object, including givenName/familyName."""
+    if "givenName" in name_obj:
+        user.given_name = name_obj["givenName"]
+    if "familyName" in name_obj:
+        user.family_name = name_obj["familyName"]
+
     formatted = name_obj.get("formatted")
     if formatted:
         user.name = formatted
@@ -511,14 +602,13 @@ def _apply_direct_attrs(user: User, org_id: str, attrs: dict[str, Any]) -> None:
     if "name" in attrs and isinstance(attrs["name"], dict):
         _set_name_from_dict(user, attrs["name"])
     emails = attrs.get("emails")
-    if isinstance(emails, list) and emails:
-        primary_email = None
-        for entry in emails:
-            if isinstance(entry, dict) and entry.get("primary"):
-                primary_email = entry.get("value")
-                break
-        if primary_email:
-            user.email = primary_email
+    if isinstance(emails, list):
+        user.scim_emails = emails
+        _sync_primary_email(user, emails)
+    photos = attrs.get("photos")
+    if isinstance(photos, list):
+        user.scim_photos = photos
+        _sync_avatar_url(user, photos)
 
 
 async def delete_scim_user(org_id: str, user_id: str) -> None:
