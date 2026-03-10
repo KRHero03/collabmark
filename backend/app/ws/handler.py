@@ -162,6 +162,14 @@ class FastAPIWebsocketAdapter:
                     self.path,
                 )
             self.read_only = True
+        else:
+            if self.read_only:
+                logger.info(
+                    "Permission upgraded to %s for user on room %s; disabling read-only",
+                    perm,
+                    self.path,
+                )
+            self.read_only = False
 
     async def __anext__(self) -> bytes:
         """Receive the next binary message from the client.

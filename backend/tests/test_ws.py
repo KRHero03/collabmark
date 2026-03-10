@@ -78,6 +78,122 @@ class TestFastAPIWebsocketAdapter:
         assert received == []
 
 
+class TestPermissionRecheck:
+    """Test dynamic permission re-checking on the adapter."""
+
+    @pytest.mark.asyncio
+    async def test_recheck_upgrades_read_only_to_writable(self):
+        """When DB permission changes to EDIT, read_only should become False."""
+        from unittest.mock import patch
+
+        mock_ws = MagicMock()
+        mock_user = MagicMock()
+        adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=mock_user)
+        adapter._last_perm_check = 0
+
+        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+            mock_perm.return_value = "edit"
+            await adapter._recheck_permission()
+
+        assert adapter.read_only is False
+
+    @pytest.mark.asyncio
+    async def test_recheck_downgrades_writable_to_read_only(self):
+        """When DB permission changes to VIEW, read_only should become True."""
+        from unittest.mock import patch
+
+        mock_ws = MagicMock()
+        mock_user = MagicMock()
+        adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=False, user=mock_user)
+        adapter._last_perm_check = 0
+
+        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+            mock_perm.return_value = "view"
+            await adapter._recheck_permission()
+
+        assert adapter.read_only is True
+
+    @pytest.mark.asyncio
+    async def test_recheck_revoked_access_sets_read_only(self):
+        """When DB permission is None (revoked), read_only should be True."""
+        from unittest.mock import patch
+
+        mock_ws = MagicMock()
+        mock_user = MagicMock()
+        adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=False, user=mock_user)
+        adapter._last_perm_check = 0
+
+        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+            mock_perm.return_value = None
+            await adapter._recheck_permission()
+
+        assert adapter.read_only is True
+
+    @pytest.mark.asyncio
+    async def test_recheck_skipped_within_interval(self):
+        """Re-check should be skipped if interval has not elapsed."""
+        from unittest.mock import patch
+
+        mock_ws = MagicMock()
+        mock_user = MagicMock()
+        adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=mock_user)
+
+        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+            mock_perm.return_value = "edit"
+            await adapter._recheck_permission()
+
+        assert adapter.read_only is True
+        assert mock_perm.call_count == 0
+
+    @pytest.mark.asyncio
+    async def test_recheck_skipped_when_no_user(self):
+        """Re-check should be a no-op when user is None."""
+        from unittest.mock import patch
+
+        mock_ws = MagicMock()
+        adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=None)
+        adapter._last_perm_check = 0
+
+        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+            await adapter._recheck_permission()
+
+        assert adapter.read_only is True
+        mock_perm.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_write_message_allowed_after_upgrade(self):
+        """After permission upgrade, sync-update messages should pass through."""
+        from unittest.mock import patch
+
+        mock_ws = MagicMock()
+        mock_user = MagicMock()
+        sync_update_msg = bytes([0, 2]) + b"\x01\x02\x03"
+        mock_ws.receive_bytes = AsyncMock(return_value=sync_update_msg)
+
+        adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=mock_user)
+        adapter._last_perm_check = 0
+
+        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+            mock_perm.return_value = "edit"
+            result = await adapter.__anext__()
+
+        assert result == sync_update_msg
+
+    @pytest.mark.asyncio
+    async def test_write_message_dropped_when_read_only(self):
+        """Sync-update messages should be dropped when read_only, non-write passes through."""
+        mock_ws = MagicMock()
+        mock_user = MagicMock()
+        sync_update_msg = bytes([0, 2]) + b"\x01\x02\x03"
+        normal_msg = bytes([0, 0]) + b"\x04\x05"
+        mock_ws.receive_bytes = AsyncMock(side_effect=[sync_update_msg, normal_msg])
+
+        adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=mock_user)
+
+        result = await adapter.__anext__()
+        assert result == normal_msg
+
+
 class TestCollabWebsocketServer:
     """Test the custom WebsocketServer subclass."""
 

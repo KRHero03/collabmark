@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, cleanup } from "@testing-library/react";
 import * as Y from "yjs";
 import { useYjsProvider } from "./useYjsProvider";
+import type { Permission } from "../lib/api";
 
 const mockOn = vi.fn();
 const mockDisconnect = vi.fn();
@@ -164,5 +165,60 @@ describe("useYjsProvider", () => {
 
     const expectedYtext = result.current.ydoc.getText("content");
     expect(result.current.ytext).toBe(expectedYtext);
+  });
+
+  it("reconnects provider when permission upgrades from view to edit", () => {
+    const { rerender } = renderHook(
+      ({ documentId, permission }: { documentId: string; permission: Permission }) =>
+        useYjsProvider(documentId, permission),
+      { initialProps: { documentId: "doc-perm", permission: "view" as Permission } },
+    );
+
+    expect(providerCallArgs).toHaveLength(1);
+    expect(mockDisconnect).not.toHaveBeenCalled();
+
+    rerender({ documentId: "doc-perm", permission: "edit" as Permission });
+
+    expect(mockDisconnect).toHaveBeenCalled();
+    expect(mockDestroy).toHaveBeenCalled();
+    expect(providerCallArgs).toHaveLength(2);
+    expect(providerCallArgs[1][1]).toBe("doc-perm");
+  });
+
+  it("does not reconnect when permission stays the same", () => {
+    const { rerender } = renderHook(
+      ({ documentId, permission }: { documentId: string; permission: Permission }) =>
+        useYjsProvider(documentId, permission),
+      { initialProps: { documentId: "doc-same", permission: "edit" as Permission } },
+    );
+
+    expect(providerCallArgs).toHaveLength(1);
+
+    rerender({ documentId: "doc-same", permission: "edit" as Permission });
+
+    expect(mockDisconnect).not.toHaveBeenCalled();
+    expect(providerCallArgs).toHaveLength(1);
+  });
+
+  it("does not reconnect when permission downgrades from edit to view", () => {
+    const { rerender } = renderHook(
+      ({ documentId, permission }: { documentId: string; permission: Permission }) =>
+        useYjsProvider(documentId, permission),
+      { initialProps: { documentId: "doc-down", permission: "edit" as Permission } },
+    );
+
+    expect(providerCallArgs).toHaveLength(1);
+
+    rerender({ documentId: "doc-down", permission: "view" as Permission });
+
+    expect(mockDisconnect).not.toHaveBeenCalled();
+    expect(providerCallArgs).toHaveLength(1);
+  });
+
+  it("defaults permission to 'edit' when not provided", () => {
+    const { result } = renderHook(() => useYjsProvider("doc-default"));
+
+    expect(result.current.provider).toBeDefined();
+    expect(providerCallArgs).toHaveLength(1);
   });
 });

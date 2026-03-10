@@ -93,7 +93,7 @@ export function EditorPage() {
 
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
-  const { ydoc, ytext, provider, synced } = useYjsProvider(id);
+  const { ydoc, ytext, provider, synced } = useYjsProvider(id, permission);
   const presenceUsers = usePresence(provider?.awareness ?? null);
   const { comments } = useComments();
 
