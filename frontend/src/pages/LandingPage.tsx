@@ -127,12 +127,6 @@ export function LandingPage() {
           <FileText className="h-6 w-6 text-[var(--color-primary)]" />
           <span>CollabMark</span>
         </div>
-        <a
-          href="#get-started"
-          className="rounded-lg bg-[var(--color-primary)] px-5 py-2 text-sm font-semibold text-white transition hover:opacity-90"
-        >
-          Sign In
-        </a>
       </nav>
 
       {/* --- Hero Section --- */}

@@ -11,10 +11,11 @@ describe("LandingPage", () => {
     expect(getByText("Supercharged")).toBeInTheDocument();
   });
 
-  it("renders 'Sign In' link in navbar (no Google button) and SSOLoginFlow in hero/footer", () => {
-    const { getByText, getAllByPlaceholderText, getAllByTestId } = render(<LandingPage />);
-    expect(getByText("Sign In")).toBeInTheDocument();
-    expect(getByText("Sign In").closest("a")).toHaveAttribute("href", "#get-started");
+  it("renders navbar without Sign In link and SSOLoginFlow in hero/footer", () => {
+    const { getAllByPlaceholderText, getAllByTestId } = render(<LandingPage />);
+    const nav = document.querySelector("nav");
+    expect(nav).toBeInTheDocument();
+    expect(nav!.querySelector('a[href="#get-started"]')).toBeNull();
     const googleBtns = document.querySelectorAll('a[href="/api/auth/google/login"]');
     const navGoogleBtns = Array.from(googleBtns).filter((el) => el.closest("nav") !== null);
     expect(navGoogleBtns.length).toBe(0);
