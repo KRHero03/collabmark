@@ -25,6 +25,7 @@ import { EditorToolbar } from "../components/Editor/EditorToolbar";
 import { ShareDialog } from "../components/Editor/ShareDialog";
 import { VersionHistory } from "../components/Editor/VersionHistory";
 import { CommentsPanel } from "../components/Editor/CommentsPanel";
+import { FormattingToolbar } from "../components/Editor/FormattingToolbar";
 import { documentsApi, sharingApi, versionsApi, type GeneralAccess, type Permission } from "../lib/api";
 import { useYjsProvider } from "../hooks/useYjsProvider";
 import { useAuth } from "../hooks/useAuth";
@@ -332,6 +333,7 @@ export function EditorPage() {
     printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
+<base href="${window.location.origin}">
 <meta charset="utf-8">
 <title>${title || "document"}</title>
 ${stylesheets}
@@ -529,6 +531,8 @@ ${previewEl.innerHTML}
           Connecting to collaboration server...
         </div>
       )}
+
+      {!presentationMode && permission === "edit" && <FormattingToolbar editorView={editorView} docId={id} />}
 
       {presentationMode ? (
         <div className="relative flex-1 overflow-auto">

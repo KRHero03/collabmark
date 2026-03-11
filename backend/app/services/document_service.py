@@ -4,6 +4,7 @@ import logging
 import uuid
 from pathlib import Path
 
+import puremagic
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
@@ -21,6 +22,95 @@ logger = logging.getLogger(__name__)
 MAX_DOCUMENTS_PER_USER = 10_000
 IMAGE_ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 IMAGE_MAX_SIZE = 5 * 1024 * 1024  # 5MB
+
+ATTACHMENT_ALLOWED_EXTENSIONS = IMAGE_ALLOWED_EXTENSIONS | {
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+    ".ppt",
+    ".pptx",
+    ".txt",
+    ".csv",
+    ".zip",
+    ".tar",
+    ".gz",
+}
+ATTACHMENT_MAX_SIZE = 5 * 1024 * 1024  # 5MB
+
+_OLE_MIMES = {"application/msword", "application/vnd.ms-excel", "application/vnd.ms-powerpoint"}
+_ZIP_MIMES = {
+    "application/zip",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+}
+
+EXTENSION_MIME_MAP: dict[str, set[str]] = {
+    ".png": {"image/png"},
+    ".jpg": {"image/jpeg"},
+    ".jpeg": {"image/jpeg"},
+    ".gif": {"image/gif"},
+    ".webp": {"image/webp"},
+    ".pdf": {"application/pdf"},
+    ".doc": _OLE_MIMES,
+    ".xls": _OLE_MIMES,
+    ".ppt": _OLE_MIMES,
+    ".docx": _ZIP_MIMES,
+    ".xlsx": _ZIP_MIMES,
+    ".pptx": _ZIP_MIMES,
+    ".zip": _ZIP_MIMES,
+    ".tar": {"application/x-tar"},
+    ".gz": {"application/gzip", "application/x-gzip"},
+    ".txt": {"text/plain"},
+    ".csv": {"text/plain", "text/csv", "application/csv"},
+}
+
+_WEAK_MAGIC_EXTENSIONS = {".txt", ".csv", ".tar"}
+
+
+def validate_file_content(contents: bytes, claimed_ext: str) -> None:
+    """Verify file content matches the claimed extension using magic byte inspection.
+
+    Uses puremagic to detect the actual MIME type from the raw bytes and checks
+    it against a known mapping for the claimed extension. Formats with weak or
+    absent magic signatures (.txt, .csv, .tar) are skipped.
+
+    When puremagic cannot identify the content (empty result or PureError) we
+    log a warning but allow the upload; the extension allowlist already limits
+    which types are accepted.
+
+    Raises:
+        HTTPException 400 if content does not match the claimed extension.
+    """
+    if len(contents) == 0:
+        raise HTTPException(status_code=400, detail="File is empty.")
+
+    if claimed_ext in _WEAK_MAGIC_EXTENSIONS:
+        return
+
+    allowed_mimes = EXTENSION_MIME_MAP.get(claimed_ext)
+    if not allowed_mimes:
+        return
+
+    try:
+        detected_mime = puremagic.from_string(contents, mime=True)
+    except puremagic.PureError:
+        logger.warning("puremagic could not identify content for claimed extension '%s'", claimed_ext)
+        return
+
+    if not detected_mime:
+        logger.warning("puremagic returned empty MIME for claimed extension '%s'", claimed_ext)
+        return
+
+    if detected_mime not in allowed_mimes:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"File content does not match the '{claimed_ext}' extension. Detected content type: {detected_mime}."
+            ),
+        )
 
 
 async def create_document(owner: User, payload: DocumentCreate) -> Document_:
@@ -89,6 +179,7 @@ async def upload_document_image(doc_id: str, user: User, filename: str, contents
     size_mb = len(contents) / (1024 * 1024)
     if len(contents) > IMAGE_MAX_SIZE:
         raise HTTPException(status_code=400, detail=f"Image too large ({size_mb:.1f}MB). Maximum size is 5MB.")
+    validate_file_content(contents, ext)
 
     doc = await _find_doc(doc_id)
     await _assert_access(doc, user, Permission.EDIT)
@@ -106,6 +197,47 @@ async def upload_document_image(doc_id: str, user: User, filename: str, contents
 
     url = blob_storage.get_public_url(key)
     return {"url": url, "name": image_name}
+
+
+async def upload_document_attachment(doc_id: str, user: User, filename: str, contents: bytes) -> dict[str, str]:
+    """Upload a generic file attachment for a document. Requires EDIT permission.
+
+    Returns:
+        Dict with "url", "name" (storage key), and "original_name".
+
+    Raises:
+        HTTPException: 400 for invalid file type/size, 403/404 for access.
+    """
+    ext = Path(filename).suffix.lower()
+    if ext not in ATTACHMENT_ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Unsupported file type '{ext or '(none)'}'. "
+                f"Allowed formats: {', '.join(sorted(ATTACHMENT_ALLOWED_EXTENSIONS))}"
+            ),
+        )
+    size_mb = len(contents) / (1024 * 1024)
+    if len(contents) > ATTACHMENT_MAX_SIZE:
+        raise HTTPException(status_code=400, detail=f"File too large ({size_mb:.1f}MB). Maximum size is 5MB.")
+    validate_file_content(contents, ext)
+
+    doc = await _find_doc(doc_id)
+    await _assert_access(doc, user, Permission.EDIT)
+
+    safe_name = f"{uuid.uuid4().hex}{ext}"
+    key = f"documents/{doc_id}/attachments/{safe_name}"
+    content_type = blob_storage.MIME_TYPES.get(ext, "application/octet-stream")
+    try:
+        blob_storage.upload(key, contents, content_type)
+    except Exception:
+        logger.exception("S3 upload failed for key %s", key)
+        raise HTTPException(
+            status_code=502, detail="File storage is temporarily unavailable. Please try again later."
+        ) from None
+
+    url = blob_storage.get_public_url(key)
+    return {"url": url, "name": safe_name, "original_name": filename}
 
 
 async def get_document(doc_id: str, user: User) -> Document_:

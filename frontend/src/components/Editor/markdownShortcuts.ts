@@ -2,7 +2,8 @@
  * Markdown formatting keyboard shortcuts for the CodeMirror editor.
  *
  * Provides toggle-wrap logic for inline markers (bold, italic, underline,
- * strikethrough, code) and a line-prefix toggle for headings.
+ * strikethrough, code), a line-prefix toggle for headings and lists,
+ * and a link insertion command.
  *
  * Each shortcut is idempotent: applying it twice returns to the original text.
  */
@@ -43,7 +44,30 @@ export function toggleHeading(lineText: string): string {
   return `# ${lineText}`;
 }
 
-function wrapCommand(marker: string) {
+/**
+ * Toggle a list prefix on a line.
+ * `ordered` = false → `- `, `ordered` = true → `1. `.
+ */
+export function toggleListPrefix(lineText: string, ordered: boolean): string {
+  const prefix = ordered ? "1. " : "- ";
+  if (lineText.startsWith(prefix)) {
+    return lineText.slice(prefix.length);
+  }
+  return `${prefix}${lineText}`;
+}
+
+/**
+ * Wrap selected text as a markdown link, or insert a link placeholder.
+ * With selection: `[selected](url)`. Without: `[](url)`.
+ */
+export function toLinkMarkdown(selectedText: string): string {
+  if (selectedText.length > 0) {
+    return `[${selectedText}](url)`;
+  }
+  return "[](url)";
+}
+
+export function wrapCommand(marker: string) {
   return (view: EditorView): boolean => {
     const { from, to } = view.state.selection.main;
     const selected = view.state.doc.sliceString(from, to);
@@ -59,7 +83,7 @@ function wrapCommand(marker: string) {
   };
 }
 
-function htmlWrapCommand(open: string, close: string) {
+export function htmlWrapCommand(open: string, close: string) {
   return (view: EditorView): boolean => {
     const { from, to } = view.state.selection.main;
     const selected = view.state.doc.sliceString(from, to);
@@ -75,12 +99,38 @@ function htmlWrapCommand(open: string, close: string) {
   };
 }
 
-function headingCommand(view: EditorView): boolean {
+export function headingCommand(view: EditorView): boolean {
   const { from } = view.state.selection.main;
   const line = view.state.doc.lineAt(from);
   const result = toggleHeading(line.text);
   view.dispatch({
     changes: { from: line.from, to: line.to, insert: result },
+  });
+  return true;
+}
+
+export function listCommand(ordered: boolean) {
+  return (view: EditorView): boolean => {
+    const { from } = view.state.selection.main;
+    const line = view.state.doc.lineAt(from);
+    const result = toggleListPrefix(line.text, ordered);
+    view.dispatch({
+      changes: { from: line.from, to: line.to, insert: result },
+    });
+    return true;
+  };
+}
+
+export function linkCommand(view: EditorView): boolean {
+  const { from, to } = view.state.selection.main;
+  const selected = view.state.doc.sliceString(from, to);
+  const result = toLinkMarkdown(selected);
+  view.dispatch({
+    changes: { from, to, insert: result },
+    selection: {
+      anchor: from + result.length - 4,
+      head: from + result.length - 1,
+    },
   });
   return true;
 }
@@ -92,16 +142,10 @@ const markdownBindings: KeyBinding[] = [
   { key: "Mod-Shift-s", run: wrapCommand("~~") },
   { key: "Mod-e", run: wrapCommand("`") },
   { key: "Mod-Shift-h", run: headingCommand },
+  { key: "Mod-Shift-l", run: linkCommand },
 ];
 
 /**
  * CodeMirror extension that registers all markdown formatting shortcuts.
  */
 export const markdownKeymap = keymap.of(markdownBindings);
-
-/** @internal Exported for testing only */
-export const _wrapCommand = wrapCommand;
-/** @internal Exported for testing only */
-export const _htmlWrapCommand = htmlWrapCommand;
-/** @internal Exported for testing only */
-export const _headingCommand = headingCommand;

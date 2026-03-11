@@ -94,6 +94,21 @@ async def upload_image(
     return await document_service.upload_document_image(doc_id, user, file.filename or "image.png", contents)
 
 
+@router.post("/{doc_id}/attachments")
+async def upload_attachment(
+    doc_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Upload a file attachment for a document. Requires EDIT permission.
+
+    Supports images, documents, spreadsheets, presentations, archives, and text files
+    up to 5 MB. Stored in S3 and served via the /media proxy route.
+    """
+    contents = await file.read()
+    return await document_service.upload_document_attachment(doc_id, user, file.filename or "attachment", contents)
+
+
 @router.get("/{doc_id}", response_model=DocumentRead)
 async def get_document(
     doc_id: str,

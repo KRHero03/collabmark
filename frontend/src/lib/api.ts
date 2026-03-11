@@ -137,6 +137,11 @@ export const documentsApi = {
     formData.append("file", file);
     return api.post<{ url: string; name: string }>(`/documents/${docId}/images`, formData);
   },
+  uploadAttachment: (docId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<{ url: string; name: string; original_name: string }>(`/documents/${docId}/attachments`, formData);
+  },
 };
 
 export const foldersApi = {

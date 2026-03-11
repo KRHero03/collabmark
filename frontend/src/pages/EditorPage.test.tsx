@@ -244,6 +244,10 @@ vi.mock("../components/Editor/CommentsPanel", () => ({
     ) : null,
 }));
 
+vi.mock("../components/Editor/FormattingToolbar", () => ({
+  FormattingToolbar: () => <div data-testid="formatting-toolbar" />,
+}));
+
 const defaultDocResponse = {
   data: {
     id: "doc-123",
