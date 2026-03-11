@@ -6,7 +6,7 @@ vi.mock("../components/Auth/SSOLoginFlow", () => ({
   SSOLoginFlow: () => (
     <div data-testid="sso-login-flow">
       <input data-testid="sso-email-input" placeholder="Enter your work email" />
-      <button data-testid="sso-continue-btn">Continue with email</button>
+      <button data-testid="sso-continue-btn">Continue with work email</button>
     </div>
   ),
 }));
