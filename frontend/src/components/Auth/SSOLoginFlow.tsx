@@ -117,12 +117,12 @@ export function SSOLoginFlow() {
             Checking...
           </>
         ) : (
-          "Continue with email"
+          "Continue with work email"
         )}
       </button>
 
       {state === "no_sso" && (
-        <div className="flex flex-col items-center gap-3" data-testid="sso-fallback">
+        <div data-testid="sso-fallback">
           <div
             className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950"
             data-testid="sso-no-org-message"
@@ -130,25 +130,17 @@ export function SSOLoginFlow() {
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
             <p className="text-xs text-amber-700 dark:text-amber-400">{noSsoMsg}</p>
           </div>
-          <div className="flex w-full items-center gap-3">
-            <div className="h-px flex-1 bg-[var(--color-border)]" />
-            <span className="text-xs text-[var(--color-text-muted)]">or</span>
-            <div className="h-px flex-1 bg-[var(--color-border)]" />
-          </div>
-          <GoogleLoginButton />
         </div>
       )}
 
-      {state === "idle" && (
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex w-full items-center gap-3">
-            <div className="h-px flex-1 bg-[var(--color-border)]" />
-            <span className="text-xs text-[var(--color-text-muted)]">or</span>
-            <div className="h-px flex-1 bg-[var(--color-border)]" />
-          </div>
-          <GoogleLoginButton />
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex w-full items-center gap-3">
+          <div className="h-px flex-1 bg-[var(--color-border)]" />
+          <span className="text-xs text-[var(--color-text-muted)]">or</span>
+          <div className="h-px flex-1 bg-[var(--color-border)]" />
         </div>
-      )}
+        <GoogleLoginButton />
+      </div>
     </div>
   );
 }

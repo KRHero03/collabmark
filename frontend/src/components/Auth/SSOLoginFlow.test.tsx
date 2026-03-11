@@ -34,7 +34,7 @@ describe("SSOLoginFlow", () => {
     const { getByTestId, getByPlaceholderText } = render(<SSOLoginFlow />);
     expect(getByPlaceholderText("Enter your work email")).toBeInTheDocument();
     expect(getByTestId("sso-continue-btn")).toBeInTheDocument();
-    expect(getByTestId("sso-continue-btn")).toHaveTextContent("Continue with email");
+    expect(getByTestId("sso-continue-btn")).toHaveTextContent("Continue with work email");
   });
 
   it("empty email shows validation error", async () => {
@@ -272,5 +272,88 @@ describe("SSOLoginFlow", () => {
     });
 
     expect(queryByTestId("sso-error")).toBeNull();
+  });
+
+  it("Google button is visible in idle state", () => {
+    const { getByRole } = render(<SSOLoginFlow />);
+    expect(getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
+  });
+
+  it("Google button remains visible after validation error", async () => {
+    const { getByTestId, getByRole } = render(<SSOLoginFlow />);
+    fireEvent.click(getByTestId("sso-continue-btn"));
+
+    await waitFor(() => {
+      expect(getByTestId("sso-error")).toBeInTheDocument();
+    });
+
+    expect(getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
+  });
+
+  it("Google button remains visible after invalid email error", async () => {
+    const { getByTestId, getByPlaceholderText, getByRole } = render(<SSOLoginFlow />);
+    fireEvent.change(getByPlaceholderText("Enter your work email"), {
+      target: { value: "not-an-email" },
+    });
+    fireEvent.click(getByTestId("sso-continue-btn"));
+
+    await waitFor(() => {
+      expect(getByTestId("sso-error")).toHaveTextContent("Please enter a valid email address.");
+    });
+
+    expect(getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
+  });
+
+  it("Google button remains visible during SSO detection", async () => {
+    let resolveDetect: (value: unknown) => void;
+    mockDetectSSO.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveDetect = resolve;
+        }),
+    );
+
+    const { getByTestId, getByPlaceholderText, getByRole } = render(<SSOLoginFlow />);
+    fireEvent.change(getByPlaceholderText("Enter your work email"), {
+      target: { value: "user@example.com" },
+    });
+    fireEvent.click(getByTestId("sso-continue-btn"));
+
+    expect(getByTestId("sso-continue-btn")).toHaveTextContent("Checking...");
+    expect(getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
+
+    resolveDetect!({ data: { sso: false } });
+    await waitFor(() => {
+      expect(getByTestId("sso-fallback")).toBeInTheDocument();
+    });
+  });
+
+  it("Google button remains visible when SSO query param error is shown", () => {
+    Object.defineProperty(window, "location", {
+      value: { href: "", search: "?error=sso_not_configured", pathname: "/login" },
+      writable: true,
+    });
+
+    const { getByTestId, getByRole } = render(<SSOLoginFlow />);
+    expect(getByTestId("sso-error")).toBeInTheDocument();
+    expect(getByRole("link", { name: /sign in with google/i })).toBeInTheDocument();
+  });
+
+  it("Google button is not visible during SSO redirect", async () => {
+    mockDetectSSO.mockResolvedValue({
+      data: { sso: true, org_id: "org-1", org_name: "TestOrg", protocol: "saml" },
+    });
+
+    const { getByTestId, getByPlaceholderText, queryByRole } = render(<SSOLoginFlow />);
+    fireEvent.change(getByPlaceholderText("Enter your work email"), {
+      target: { value: "user@testorg.com" },
+    });
+    fireEvent.click(getByTestId("sso-continue-btn"));
+
+    await waitFor(() => {
+      expect(getByTestId("sso-redirecting")).toBeInTheDocument();
+    });
+
+    expect(queryByRole("link", { name: /sign in with google/i })).toBeNull();
   });
 });
