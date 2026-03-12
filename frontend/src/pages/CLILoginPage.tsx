@@ -75,7 +75,10 @@ export function CLILoginPage() {
     <div className="min-h-screen bg-[var(--color-bg)]">
       {/* Sticky Top Bar */}
       <nav className="fixed inset-x-0 top-0 z-50 flex h-16 items-center justify-between border-b border-[var(--color-border)] bg-gradient-to-r from-white via-white to-blue-50/60 px-4 shadow-sm backdrop-blur-lg dark:from-[#0f172a]/90 dark:via-[#0f172a]/90 dark:to-indigo-950/40 md:px-8">
-        <a href="/" className="flex items-center gap-2 text-lg font-bold no-underline text-inherit transition hover:opacity-80">
+        <a
+          href="/"
+          className="flex items-center gap-2 text-lg font-bold no-underline text-inherit transition hover:opacity-80"
+        >
           <FileText className="h-6 w-6 text-[var(--color-primary)]" />
           <span>CollabMark</span>
         </a>
@@ -193,8 +196,7 @@ export function CLILoginPage() {
                     </span>
                   </h1>
                   <p className="text-sm text-[var(--color-text-muted)]">
-                    Connect your terminal to CollabMark.
-                    After signing in, you'll be redirected back automatically.
+                    Connect your terminal to CollabMark. After signing in, you'll be redirected back automatically.
                   </p>
                 </div>
                 <div className="flex justify-center">

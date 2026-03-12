@@ -424,7 +424,15 @@ export function HomePage() {
           }),
         onInfo: () => setInfoDoc(doc),
       }),
-    [restoreDocument, hardDeleteDocument, requestConfirm, closeConfirm, addToast, trashCurrentFolderId, navigateTrashFolder],
+    [
+      restoreDocument,
+      hardDeleteDocument,
+      requestConfirm,
+      closeConfirm,
+      addToast,
+      trashCurrentFolderId,
+      navigateTrashFolder,
+    ],
   );
 
   const handleTrashDocContextMenu = useCallback(
