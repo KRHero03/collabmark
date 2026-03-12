@@ -1,6 +1,18 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { Clock, FileText, Folder, FolderPlus, MoreVertical, Plus, Trash2, Users, XCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  Folder,
+  FolderPlus,
+  MoreVertical,
+  Plus,
+  Trash2,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { Navbar } from "../components/Layout/Navbar";
 import { FolderBreadcrumbs } from "../components/Home/FolderBreadcrumbs";
 import { CreateFolderDialog } from "../components/Home/CreateFolderDialog";
@@ -86,6 +98,14 @@ export function HomePage() {
     hardDeleteFolder,
     fetchTrashFolders,
     fetchContents,
+    trashCurrentFolderId,
+    trashSubFolders,
+    trashDocuments,
+    trashBreadcrumbs,
+    trashContentsLoading,
+    navigateTrashFolder,
+    deletedFolderRedirect,
+    clearDeletedFolderRedirect,
   } = useFolders();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -147,8 +167,20 @@ export function HomePage() {
     }
   }, [accessError, addToast, clearAccessError, navigateToFolder]);
 
+  const pendingTrashFolderRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (tab === "shared") {
+    if (deletedFolderRedirect) {
+      clearDeletedFolderRedirect();
+      pendingTrashFolderRef.current = deletedFolderRedirect;
+      setTab("trash");
+    }
+  }, [deletedFolderRedirect, clearDeletedFolderRedirect]);
+
+  useEffect(() => {
+    if (tab === "browse") {
+      fetchContents();
+    } else if (tab === "shared") {
       setSharedLoading(true);
       Promise.all([sharingApi.listShared(), foldersApi.listShared()]).then(([docsRes, foldersRes]) => {
         setSharedDocs(docsRes.data);
@@ -163,10 +195,17 @@ export function HomePage() {
         setRecentLoading(false);
       });
     } else if (tab === "trash") {
+      const pendingFolderId = pendingTrashFolderRef.current;
+      pendingTrashFolderRef.current = null;
+      if (pendingFolderId) {
+        navigateTrashFolder(pendingFolderId);
+      } else {
+        navigateTrashFolder(null);
+      }
       fetchTrash();
       fetchTrashFolders();
     }
-  }, [tab, fetchTrash, fetchTrashFolders]);
+  }, [tab, fetchContents, fetchTrash, fetchTrashFolders, navigateTrashFolder]);
 
   const handleCreateDoc = async () => {
     try {
@@ -356,6 +395,9 @@ export function HomePage() {
         onRestore: async () => {
           try {
             await restoreDocument(doc.id);
+            if (trashCurrentFolderId) {
+              navigateTrashFolder(trashCurrentFolderId);
+            }
             addToast("Document restored", "success");
           } catch (err) {
             addToast(extractApiError(err, "Failed to restore document."), "error");
@@ -371,6 +413,9 @@ export function HomePage() {
               closeConfirm();
               try {
                 await hardDeleteDocument(doc.id);
+                if (trashCurrentFolderId) {
+                  navigateTrashFolder(trashCurrentFolderId);
+                }
                 addToast("Document deleted permanently", "success");
               } catch (err) {
                 addToast(extractApiError(err, "Failed to delete document."), "error");
@@ -379,7 +424,15 @@ export function HomePage() {
           }),
         onInfo: () => setInfoDoc(doc),
       }),
-    [restoreDocument, hardDeleteDocument, requestConfirm, closeConfirm, addToast],
+    [
+      restoreDocument,
+      hardDeleteDocument,
+      requestConfirm,
+      closeConfirm,
+      addToast,
+      trashCurrentFolderId,
+      navigateTrashFolder,
+    ],
   );
 
   const handleTrashDocContextMenu = useCallback(
@@ -784,78 +837,184 @@ export function HomePage() {
         {/* ========== TRASH ========== */}
         {tab === "trash" && (
           <>
-            <div className="mb-6 flex justify-end">
-              {(trash.length > 0 || trashFolders.length > 0) && (
-                <button
-                  onClick={handleEmptyTrash}
-                  className="inline-flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
-                >
-                  <XCircle className="h-4 w-4" />
-                  <span className="hidden sm:inline">Empty Trash</span>
-                </button>
-              )}
-            </div>
-            {trashLoading || folderTrashLoading ? (
-              <Spinner />
-            ) : trash.length === 0 && trashFolders.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-[var(--color-border)] p-12 text-center">
-                <Trash2 className="mx-auto mb-3 h-10 w-10 text-[var(--color-text-muted)]" />
-                <p className="text-[var(--color-text-muted)]">Trash is empty.</p>
-              </div>
+            {trashCurrentFolderId ? (
+              <>
+                {/* Breadcrumb bar when viewing inside a deleted folder */}
+                <div className="mb-4 flex items-center gap-1 text-sm">
+                  <button
+                    onClick={() => navigateTrashFolder(null)}
+                    className="text-[var(--color-primary)] hover:underline"
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      <ArrowLeft className="h-3.5 w-3.5" />
+                      Trash
+                    </span>
+                  </button>
+                  {trashBreadcrumbs.map((crumb) => (
+                    <span key={crumb.id} className="inline-flex items-center gap-1">
+                      <ChevronRight className="h-3.5 w-3.5 text-[var(--color-text-muted)]" />
+                      <button
+                        onClick={() => navigateTrashFolder(crumb.id)}
+                        className={
+                          crumb.id === trashCurrentFolderId
+                            ? "font-medium text-[var(--color-text)]"
+                            : "text-[var(--color-primary)] hover:underline"
+                        }
+                      >
+                        {crumb.name}
+                      </button>
+                    </span>
+                  ))}
+                </div>
+
+                {trashContentsLoading ? (
+                  <Spinner />
+                ) : trashSubFolders.length === 0 && trashDocuments.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--color-border)] p-12 text-center">
+                    <Folder className="mx-auto mb-3 h-10 w-10 text-[var(--color-text-muted)]" />
+                    <p className="text-[var(--color-text-muted)]">This folder is empty.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {trashSubFolders.map((folder) => (
+                      <div
+                        key={`folder-${folder.id}`}
+                        className="group flex cursor-pointer items-center justify-between rounded-lg border border-[var(--color-border)] p-4 transition hover:bg-[var(--color-bg-secondary)]"
+                        onClick={() => navigateTrashFolder(folder.id)}
+                        onContextMenu={(e) => handleTrashFolderContextMenu(e, folder)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Folder className="h-5 w-5 flex-shrink-0 text-[var(--color-text-muted)]" />
+                          <div>
+                            <p className="font-medium text-[var(--color-text)]">{folder.name}</p>
+                            <p className="text-xs text-[var(--color-text-muted)]">
+                              Folder · Deleted {folder.deleted_at ? formatDateTime(folder.deleted_at) : "recently"}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openMenuFromButton(e, buildTrashFolderActions(folder));
+                          }}
+                          className="rounded p-1 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] sm:invisible sm:group-hover:visible"
+                          aria-label="More actions"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                    {trashDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="group flex items-center justify-between rounded-lg border border-[var(--color-border)] p-4 transition hover:bg-[var(--color-bg-secondary)]"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          handleTrashDocContextMenu(e, doc);
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 flex-shrink-0 text-[var(--color-text-muted)]" />
+                          <div>
+                            <p className="font-medium text-[var(--color-text)]">{doc.title}</p>
+                            <p className="text-xs text-[var(--color-text-muted)]">
+                              Document · Deleted {doc.deleted_at ? formatDateTime(doc.deleted_at) : "recently"}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => openMenuFromButton(e, buildTrashDocActions(doc))}
+                          className="rounded p-1 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] sm:invisible sm:group-hover:visible"
+                          aria-label="More actions"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="space-y-2">
-                {trashFolders.map((folder) => (
-                  <div
-                    key={`folder-${folder.id}`}
-                    className="group flex items-center justify-between rounded-lg border border-[var(--color-border)] p-4 transition hover:bg-[var(--color-bg-secondary)]"
-                    onContextMenu={(e) => handleTrashFolderContextMenu(e, folder)}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Folder className="h-5 w-5 flex-shrink-0 text-[var(--color-text-muted)]" />
-                      <div>
-                        <p className="font-medium text-[var(--color-text)]">{folder.name}</p>
-                        <p className="text-xs text-[var(--color-text-muted)]">
-                          Folder · Deleted {folder.deleted_at ? formatDateTime(folder.deleted_at) : "recently"}
-                        </p>
-                      </div>
-                    </div>
+              <>
+                {/* Root trash view */}
+                <div className="mb-6 flex justify-end">
+                  {(trash.length > 0 || trashFolders.length > 0) && (
                     <button
-                      onClick={(e) => openMenuFromButton(e, buildTrashFolderActions(folder))}
-                      className="rounded p-1 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] sm:invisible sm:group-hover:visible"
-                      aria-label="More actions"
+                      onClick={handleEmptyTrash}
+                      className="inline-flex items-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
                     >
-                      <MoreVertical className="h-4 w-4" />
+                      <XCircle className="h-4 w-4" />
+                      <span className="hidden sm:inline">Empty Trash</span>
                     </button>
+                  )}
+                </div>
+                {trashLoading || folderTrashLoading ? (
+                  <Spinner />
+                ) : trash.length === 0 && trashFolders.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--color-border)] p-12 text-center">
+                    <Trash2 className="mx-auto mb-3 h-10 w-10 text-[var(--color-text-muted)]" />
+                    <p className="text-[var(--color-text-muted)]">Trash is empty.</p>
                   </div>
-                ))}
-                {trash.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="group flex items-center justify-between rounded-lg border border-[var(--color-border)] p-4 transition hover:bg-[var(--color-bg-secondary)]"
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      handleTrashDocContextMenu(e, doc);
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileText className="h-5 w-5 flex-shrink-0 text-[var(--color-text-muted)]" />
-                      <div>
-                        <p className="font-medium text-[var(--color-text)]">{doc.title}</p>
-                        <p className="text-xs text-[var(--color-text-muted)]">
-                          Document · Deleted {doc.deleted_at ? formatDateTime(doc.deleted_at) : "recently"}
-                        </p>
+                ) : (
+                  <div className="space-y-2">
+                    {trashFolders.map((folder) => (
+                      <div
+                        key={`folder-${folder.id}`}
+                        className="group flex cursor-pointer items-center justify-between rounded-lg border border-[var(--color-border)] p-4 transition hover:bg-[var(--color-bg-secondary)]"
+                        onClick={() => navigateTrashFolder(folder.id)}
+                        onContextMenu={(e) => handleTrashFolderContextMenu(e, folder)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Folder className="h-5 w-5 flex-shrink-0 text-[var(--color-text-muted)]" />
+                          <div>
+                            <p className="font-medium text-[var(--color-text)]">{folder.name}</p>
+                            <p className="text-xs text-[var(--color-text-muted)]">
+                              Folder · Deleted {folder.deleted_at ? formatDateTime(folder.deleted_at) : "recently"}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openMenuFromButton(e, buildTrashFolderActions(folder));
+                          }}
+                          className="rounded p-1 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] sm:invisible sm:group-hover:visible"
+                          aria-label="More actions"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
                       </div>
-                    </div>
-                    <button
-                      onClick={(e) => openMenuFromButton(e, buildTrashDocActions(doc))}
-                      className="rounded p-1 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] sm:invisible sm:group-hover:visible"
-                      aria-label="More actions"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </button>
+                    ))}
+                    {trash.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="group flex items-center justify-between rounded-lg border border-[var(--color-border)] p-4 transition hover:bg-[var(--color-bg-secondary)]"
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          handleTrashDocContextMenu(e, doc);
+                        }}
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 flex-shrink-0 text-[var(--color-text-muted)]" />
+                          <div>
+                            <p className="font-medium text-[var(--color-text)]">{doc.title}</p>
+                            <p className="text-xs text-[var(--color-text-muted)]">
+                              Document · Deleted {doc.deleted_at ? formatDateTime(doc.deleted_at) : "recently"}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => openMenuFromButton(e, buildTrashDocActions(doc))}
+                          className="rounded p-1 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] sm:invisible sm:group-hover:visible"
+                          aria-label="More actions"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </>
             )}
           </>
         )}

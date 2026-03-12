@@ -9,7 +9,10 @@ import { ProfilePage } from "./pages/ProfilePage";
 import { ApiDocsPage } from "./pages/ApiDocsPage";
 import { SuperAdminPage } from "./pages/SuperAdminPage";
 import { OrgSettingsPage } from "./pages/OrgSettingsPage";
+import { CLILoginPage } from "./pages/CLILoginPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
+
+const CLI_PORT_KEY = "cli_login_port";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -31,6 +34,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function SmartHome() {
   const { user, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading || !user) return;
+    const raw = sessionStorage.getItem(CLI_PORT_KEY);
+    if (!raw) return;
+    try {
+      const { port, ts } = JSON.parse(raw);
+      const ageMs = Date.now() - ts;
+      if (port && ageMs < 5 * 60 * 1000) {
+        sessionStorage.removeItem(CLI_PORT_KEY);
+        window.location.href = `/api/auth/cli/complete?port=${port}`;
+        return;
+      }
+    } catch {
+      /* not JSON — legacy or corrupt entry */
+    }
+    sessionStorage.removeItem(CLI_PORT_KEY);
+  }, [user, loading]);
 
   if (loading) {
     return (
@@ -55,6 +76,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<SmartHome />} />
         <Route path="/login" element={<SmartHome />} />
+        <Route path="/cli-login" element={<CLILoginPage />} />
         <Route
           path="/edit/:id"
           element={

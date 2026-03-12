@@ -3,14 +3,14 @@
 import logging
 import secrets
 
-from fastapi import APIRouter, Query, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Cookie, Query, Request, Response
+from fastapi.responses import HTMLResponse, RedirectResponse
 
 from app.auth.cookie_utils import clear_auth_cookie, set_auth_cookie
 from app.auth.google_oauth import get_google_oauth
-from app.auth.jwt import create_access_token
+from app.auth.jwt import create_access_token, decode_access_token
 from app.auth.sso_common import detect_org_by_email_domain, find_or_create_sso_user
-from app.config import settings
+from app.config import AUTH_COOKIE_NAME, settings
 from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
 from app.models.user import User
 
@@ -89,6 +89,44 @@ async def google_callback(request: Request):
     response = RedirectResponse(url=settings.frontend_url)
     set_auth_cookie(response, access_token)
     return response
+
+
+@router.get("/cli/complete")
+async def cli_complete(
+    port: int = Query(...),
+    access_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_NAME),
+):
+    """Relay the authenticated user's JWT to the CLI's local callback server.
+
+    The frontend redirects here after a successful login during the CLI flow.
+    This endpoint reads the httpOnly JWT cookie (which JS cannot access) and
+    redirects to the CLI's localhost server with the token as a query param.
+    The CLI's local server then redirects the browser back to the frontend
+    ``/cli-login?status=success`` page for the final UI.
+
+    Args:
+        port: The CLI's local HTTP server port.
+        access_token: JWT from the httpOnly cookie.
+
+    Returns:
+        302 redirect to ``http://localhost:{port}/callback?token={jwt}``.
+    """
+    if not access_token or decode_access_token(access_token) is None:
+        return _error_redirect("cli_not_authenticated")
+
+    if not (1024 <= port <= 65535):
+        return _error_redirect("cli_invalid_port")
+
+    redirect_url = f"http://localhost:{port}/callback?token={access_token}"
+
+    html = f"""<!DOCTYPE html>
+<html><head>
+<meta http-equiv="refresh" content="0;url={redirect_url}">
+<style>body{{margin:0;display:flex;align-items:center;justify-content:center;height:100vh;
+font-family:-apple-system,system-ui,sans-serif;background:#fff;color:#64748b;font-size:.875rem}}</style>
+</head><body>Completing login&hellip;</body></html>"""
+
+    return HTMLResponse(content=html, status_code=200)
 
 
 @router.post("/logout")

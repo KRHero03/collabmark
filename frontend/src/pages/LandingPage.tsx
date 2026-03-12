@@ -12,6 +12,8 @@ import {
   Zap,
   Shield,
   Globe,
+  Moon,
+  Sun,
 } from "lucide-react";
 import { SSOLoginFlow } from "../components/Auth/SSOLoginFlow";
 
@@ -74,6 +76,22 @@ export function LandingPage() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const touchStartX = useRef(0);
   const [scrolled, setScrolled] = useState(false);
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  const toggleDark = useCallback(() => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    localStorage.setItem("theme", next ? "dark" : "light");
+  }, [dark]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved === "dark" && !dark) {
+      document.documentElement.classList.add("dark");
+      setDark(true);
+    }
+  }, []);
 
   useEffect(() => {
     document.title = "CollabMark -- Collaborative Markdown Editor";
@@ -127,6 +145,14 @@ export function LandingPage() {
           <FileText className="h-6 w-6 text-[var(--color-primary)]" />
           <span>CollabMark</span>
         </div>
+        <button
+          onClick={toggleDark}
+          className="rounded-lg p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] hover:text-[var(--color-text)]"
+          title={dark ? "Light mode" : "Dark mode"}
+          aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+        </button>
       </nav>
 
       {/* --- Hero Section --- */}
