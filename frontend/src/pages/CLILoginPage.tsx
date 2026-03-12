@@ -10,7 +10,7 @@ type PageStatus = "login" | "success" | "error";
 export function CLILoginPage() {
   const { user, loading } = useAuth();
   const [dark, setDark] = useState(() => document.documentElement.classList.contains("dark"));
-  const [status, setStatus] = useState<PageStatus>(() => {
+  const [status] = useState<PageStatus>(() => {
     const params = new URLSearchParams(window.location.search);
     const s = params.get("status");
     if (s === "success") return "success";
