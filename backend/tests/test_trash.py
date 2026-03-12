@@ -15,7 +15,9 @@ def _auth_cookies(user: User) -> dict[str, str]:
     return {"access_token": token}
 
 
-async def _create_doc(client: AsyncClient, title: str = "Test Doc", content: str = "", folder_id: str | None = None) -> dict:
+async def _create_doc(
+    client: AsyncClient, title: str = "Test Doc", content: str = "", folder_id: str | None = None
+) -> dict:
     payload: dict = {"title": title, "content": content}
     if folder_id is not None:
         payload["folder_id"] = folder_id
@@ -587,9 +589,7 @@ class TestFolderRestoreScenarios:
     """Restore behavior for folders with hierarchy."""
 
     @pytest.mark.asyncio
-    async def test_folder_restore_moves_to_root_when_parent_deleted(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_folder_restore_moves_to_root_when_parent_deleted(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         parent = await _create_folder(async_client, "GrandParent")
         child = await _create_folder(async_client, "Child", parent_id=parent["id"])
@@ -600,9 +600,7 @@ class TestFolderRestoreScenarios:
         assert resp.json()["parent_id"] is None
 
     @pytest.mark.asyncio
-    async def test_folder_restore_cascade_restores_children(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_folder_restore_cascade_restores_children(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         folder = await _create_folder(async_client, "Root")
         subfolder = await _create_folder(async_client, "Sub", parent_id=folder["id"])
@@ -615,15 +613,11 @@ class TestFolderRestoreScenarios:
         contents = (await async_client.get("/api/folders/contents", params={"folder_id": folder["id"]})).json()
         assert subfolder["id"] in [f["id"] for f in contents["folders"]]
 
-        sub_contents = (
-            await async_client.get("/api/folders/contents", params={"folder_id": subfolder["id"]})
-        ).json()
+        sub_contents = (await async_client.get("/api/folders/contents", params={"folder_id": subfolder["id"]})).json()
         assert doc["id"] in [d["id"] for d in sub_contents["documents"]]
 
     @pytest.mark.asyncio
-    async def test_folder_restore_stays_in_parent_when_parent_alive(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_folder_restore_stays_in_parent_when_parent_alive(self, async_client: AsyncClient, test_user: User):
         async_client.cookies.update(_auth_cookies(test_user))
         parent = await _create_folder(async_client, "Alive")
         child = await _create_folder(async_client, "Nested", parent_id=parent["id"])
@@ -656,9 +650,7 @@ class TestDeletedItemAccessBlocked:
         assert resp.status_code == 410
 
     @pytest.mark.asyncio
-    async def test_non_owner_cannot_access_deleted_doc_via_acl(
-        self, async_client: AsyncClient, test_user: User
-    ):
+    async def test_non_owner_cannot_access_deleted_doc_via_acl(self, async_client: AsyncClient, test_user: User):
         other = User(google_id="acl-other", email="acl-other@test.com", name="Other")
         await other.insert()
 

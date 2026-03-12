@@ -99,6 +99,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.middleware("http")
 async def no_cache_api(request: Request, call_next):
     response = await call_next(request)
