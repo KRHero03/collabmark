@@ -1,8 +1,16 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { render, fireEvent, cleanup, act } from "@testing-library/react";
 import { LandingPage } from "./LandingPage";
 
 describe("LandingPage", () => {
+  beforeEach(() => {
+    document.documentElement.classList.remove("dark");
+    Object.defineProperty(window, "localStorage", {
+      value: { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn(), clear: vi.fn(), length: 0, key: vi.fn() },
+      writable: true,
+    });
+  });
+
   afterEach(cleanup);
 
   it("renders the hero headline 'Collaborative Markdown, Supercharged'", () => {
