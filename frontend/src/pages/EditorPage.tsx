@@ -141,6 +141,7 @@ export function EditorPage() {
         const status = err?.response?.status;
         if (status === 404) setLoadError("Document not found");
         else if (status === 403) setLoadError("Permission denied");
+        else if (status === 410) setLoadError("This document has been deleted");
         else setLoadError("Failed to load document");
       });
   }, [id, user?.id]);
@@ -162,11 +163,17 @@ export function EditorPage() {
   }, [id]);
 
   useEffect(() => {
-    document.title = title ? `${title} - CollabMark` : "CollabMark";
+    if (loadError) {
+      document.title = loadError.toLowerCase().includes("deleted")
+        ? "Document deleted - CollabMark"
+        : "Error - CollabMark";
+    } else {
+      document.title = title ? `${title} - CollabMark` : "CollabMark";
+    }
     return () => {
       document.title = "CollabMark";
     };
-  }, [title]);
+  }, [title, loadError]);
 
   useEffect(() => {
     if (!synced) return;
@@ -501,7 +508,15 @@ ${previewEl.innerHTML}
   }
 
   if (loadError) {
-    return <NotFoundPage />;
+    const isDeleted = loadError.toLowerCase().includes("deleted");
+    return (
+      <NotFoundPage
+        code={isDeleted ? "410" : "404"}
+        title={isDeleted ? "Document deleted" : "Page not found"}
+        message={loadError}
+        icon={isDeleted ? "trash" : "file"}
+      />
+    );
   }
 
   return (

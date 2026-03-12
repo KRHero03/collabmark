@@ -59,6 +59,11 @@ async def create_folder(owner: User, payload: FolderCreate) -> Folder:
 
 async def get_folder(folder_id: str, user: User) -> Folder:
     folder = await _find_folder(folder_id)
+    if folder.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail={"message": "This folder has been deleted", "folder_id": folder_id},
+        )
     await _assert_folder_access(folder, user, Permission.VIEW)
     return folder
 
@@ -158,17 +163,19 @@ async def soft_delete_folder(folder_id: str, user: User) -> Folder:
 
 
 async def restore_folder(folder_id: str, user: User) -> Folder:
-    """Cascade restore: restores the folder and all nested folders/documents."""
+    """Cascade restore: restores the folder and all nested folders/documents.
+
+    If the folder's parent is still deleted the folder is moved to root
+    (parent_id set to None) so the hierarchy break removes inherited ACLs
+    while preserving the folder's own access management.
+    """
     folder = await _find_folder(folder_id)
     await _assert_can_delete_folder(folder, user)
 
     if folder.parent_id is not None:
         parent = await _find_folder_or_none(folder.parent_id)
         if parent is not None and parent.is_deleted:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot restore a folder whose parent is still deleted",
-            )
+            folder.parent_id = None
 
     await _cascade_restore(folder)
     return folder
@@ -194,6 +201,45 @@ async def list_trash_folders(user: User) -> list[Folder]:
             if parent is None or not parent.is_deleted:
                 result.append(f)
     return result
+
+
+async def list_trash_folder_contents(folder_id: str, user: User) -> dict:
+    """List the deleted children (folders and documents) inside a trashed folder.
+
+    Also returns an ``ancestors`` list walking up the deleted parent chain
+    so the frontend can render full breadcrumbs even on direct URL access.
+    """
+    folder = await _find_folder(folder_id)
+    if folder.owner_id != str(user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this folder's trash contents",
+        )
+
+    child_folders = (
+        await Folder.find({"parent_id": folder_id, "is_deleted": True}).sort(["-deleted_at", "-_id"]).to_list()
+    )
+    child_docs = (
+        await Document_.find({"folder_id": folder_id, "is_deleted": True}).sort(["-deleted_at", "-_id"]).to_list()
+    )
+
+    ancestors: list[dict[str, str]] = []
+    current = folder
+    while current is not None:
+        ancestors.insert(0, {"id": str(current.id), "name": current.name})
+        if current.parent_id:
+            parent = await _find_folder_or_none(current.parent_id)
+            if parent and parent.is_deleted:
+                current = parent
+                continue
+        break
+
+    return {
+        "folders": child_folders,
+        "documents": child_docs,
+        "parent_folder": folder,
+        "ancestors": ancestors,
+    }
 
 
 async def hard_delete_folder(folder_id: str, user: User) -> None:
@@ -223,6 +269,11 @@ async def list_folder_contents(user: User, folder_id: str | None = None) -> dict
     """
     if folder_id is not None:
         folder = await _find_folder(folder_id)
+        if folder.is_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail={"message": "This folder is in the trash", "folder_id": folder_id},
+            )
         await _assert_folder_access(folder, user, Permission.VIEW)
         permission = await get_folder_permission(folder_id, user)
 
@@ -239,6 +290,52 @@ async def list_folder_contents(user: User, folder_id: str | None = None) -> dict
     )
 
     return {"folders": own_folders, "documents": own_docs, "permission": "edit"}
+
+
+async def get_folder_tree(folder_id: str, user: User, max_depth: int = 10) -> dict:
+    """Recursively list all nested folders and documents under a folder.
+
+    Returns a tree structure:
+    {
+        "id": "...", "name": "...",
+        "folders": [<subtree>, ...],
+        "documents": [<DocumentRead>, ...],
+        "permission": "edit"|"view"
+    }
+    """
+    folder = await _find_folder(folder_id)
+    await _assert_folder_access(folder, user, Permission.VIEW)
+    permission = await get_folder_permission(folder_id, user)
+
+    return await _build_subtree(folder_id, str(folder.name), permission, depth=0, max_depth=max_depth)
+
+
+async def _build_subtree(folder_id: str, folder_name: str, permission: str, depth: int, max_depth: int) -> dict:
+    child_folders = await Folder.find({"parent_id": folder_id, "is_deleted": False}).sort("name").to_list()
+    child_docs = await Document_.find({"folder_id": folder_id, "is_deleted": False}).sort("title").to_list()
+
+    subtrees = []
+    if depth < max_depth:
+        for cf in child_folders:
+            subtree = await _build_subtree(str(cf.id), cf.name, permission, depth + 1, max_depth)
+            subtrees.append(subtree)
+
+    return {
+        "id": folder_id,
+        "name": folder_name,
+        "folders": subtrees,
+        "documents": [
+            {
+                "id": str(d.id),
+                "title": d.title,
+                "content": d.content,
+                "content_length": len(d.content),
+                "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+            }
+            for d in child_docs
+        ],
+        "permission": permission,
+    }
 
 
 async def get_breadcrumbs(folder_id: str, user: User) -> list[dict]:

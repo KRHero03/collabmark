@@ -46,9 +46,7 @@ class TestSaveApiKey:
     @patch("collabmark.lib.auth.keyring")
     def test_stores_in_keyring(self, mock_keyring: MagicMock) -> None:
         save_api_key(FAKE_KEY)
-        mock_keyring.set_password.assert_called_once_with(
-            "collabmark-cli", "api_key", FAKE_KEY
-        )
+        mock_keyring.set_password.assert_called_once_with("collabmark-cli", "api_key", FAKE_KEY)
 
     @patch("collabmark.lib.auth.keyring")
     def test_raises_on_no_keyring_backend(self, mock_keyring: MagicMock) -> None:
@@ -62,9 +60,7 @@ class TestLoadApiKey:
     def test_loads_from_keyring(self, mock_keyring: MagicMock) -> None:
         mock_keyring.get_password.return_value = FAKE_KEY
         assert load_api_key() == FAKE_KEY
-        mock_keyring.get_password.assert_called_once_with(
-            "collabmark-cli", "api_key"
-        )
+        mock_keyring.get_password.assert_called_once_with("collabmark-cli", "api_key")
 
     @patch("collabmark.lib.auth.keyring")
     def test_returns_none_when_not_stored(self, mock_keyring: MagicMock) -> None:
@@ -221,9 +217,7 @@ class TestValidateApiKey:
     @pytest.mark.asyncio
     @respx.mock
     async def test_valid_key_returns_user_info(self) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(200, json=FAKE_USER_RESPONSE)
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(200, json=FAKE_USER_RESPONSE))
         info = await validate_api_key(FAKE_KEY, api_url=API_BASE)
         assert isinstance(info, UserInfo)
         assert info.email == "pm@acme.com"
@@ -233,36 +227,28 @@ class TestValidateApiKey:
     @pytest.mark.asyncio
     @respx.mock
     async def test_invalid_key_raises_auth_error(self) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(401, json={"detail": "Invalid API key"})
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(401, json={"detail": "Invalid API key"}))
         with pytest.raises(AuthError, match="Invalid API key"):
             await validate_api_key("cm_bad_key", api_url=API_BASE)
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_server_error_raises_auth_error(self) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(500, text="Internal Server Error")
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(500, text="Internal Server Error"))
         with pytest.raises(AuthError, match="unexpected status 500"):
             await validate_api_key(FAKE_KEY, api_url=API_BASE)
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_network_error_raises_auth_error(self) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            side_effect=httpx.ConnectError("Connection refused")
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(side_effect=httpx.ConnectError("Connection refused"))
         with pytest.raises(AuthError, match="Cannot reach"):
             await validate_api_key(FAKE_KEY, api_url=API_BASE)
 
     @pytest.mark.asyncio
     @respx.mock
     async def test_sends_api_key_header(self) -> None:
-        route = respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(200, json=FAKE_USER_RESPONSE)
-        )
+        route = respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(200, json=FAKE_USER_RESPONSE))
         await validate_api_key(FAKE_KEY, api_url=API_BASE)
         assert route.called
         request = route.calls[0].request
@@ -285,9 +271,7 @@ class TestEnsureAuthenticated:
     @respx.mock
     @patch("collabmark.lib.auth.load_api_key", return_value=FAKE_KEY)
     async def test_returns_key_and_user_info(self, _mock_load: MagicMock) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(200, json=FAKE_USER_RESPONSE)
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(200, json=FAKE_USER_RESPONSE))
         api_key, user_info = await ensure_authenticated(api_url=API_BASE)
         assert api_key == FAKE_KEY
         assert user_info.name == "Alice PM"
@@ -296,9 +280,7 @@ class TestEnsureAuthenticated:
     @respx.mock
     @patch("collabmark.lib.auth.load_api_key", return_value=FAKE_KEY)
     async def test_raises_on_expired_key(self, _mock_load: MagicMock) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(401, json={"detail": "Expired"})
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(401, json={"detail": "Expired"}))
         with pytest.raises(AuthError, match="Invalid API key"):
             await ensure_authenticated(api_url=API_BASE)
 

@@ -148,8 +148,7 @@ async def browser_login(
 
         if _CallbackHandler.token is None:
             raise AuthError(
-                f"Login timed out after {timeout_seconds}s. "
-                "Please try again or use --api-key for manual login."
+                f"Login timed out after {timeout_seconds}s. Please try again or use --api-key for manual login."
             )
 
         jwt_token = _CallbackHandler.token

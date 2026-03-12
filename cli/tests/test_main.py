@@ -22,28 +22,23 @@ class TestCLIEntryPoint:
         assert __version__ in result.output
 
 
-class TestStartCommandStub:
-    """Verify the start command stub is wired up."""
+class TestStartCommand:
+    """Verify the start command is wired up correctly."""
 
     def test_start_help(self, cli_runner: CliRunner) -> None:
         result = cli_runner.invoke(cli, ["start", "--help"])
         assert result.exit_code == 0
         assert "Start syncing" in result.output
 
-    def test_start_no_args(self, cli_runner: CliRunner) -> None:
+    def test_start_shows_options(self, cli_runner: CliRunner) -> None:
+        result = cli_runner.invoke(cli, ["start", "--help"])
+        assert "--daemon" in result.output
+        assert "--path" in result.output
+        assert "--interval" in result.output
+
+    def test_start_without_auth_exits_with_error(self, cli_runner: CliRunner) -> None:
         result = cli_runner.invoke(cli, ["start"])
-        assert result.exit_code == 0
-        assert "not yet implemented" in result.output
-
-    def test_start_with_link(self, cli_runner: CliRunner) -> None:
-        result = cli_runner.invoke(cli, ["start", "https://collabmark.io/share/abc123"])
-        assert result.exit_code == 0
-        assert "abc123" in result.output
-
-    def test_start_daemon_flag(self, cli_runner: CliRunner) -> None:
-        result = cli_runner.invoke(cli, ["start", "--daemon"])
-        assert result.exit_code == 0
-        assert "daemon" in result.output
+        assert result.exit_code == 1
 
 
 class TestStatusCommandStub:

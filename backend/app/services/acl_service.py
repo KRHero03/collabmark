@@ -228,6 +228,9 @@ async def get_base_permission(
         if doc is None:
             return None
 
+        if doc.is_deleted and doc.owner_id != user_id:
+            return None
+
         if doc.owner_id == user_id:
             return Permission.EDIT
 
@@ -269,6 +272,9 @@ async def get_base_permission(
     except (InvalidId, ValueError):
         return None
     if folder is None:
+        return None
+
+    if folder.is_deleted and folder.owner_id != user_id:
         return None
 
     if folder.owner_id == user_id:

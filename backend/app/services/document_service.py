@@ -13,6 +13,7 @@ from app.models.comment import Comment
 from app.models.document import Document_, DocumentCreate, DocumentUpdate, GeneralAccess
 from app.models.document_version import DocumentVersion
 from app.models.document_view import DocumentView
+from app.models.folder import Folder
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 from app.services import blob_storage
@@ -251,9 +252,14 @@ async def get_document(doc_id: str, user: User) -> Document_:
         The Document_ instance.
 
     Raises:
-        HTTPException: 404 if not found, 403 if no access.
+        HTTPException: 404 if not found, 410 if deleted, 403 if no access.
     """
     doc = await _find_doc(doc_id)
+    if doc.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This document has been deleted",
+        )
     await _assert_access(doc, user, Permission.VIEW)
     return doc
 
@@ -286,9 +292,14 @@ async def update_document(doc_id: str, user: User, payload: DocumentUpdate) -> D
         The updated Document_ instance.
 
     Raises:
-        HTTPException: 404 if not found, 403 if no edit access.
+        HTTPException: 404 if not found, 410 if deleted, 403 if no edit access.
     """
     doc = await _find_doc(doc_id)
+    if doc.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="This document has been deleted",
+        )
     await _assert_access(doc, user, Permission.EDIT)
 
     content_changed = payload.content is not None and payload.content != doc.content
@@ -321,33 +332,46 @@ async def update_document(doc_id: str, user: User, payload: DocumentUpdate) -> D
 
 
 async def soft_delete_document(doc_id: str, user: User) -> Document_:
-    """Soft-delete a document. Requires delete permission (ACL-aware)."""
+    """Soft-delete a document. Requires delete permission (ACL-aware).
+
+    Breaks the folder hierarchy link so the document appears independently
+    in the root trash view and restores to root.
+    """
     doc = await _find_doc(doc_id)
     await _assert_can_delete(doc, user)
+    doc.folder_id = None
     doc.soft_delete()
     await doc.save()
     return doc
 
 
 async def restore_document(doc_id: str, user: User) -> Document_:
-    """Restore a soft-deleted document. Requires delete permission (ACL-aware)."""
+    """Restore a soft-deleted document. Requires delete permission (ACL-aware).
+
+    If the document's parent folder is still deleted the document is moved
+    to the root level so it remains accessible after restoration.
+    """
     doc = await _find_doc(doc_id)
     await _assert_can_delete(doc, user)
+
+    if doc.folder_id is not None:
+        folder = await Folder.find_one(Folder.id == PydanticObjectId(doc.folder_id))
+        if folder is not None and folder.is_deleted:
+            doc.folder_id = None
+
     doc.restore()
     await doc.save()
     return doc
 
 
 async def list_trash(user: User) -> list[Document_]:
-    """List soft-deleted documents owned by the user, sorted by deleted_at descending.
+    """List top-level trashed documents (whose parent folder is NOT also trashed).
 
-    Args:
-        user: Owner whose trashed documents to list.
-
-    Returns:
-        List of soft-deleted Document_ instances.
+    Documents that were cascade-deleted as part of a folder deletion are
+    excluded — they are visible only when drilling into the folder in the
+    trash view.
     """
-    return (
+    trashed = (
         await Document_.find(
             Document_.owner_id == str(user.id),
             Document_.is_deleted == True,
@@ -355,6 +379,22 @@ async def list_trash(user: User) -> list[Document_]:
         .sort(["-deleted_at", "-_id"])
         .to_list()
     )
+
+    result: list[Document_] = []
+    folder_cache: dict[str, bool] = {}
+    for doc in trashed:
+        if doc.folder_id is None:
+            result.append(doc)
+            continue
+
+        if doc.folder_id not in folder_cache:
+            folder = await Folder.find_one(Folder.id == PydanticObjectId(doc.folder_id))
+            folder_cache[doc.folder_id] = folder is not None and folder.is_deleted
+
+        if not folder_cache[doc.folder_id]:
+            result.append(doc)
+
+    return result
 
 
 async def hard_delete_document(doc_id: str, user: User) -> None:

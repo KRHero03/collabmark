@@ -45,13 +45,14 @@ const GROUPS: EndpointGroup[] = [
         summary: "Create a document",
         description:
           "Create a new Markdown document. Both fields are optional and default to 'Untitled' and empty content.",
-        body: JSON.stringify({ title: "My Document", content: "# Hello World" }, null, 2),
+        body: JSON.stringify({ title: "My Document", content: "# Hello World", folder_id: null }, null, 2),
         responseExample: JSON.stringify(
           {
             id: "abc123",
             title: "My Document",
             content: "# Hello World",
             owner_id: "user123",
+            folder_id: null,
             general_access: "restricted",
             is_deleted: false,
             created_at: "2026-01-01T00:00:00Z",
@@ -79,7 +80,8 @@ const GROUPS: EndpointGroup[] = [
         method: "GET",
         path: "/api/documents/{doc_id}",
         summary: "Get a document",
-        description: "Fetch a single document by ID. Works for documents you own or have access to (via sharing).",
+        description:
+          "Fetch a single document by ID. Returns 410 Gone if the document has been soft-deleted. Works for documents you own or have access to (via sharing).",
         params: [
           {
             name: "doc_id",
@@ -94,7 +96,7 @@ const GROUPS: EndpointGroup[] = [
         path: "/api/documents/{doc_id}",
         summary: "Update a document",
         description:
-          "Update a document's title and/or content. To append text, GET the document first, modify the content string, then PUT the full content back.",
+          "Update a document's title and/or content. Returns 410 Gone if the document has been soft-deleted. To append text, GET the document first, modify the content string, then PUT the full content back.",
         params: [
           {
             name: "doc_id",
@@ -109,7 +111,8 @@ const GROUPS: EndpointGroup[] = [
         method: "DELETE",
         path: "/api/documents/{doc_id}",
         summary: "Delete a document",
-        description: "Soft-delete a document (moves to trash). Owner only. Can be restored later.",
+        description:
+          "Soft-delete a document (moves to trash). Owner only. Breaks the folder hierarchy so the document restores to root.",
         params: [
           {
             name: "doc_id",
@@ -123,13 +126,204 @@ const GROUPS: EndpointGroup[] = [
         method: "POST",
         path: "/api/documents/{doc_id}/restore",
         summary: "Restore a document",
-        description: "Restore a soft-deleted document from trash. Owner only.",
+        description:
+          "Restore a soft-deleted document from trash. Owner only. If the document's parent folder is still deleted, it restores to root.",
         params: [
           {
             name: "doc_id",
             in: "path",
             required: true,
             description: "Document ID",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Folders",
+    endpoints: [
+      {
+        method: "POST",
+        path: "/api/folders",
+        summary: "Create a folder",
+        description: "Create a new folder. Optionally nest it under a parent folder by providing parent_id.",
+        body: JSON.stringify({ name: "My Folder", parent_id: null }, null, 2),
+        responseExample: JSON.stringify(
+          {
+            id: "folder123",
+            name: "My Folder",
+            owner_id: "user123",
+            parent_id: null,
+            general_access: "restricted",
+            is_deleted: false,
+            created_at: "2026-01-01T00:00:00Z",
+            updated_at: "2026-01-01T00:00:00Z",
+          },
+          null,
+          2,
+        ),
+      },
+      {
+        method: "GET",
+        path: "/api/folders/contents",
+        summary: "List folder contents",
+        description:
+          "List folders and documents at a given level. Omit folder_id for root. Returns folders, documents, and the user's permission level.",
+        params: [
+          {
+            name: "folder_id",
+            in: "query",
+            description: "Parent folder ID (omit for root)",
+          },
+        ],
+      },
+      {
+        method: "GET",
+        path: "/api/folders/{folder_id}",
+        summary: "Get a folder",
+        description:
+          "Fetch a single folder by ID. Returns 410 Gone if the folder has been soft-deleted. Requires VIEW permission.",
+        params: [
+          {
+            name: "folder_id",
+            in: "path",
+            required: true,
+            description: "Folder ID",
+          },
+        ],
+      },
+      {
+        method: "PUT",
+        path: "/api/folders/{folder_id}",
+        summary: "Update a folder",
+        description: "Rename a folder or move it to a different parent.",
+        params: [
+          {
+            name: "folder_id",
+            in: "path",
+            required: true,
+            description: "Folder ID",
+          },
+        ],
+        body: JSON.stringify({ name: "Renamed Folder" }, null, 2),
+      },
+      {
+        method: "DELETE",
+        path: "/api/folders/{folder_id}",
+        summary: "Delete a folder",
+        description:
+          "Cascade soft-delete a folder and all its nested folders and documents. Owner only. Access is deactivated for non-owners.",
+        params: [
+          {
+            name: "folder_id",
+            in: "path",
+            required: true,
+            description: "Folder ID",
+          },
+        ],
+      },
+      {
+        method: "POST",
+        path: "/api/folders/{folder_id}/restore",
+        summary: "Restore a folder",
+        description:
+          "Cascade restore a folder and all its children. If the parent folder is still deleted, restores to root. Own ACLs are preserved; parent ACLs are broken.",
+        params: [
+          {
+            name: "folder_id",
+            in: "path",
+            required: true,
+            description: "Folder ID",
+          },
+        ],
+      },
+      {
+        method: "GET",
+        path: "/api/folders/breadcrumbs",
+        summary: "Get breadcrumb trail",
+        description: "Return the breadcrumb trail from root to the given folder for navigation.",
+        params: [
+          {
+            name: "folder_id",
+            in: "query",
+            required: true,
+            description: "Folder ID",
+          },
+        ],
+      },
+      {
+        method: "GET",
+        path: "/api/folders/{folder_id}/tree",
+        summary: "Get folder tree",
+        description:
+          "Recursively list all nested folders and documents under a folder in a single request. Used by the CLI sync engine.",
+        params: [
+          {
+            name: "folder_id",
+            in: "path",
+            required: true,
+            description: "Folder ID",
+          },
+        ],
+      },
+    ],
+  },
+  {
+    name: "Trash",
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/documents/trash",
+        summary: "List trashed documents",
+        description:
+          "List all soft-deleted documents owned by the current user. Only shows individually deleted documents (not cascade-deleted children).",
+      },
+      {
+        method: "GET",
+        path: "/api/folders/trash",
+        summary: "List trashed folders",
+        description: "List all soft-deleted top-level folders owned by the current user.",
+      },
+      {
+        method: "GET",
+        path: "/api/folders/trash/{folder_id}/contents",
+        summary: "Drill into trashed folder",
+        description:
+          "List deleted subfolders and documents inside a trashed folder. Returns an ancestors array for breadcrumb navigation.",
+        params: [
+          {
+            name: "folder_id",
+            in: "path",
+            required: true,
+            description: "Trashed folder ID",
+          },
+        ],
+      },
+      {
+        method: "DELETE",
+        path: "/api/documents/{doc_id}/permanent",
+        summary: "Hard-delete a document",
+        description: "Permanently delete a document. Cannot be undone. Owner only.",
+        params: [
+          {
+            name: "doc_id",
+            in: "path",
+            required: true,
+            description: "Document ID",
+          },
+        ],
+      },
+      {
+        method: "DELETE",
+        path: "/api/folders/{folder_id}/permanent",
+        summary: "Hard-delete a folder",
+        description: "Permanently delete a folder and all its nested content. Cannot be undone. Owner only.",
+        params: [
+          {
+            name: "folder_id",
+            in: "path",
+            required: true,
+            description: "Folder ID",
           },
         ],
       },
@@ -348,6 +542,29 @@ const GROUPS: EndpointGroup[] = [
             description: "Comment ID",
           },
         ],
+      },
+    ],
+  },
+  {
+    name: "Users",
+    endpoints: [
+      {
+        method: "GET",
+        path: "/api/users/me",
+        summary: "Get current user",
+        description: "Return the authenticated user's profile including name, email, avatar, and organization context.",
+        responseExample: JSON.stringify(
+          {
+            id: "user123",
+            name: "Jane Doe",
+            email: "jane@example.com",
+            avatar_url: null,
+            org_id: "org123",
+            org_name: "Acme Corp",
+          },
+          null,
+          2,
+        ),
       },
     ],
   },

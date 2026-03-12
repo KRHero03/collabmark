@@ -208,9 +208,7 @@ async def ensure_authenticated(
     """
     api_key = load_api_key()
     if not api_key:
-        raise AuthError(
-            "Not logged in. Run [bold]collabmark login[/bold] first."
-        )
+        raise AuthError("Not logged in. Run [bold]collabmark login[/bold] first.")
     user_info = await validate_api_key(api_key, api_url)
     return api_key, user_info
 

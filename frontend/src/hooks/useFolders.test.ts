@@ -10,6 +10,7 @@ vi.mock("../lib/api", () => ({
     restore: vi.fn(),
     hardDelete: vi.fn(),
     listTrash: vi.fn(),
+    listTrashContents: vi.fn(),
     listShared: vi.fn(),
     listContents: vi.fn(),
     getBreadcrumbs: vi.fn(),
@@ -76,6 +77,13 @@ describe("useFolders store", () => {
       loading: true,
       trashLoading: false,
       accessError: null,
+      trashCurrentFolderId: null,
+      trashCurrentFolderName: null,
+      trashSubFolders: [],
+      trashDocuments: [],
+      trashBreadcrumbs: [],
+      trashContentsLoading: false,
+      deletedFolderRedirect: null,
     });
     vi.clearAllMocks();
     vi.mocked(foldersApi.recordView).mockResolvedValue({} as never);
@@ -252,18 +260,53 @@ describe("useFolders store", () => {
       expect(useFolders.getState().loading).toBe(false);
     });
 
-    it("should rethrow when fetchContents fails with non-403 error", async () => {
+    it("should show error message for generic failures", async () => {
       const err = new Error("Server error");
       vi.mocked(foldersApi.listContents).mockRejectedValue(err);
 
-      await expect(useFolders.getState().fetchContents("folder-1")).rejects.toThrow("Server error");
-      expect(useFolders.getState().loading).toBe(false);
+      await useFolders.getState().fetchContents("folder-1");
+
+      const state = useFolders.getState();
+      expect(state.loading).toBe(false);
+      expect(state.accessError).toBe("Something went wrong. Please try again.");
+      expect(state.currentFolderId).toBeNull();
+    });
+
+    it("should set deletedFolderRedirect on 410", async () => {
+      vi.mocked(foldersApi.listContents).mockRejectedValue({
+        response: { status: 410, data: { detail: { folder_id: "deleted-folder-1" } } },
+      });
+
+      await useFolders.getState().fetchContents("deleted-folder-1");
+
+      const state = useFolders.getState();
+      expect(state.deletedFolderRedirect).toBe("deleted-folder-1");
+      expect(state.currentFolderId).toBeNull();
+      expect(state.folders).toEqual([]);
+      expect(state.documents).toEqual([]);
+      expect(state.loading).toBe(false);
+    });
+
+    it("should use folderId param as fallback when 410 detail is missing", async () => {
+      vi.mocked(foldersApi.listContents).mockRejectedValue({
+        response: { status: 410, data: {} },
+      });
+
+      await useFolders.getState().fetchContents("fallback-id");
+
+      expect(useFolders.getState().deletedFolderRedirect).toBe("fallback-id");
     });
 
     it("should clear accessError via clearAccessError", () => {
       useFolders.setState({ accessError: "some error" });
       useFolders.getState().clearAccessError();
       expect(useFolders.getState().accessError).toBeNull();
+    });
+
+    it("should clear deletedFolderRedirect via clearDeletedFolderRedirect", () => {
+      useFolders.setState({ deletedFolderRedirect: "folder-1" });
+      useFolders.getState().clearDeletedFolderRedirect();
+      expect(useFolders.getState().deletedFolderRedirect).toBeNull();
     });
   });
 
@@ -414,7 +457,7 @@ describe("useFolders store", () => {
   });
 
   describe("hardDeleteFolder", () => {
-    it("should remove folder from trash", async () => {
+    it("should remove folder from trash at root level", async () => {
       useFolders.setState({ trashFolders: [mockTrashFolder] });
       vi.mocked(foldersApi.hardDelete).mockResolvedValue({} as never);
 
@@ -422,6 +465,18 @@ describe("useFolders store", () => {
 
       expect(foldersApi.hardDelete).toHaveBeenCalledWith("folder-trash-1");
       expect(useFolders.getState().trashFolders).toHaveLength(0);
+    });
+
+    it("should remove folder from trashSubFolders when inside a folder", async () => {
+      useFolders.setState({
+        trashCurrentFolderId: "parent-trash",
+        trashSubFolders: [mockTrashFolder],
+      });
+      vi.mocked(foldersApi.hardDelete).mockResolvedValue({} as never);
+
+      await useFolders.getState().hardDeleteFolder("folder-trash-1");
+
+      expect(useFolders.getState().trashSubFolders).toHaveLength(0);
     });
 
     it("should not affect other trashed folders", async () => {
@@ -432,6 +487,121 @@ describe("useFolders store", () => {
       await useFolders.getState().hardDeleteFolder("folder-trash-1");
 
       expect(useFolders.getState().trashFolders).toHaveLength(1);
+    });
+  });
+
+  describe("restoreFolder - context aware", () => {
+    it("should remove from trashSubFolders when inside a folder", async () => {
+      useFolders.setState({
+        trashCurrentFolderId: "parent-trash",
+        trashSubFolders: [mockTrashFolder],
+      });
+      vi.mocked(foldersApi.restore).mockResolvedValue({} as never);
+
+      await useFolders.getState().restoreFolder("folder-trash-1");
+
+      expect(useFolders.getState().trashSubFolders).toHaveLength(0);
+      expect(useFolders.getState().trashFolders).toEqual([]);
+    });
+  });
+
+  describe("navigateTrashFolder", () => {
+    it("should reset state when navigating to null", async () => {
+      useFolders.setState({
+        trashCurrentFolderId: "folder-1",
+        trashCurrentFolderName: "Folder",
+        trashSubFolders: [mockTrashFolder],
+        trashDocuments: [mockDoc],
+        trashBreadcrumbs: [{ id: "folder-1", name: "Folder" }],
+      });
+
+      await useFolders.getState().navigateTrashFolder(null);
+
+      const state = useFolders.getState();
+      expect(state.trashCurrentFolderId).toBeNull();
+      expect(state.trashCurrentFolderName).toBeNull();
+      expect(state.trashSubFolders).toEqual([]);
+      expect(state.trashDocuments).toEqual([]);
+      expect(state.trashBreadcrumbs).toEqual([]);
+    });
+
+    it("should fetch and populate trash folder contents", async () => {
+      const trashDoc: typeof mockDoc = { ...mockDoc, id: "trash-doc-1", is_deleted: true };
+      vi.mocked(foldersApi.listTrashContents).mockResolvedValue({
+        data: {
+          folders: [mockTrashFolder],
+          documents: [trashDoc],
+          parent_name: "ParentFolder",
+          parent_id: "folder-99",
+          ancestors: [{ id: "folder-99", name: "ParentFolder" }],
+        },
+      } as never);
+
+      await useFolders.getState().navigateTrashFolder("folder-99");
+
+      const state = useFolders.getState();
+      expect(state.trashCurrentFolderId).toBe("folder-99");
+      expect(state.trashCurrentFolderName).toBe("ParentFolder");
+      expect(state.trashSubFolders).toHaveLength(1);
+      expect(state.trashDocuments).toHaveLength(1);
+      expect(state.trashBreadcrumbs).toEqual([{ id: "folder-99", name: "ParentFolder" }]);
+      expect(state.trashContentsLoading).toBe(false);
+    });
+
+    it("should use server-provided ancestors for breadcrumbs", async () => {
+      vi.mocked(foldersApi.listTrashContents).mockResolvedValue({
+        data: {
+          folders: [],
+          documents: [],
+          parent_name: "Level 2",
+          parent_id: "folder-2",
+          ancestors: [
+            { id: "folder-1", name: "Level 1" },
+            { id: "folder-2", name: "Level 2" },
+          ],
+        },
+      } as never);
+
+      await useFolders.getState().navigateTrashFolder("folder-2");
+
+      const state = useFolders.getState();
+      expect(state.trashBreadcrumbs).toEqual([
+        { id: "folder-1", name: "Level 1" },
+        { id: "folder-2", name: "Level 2" },
+      ]);
+    });
+
+    it("should use ancestors from server when navigating back", async () => {
+      useFolders.setState({
+        trashBreadcrumbs: [
+          { id: "folder-1", name: "Level 1" },
+          { id: "folder-2", name: "Level 2" },
+          { id: "folder-3", name: "Level 3" },
+        ],
+      });
+
+      vi.mocked(foldersApi.listTrashContents).mockResolvedValue({
+        data: {
+          folders: [],
+          documents: [],
+          parent_name: "Level 1",
+          parent_id: "folder-1",
+          ancestors: [{ id: "folder-1", name: "Level 1" }],
+        },
+      } as never);
+
+      await useFolders.getState().navigateTrashFolder("folder-1");
+
+      expect(useFolders.getState().trashBreadcrumbs).toEqual([{ id: "folder-1", name: "Level 1" }]);
+    });
+
+    it("should handle API error gracefully and reset state", async () => {
+      vi.mocked(foldersApi.listTrashContents).mockRejectedValue(new Error("Network error"));
+
+      await useFolders.getState().navigateTrashFolder("bad-folder");
+
+      expect(useFolders.getState().trashContentsLoading).toBe(false);
+      expect(useFolders.getState().trashCurrentFolderId).toBeNull();
     });
   });
 });

@@ -79,14 +79,11 @@ def _login_with_browser(server: str | None) -> None:
     except AuthError as exc:
         console.print(f"\n[red bold]Login failed:[/red bold] {exc}")
         console.print(
-            "\n[dim]Tip: if you don't have a browser, use "
-            "[bold]collabmark login --api-key YOUR_KEY[/bold][/dim]"
+            "\n[dim]Tip: if you don't have a browser, use [bold]collabmark login --api-key YOUR_KEY[/bold][/dim]"
         )
         raise SystemExit(1) from exc
 
-    save_metadata(
-        LoginMetadata(email=user_info.email, name=user_info.name, server_url=server)
-    )
+    save_metadata(LoginMetadata(email=user_info.email, name=user_info.name, server_url=server))
     _show_success(user_info.name, user_info.email, raw_key, "Browser OAuth")
 
 
@@ -109,7 +106,5 @@ def _login_with_api_key(api_key: str, server: str | None) -> None:
         console.print(f"\n[red bold]Cannot store credentials:[/red bold] {exc}")
         raise SystemExit(1) from exc
 
-    save_metadata(
-        LoginMetadata(email=user_info.email, name=user_info.name, server_url=server)
-    )
+    save_metadata(LoginMetadata(email=user_info.email, name=user_info.name, server_url=server))
     _show_success(user_info.name, user_info.email, api_key, "API Key")

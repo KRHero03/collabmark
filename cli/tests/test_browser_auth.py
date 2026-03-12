@@ -96,12 +96,8 @@ class TestReuseOrCreateApiKey:
     @respx.mock
     @patch("collabmark.lib.browser_auth.load_api_key", return_value=None)
     async def test_creates_key_when_no_local_key(self, _mock_load) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(200, json=FAKE_USER_RESPONSE)
-        )
-        respx.post(f"{API_BASE}/api/keys").mock(
-            return_value=httpx.Response(201, json=FAKE_KEY_RESPONSE)
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(200, json=FAKE_USER_RESPONSE))
+        respx.post(f"{API_BASE}/api/keys").mock(return_value=httpx.Response(201, json=FAKE_KEY_RESPONSE))
 
         raw_key, user_info = await _reuse_or_create_api_key(FAKE_JWT, API_BASE)
         assert raw_key == FAKE_RAW_KEY
@@ -115,8 +111,11 @@ class TestReuseOrCreateApiKey:
         from collabmark.lib.auth import UserInfo
 
         expected_info = UserInfo(
-            id="user123", email="pm@acme.com", name="Alice PM",
-            avatar_url=None, org_name="Acme Corp",
+            id="user123",
+            email="pm@acme.com",
+            name="Alice PM",
+            avatar_url=None,
+            org_name="Acme Corp",
         )
         mock_validate.return_value = expected_info
 
@@ -130,12 +129,8 @@ class TestReuseOrCreateApiKey:
     @patch("collabmark.lib.browser_auth.validate_api_key", side_effect=AuthError("expired"))
     @patch("collabmark.lib.browser_auth.load_api_key", return_value="cm_stale_key")
     async def test_creates_new_key_when_local_key_invalid(self, _mock_load, _mock_validate) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(200, json=FAKE_USER_RESPONSE)
-        )
-        respx.post(f"{API_BASE}/api/keys").mock(
-            return_value=httpx.Response(201, json=FAKE_KEY_RESPONSE)
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(200, json=FAKE_USER_RESPONSE))
+        respx.post(f"{API_BASE}/api/keys").mock(return_value=httpx.Response(201, json=FAKE_KEY_RESPONSE))
 
         raw_key, user_info = await _reuse_or_create_api_key(FAKE_JWT, API_BASE)
         assert raw_key == FAKE_RAW_KEY
@@ -148,9 +143,7 @@ class TestReuseOrCreateApiKey:
         user_route = respx.get(f"{API_BASE}/api/users/me").mock(
             return_value=httpx.Response(200, json=FAKE_USER_RESPONSE)
         )
-        respx.post(f"{API_BASE}/api/keys").mock(
-            return_value=httpx.Response(201, json=FAKE_KEY_RESPONSE)
-        )
+        respx.post(f"{API_BASE}/api/keys").mock(return_value=httpx.Response(201, json=FAKE_KEY_RESPONSE))
 
         await _reuse_or_create_api_key(FAKE_JWT, API_BASE)
         request = user_route.calls[0].request
@@ -160,9 +153,7 @@ class TestReuseOrCreateApiKey:
     @respx.mock
     @patch("collabmark.lib.browser_auth.load_api_key", return_value=None)
     async def test_raises_on_user_fetch_failure(self, _mock_load) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(401, json={"detail": "Unauthorized"})
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(401, json={"detail": "Unauthorized"}))
 
         with pytest.raises(AuthError, match="Failed to fetch user info"):
             await _reuse_or_create_api_key(FAKE_JWT, API_BASE)
@@ -171,12 +162,8 @@ class TestReuseOrCreateApiKey:
     @respx.mock
     @patch("collabmark.lib.browser_auth.load_api_key", return_value=None)
     async def test_raises_on_key_creation_failure(self, _mock_load) -> None:
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(200, json=FAKE_USER_RESPONSE)
-        )
-        respx.post(f"{API_BASE}/api/keys").mock(
-            return_value=httpx.Response(500, text="Internal Server Error")
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(200, json=FAKE_USER_RESPONSE))
+        respx.post(f"{API_BASE}/api/keys").mock(return_value=httpx.Response(500, text="Internal Server Error"))
 
         with pytest.raises(AuthError, match="Failed to create API key"):
             await _reuse_or_create_api_key(FAKE_JWT, API_BASE)
@@ -190,12 +177,8 @@ class TestBrowserLogin:
     @patch("collabmark.lib.browser_auth.webbrowser.open")
     async def test_full_flow(self, mock_open: MagicMock, mock_save: MagicMock, _mock_load: MagicMock) -> None:
         """Simulates the full browser login by injecting a token via HTTP."""
-        respx.get(f"{API_BASE}/api/users/me").mock(
-            return_value=httpx.Response(200, json=FAKE_USER_RESPONSE)
-        )
-        respx.post(f"{API_BASE}/api/keys").mock(
-            return_value=httpx.Response(201, json=FAKE_KEY_RESPONSE)
-        )
+        respx.get(f"{API_BASE}/api/users/me").mock(return_value=httpx.Response(200, json=FAKE_USER_RESPONSE))
+        respx.post(f"{API_BASE}/api/keys").mock(return_value=httpx.Response(201, json=FAKE_KEY_RESPONSE))
 
         def simulate_callback(url: str) -> None:
             """Parse the port from the frontend URL and hit the callback with a token."""
@@ -213,13 +196,9 @@ class TestBrowserLogin:
             except Exception:
                 pass
 
-        mock_open.side_effect = lambda url: threading.Thread(
-            target=simulate_callback, args=(url,), daemon=True
-        ).start()
+        mock_open.side_effect = lambda url: threading.Thread(target=simulate_callback, args=(url,), daemon=True).start()
 
-        raw_key, user_info = await browser_login(
-            api_url=API_BASE, frontend_url=FRONTEND_BASE, timeout_seconds=10
-        )
+        raw_key, user_info = await browser_login(api_url=API_BASE, frontend_url=FRONTEND_BASE, timeout_seconds=10)
 
         assert raw_key == FAKE_RAW_KEY
         assert user_info.email == "pm@acme.com"

@@ -49,6 +49,38 @@ async def list_trash_folders(
     ]
 
 
+@router.get("/trash/{folder_id}/contents")
+async def list_trash_folder_contents(
+    folder_id: str,
+    user: User = Depends(get_current_user),
+):
+    """List deleted subfolders and documents inside a trashed folder."""
+    data = await folder_service.list_trash_folder_contents(folder_id, user)
+
+    folders_out = [
+        FolderRead.from_folder(
+            f, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url
+        )
+        for f in data["folders"]
+    ]
+
+    documents_out = [
+        DocumentRead.from_doc(
+            d, owner_name=user.name or "", owner_email=user.email or "", owner_avatar_url=user.avatar_url
+        )
+        for d in data["documents"]
+    ]
+
+    parent = data["parent_folder"]
+    return {
+        "folders": folders_out,
+        "documents": documents_out,
+        "parent_name": parent.name,
+        "parent_id": str(parent.id),
+        "ancestors": data["ancestors"],
+    }
+
+
 @router.get("/shared", response_model=list[SharedFolderRead])
 async def list_shared_folders(
     user: User = Depends(get_current_user),
@@ -145,6 +177,19 @@ async def record_folder_view(
     Creates or updates the view timestamp for the 'Recently Viewed' tab.
     """
     await folder_service.record_folder_view(folder_id, user)
+
+
+@router.get("/{folder_id}/tree")
+async def get_folder_tree(
+    folder_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Recursively list all nested folders and documents under a folder.
+
+    Used by the CLI sync engine to discover the full folder structure in a
+    single request instead of making N+1 calls.
+    """
+    return await folder_service.get_folder_tree(folder_id, user)
 
 
 @router.get("/{folder_id}", response_model=FolderRead)

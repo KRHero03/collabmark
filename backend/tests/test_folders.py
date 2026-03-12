@@ -401,7 +401,9 @@ class TestFolderRestore:
         assert d.is_deleted is False
 
     @pytest.mark.asyncio
-    async def test_cannot_restore_folder_with_deleted_parent(self, async_client: AsyncClient, test_user: User):
+    async def test_restore_folder_with_deleted_parent_restores_to_root(
+        self, async_client: AsyncClient, test_user: User
+    ):
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "Parent")
         child = await _create_folder(async_client, "Child", parent_id=parent["id"])
@@ -409,7 +411,8 @@ class TestFolderRestore:
         await async_client.delete(f"/api/folders/{parent['id']}")
 
         resp = await async_client.post(f"/api/folders/{child['id']}/restore")
-        assert resp.status_code == 400
+        assert resp.status_code == 200
+        assert resp.json()["parent_id"] is None
 
     @pytest.mark.asyncio
     async def test_restore_non_owner(self, async_client: AsyncClient, test_user: User, other_user: User):
@@ -1277,14 +1280,16 @@ class TestFolderServiceEdgeCases:
         assert results[0]["owner_email"] == ""
 
     @pytest.mark.asyncio
-    async def test_restore_folder_parent_still_deleted_400(self, async_client: AsyncClient, test_user: User):
+    async def test_restore_folder_parent_still_deleted_restores_to_root(
+        self, async_client: AsyncClient, test_user: User
+    ):
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "Parent")
         child = await _create_folder(async_client, "Child", parent_id=parent["id"])
         await async_client.delete(f"/api/folders/{parent['id']}")
         resp = await async_client.post(f"/api/folders/{child['id']}/restore")
-        assert resp.status_code == 400
-        assert "parent is still deleted" in resp.json()["detail"]
+        assert resp.status_code == 200
+        assert resp.json()["parent_id"] is None
 
     @pytest.mark.asyncio
     async def test_list_trash_filters_nested_trashed_folders(self, async_client: AsyncClient, test_user: User):
@@ -1453,14 +1458,16 @@ class TestFolderBranchCoverage:
         return u
 
     @pytest.mark.asyncio
-    async def test_restore_folder_with_deleted_parent_returns_400(self, async_client: AsyncClient, test_user: User):
+    async def test_restore_folder_with_deleted_parent_restores_to_root_branch(
+        self, async_client: AsyncClient, test_user: User
+    ):
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "Parent")
         child = await _create_folder(async_client, "Child", parent_id=parent["id"])
         await async_client.delete(f"/api/folders/{parent['id']}")
         resp = await async_client.post(f"/api/folders/{child['id']}/restore")
-        assert resp.status_code == 400
-        assert "parent is still deleted" in resp.json()["detail"]
+        assert resp.status_code == 200
+        assert resp.json()["parent_id"] is None
 
     @pytest.mark.asyncio
     async def test_trash_listing_excludes_nested_deleted_folders(self, async_client: AsyncClient, test_user: User):
@@ -1631,3 +1638,102 @@ class TestFolderBranchCoverage:
         )
         assert resp.status_code == 400
         assert "descendants" in resp.json()["detail"].lower()
+
+
+# =====================================================================
+# Folder Tree
+# =====================================================================
+
+
+class TestFolderTree:
+    @pytest.mark.asyncio
+    async def test_tree_flat_folder(self, async_client: AsyncClient, test_user: User):
+        """Single folder with two docs returns a flat tree."""
+        async_client.cookies.update(_auth(test_user))
+        folder = await _create_folder(async_client, "TreeRoot")
+        await _create_doc(async_client, "Doc A", folder_id=folder["id"])
+        await _create_doc(async_client, "Doc B", folder_id=folder["id"])
+
+        resp = await async_client.get(f"/api/folders/{folder['id']}/tree")
+        assert resp.status_code == 200
+        tree = resp.json()
+        assert tree["id"] == folder["id"]
+        assert tree["name"] == "TreeRoot"
+        assert len(tree["documents"]) == 2
+        assert tree["folders"] == []
+        assert tree["permission"] == "edit"
+
+    @pytest.mark.asyncio
+    async def test_tree_nested_structure(self, async_client: AsyncClient, test_user: User):
+        """Nested folders and docs appear recursively in the tree."""
+        async_client.cookies.update(_auth(test_user))
+        root = await _create_folder(async_client, "Root")
+        child = await _create_folder(async_client, "Child", parent_id=root["id"])
+        await _create_doc(async_client, "Root Doc", folder_id=root["id"])
+        await _create_doc(async_client, "Child Doc", folder_id=child["id"])
+
+        resp = await async_client.get(f"/api/folders/{root['id']}/tree")
+        assert resp.status_code == 200
+        tree = resp.json()
+        assert tree["name"] == "Root"
+        assert len(tree["documents"]) == 1
+        assert tree["documents"][0]["title"] == "Root Doc"
+        assert len(tree["folders"]) == 1
+        assert tree["folders"][0]["name"] == "Child"
+        assert len(tree["folders"][0]["documents"]) == 1
+        assert tree["folders"][0]["documents"][0]["title"] == "Child Doc"
+
+    @pytest.mark.asyncio
+    async def test_tree_unauthenticated(self, async_client: AsyncClient, test_user: User):
+        async_client.cookies.update(_auth(test_user))
+        folder = await _create_folder(async_client, "Priv")
+        async_client.cookies.clear()
+        resp = await async_client.get(f"/api/folders/{folder['id']}/tree")
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_tree_no_access(self, async_client: AsyncClient, test_user: User, other_user: User):
+        """Non-owner without explicit access gets 403."""
+        async_client.cookies.update(_auth(test_user))
+        folder = await _create_folder(async_client, "Private")
+        async_client.cookies.update(_auth(other_user))
+        resp = await async_client.get(f"/api/folders/{folder['id']}/tree")
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_tree_shared_view_permission(self, async_client: AsyncClient, test_user: User, other_user: User):
+        """Shared folder shows correct 'view' permission in tree."""
+        async_client.cookies.update(_auth(test_user))
+        folder = await _create_folder(async_client, "SharedTree")
+        await _create_doc(async_client, "Shared Doc", folder_id=folder["id"])
+        await async_client.post(
+            f"/api/folders/{folder['id']}/collaborators",
+            json={"email": other_user.email, "permission": "view"},
+        )
+
+        async_client.cookies.update(_auth(other_user))
+        resp = await async_client.get(f"/api/folders/{folder['id']}/tree")
+        assert resp.status_code == 200
+        tree = resp.json()
+        assert tree["permission"] == "view"
+        assert len(tree["documents"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_tree_nonexistent_folder(self, async_client: AsyncClient, test_user: User):
+        async_client.cookies.update(_auth(test_user))
+        resp = await async_client.get("/api/folders/000000000000000000000000/tree")
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_tree_documents_have_expected_fields(self, async_client: AsyncClient, test_user: User):
+        async_client.cookies.update(_auth(test_user))
+        folder = await _create_folder(async_client, "FieldCheck")
+        await _create_doc(async_client, "Field Doc", folder_id=folder["id"])
+
+        resp = await async_client.get(f"/api/folders/{folder['id']}/tree")
+        tree = resp.json()
+        doc = tree["documents"][0]
+        assert "id" in doc
+        assert "title" in doc
+        assert "content_length" in doc
+        assert "updated_at" in doc

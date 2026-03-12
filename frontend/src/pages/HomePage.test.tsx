@@ -59,6 +59,8 @@ const mockHardDeleteFolder = vi.fn();
 const mockFetchTrashFolders = vi.fn();
 const mockFetchContents = vi.fn();
 const mockClearAccessError = vi.fn();
+const mockNavigateTrashFolder = vi.fn();
+const mockClearDeletedFolderRedirect = vi.fn();
 
 let mockFoldersState = {
   currentFolderId: null as string | null,
@@ -79,6 +81,15 @@ let mockFoldersState = {
   hardDeleteFolder: mockHardDeleteFolder,
   fetchTrashFolders: mockFetchTrashFolders,
   fetchContents: mockFetchContents,
+  trashCurrentFolderId: null as string | null,
+  trashCurrentFolderName: null as string | null,
+  trashSubFolders: [] as any[],
+  trashDocuments: [] as any[],
+  trashBreadcrumbs: [] as any[],
+  trashContentsLoading: false,
+  navigateTrashFolder: mockNavigateTrashFolder,
+  deletedFolderRedirect: null as string | null,
+  clearDeletedFolderRedirect: mockClearDeletedFolderRedirect,
 };
 
 vi.mock("../hooks/useFolders", () => ({
@@ -268,6 +279,15 @@ describe("HomePage", () => {
     hardDeleteFolder: mockHardDeleteFolder,
     fetchTrashFolders: mockFetchTrashFolders,
     fetchContents: mockFetchContents,
+    trashCurrentFolderId: null as string | null,
+    trashCurrentFolderName: null as string | null,
+    trashSubFolders: [] as any[],
+    trashDocuments: [] as any[],
+    trashBreadcrumbs: [] as any[],
+    trashContentsLoading: false,
+    navigateTrashFolder: mockNavigateTrashFolder,
+    deletedFolderRedirect: null as string | null,
+    clearDeletedFolderRedirect: mockClearDeletedFolderRedirect,
   };
 
   beforeEach(() => {
@@ -1951,6 +1971,18 @@ describe("HomePage", () => {
     const { getByTestId } = render(<HomePage />);
     fireEvent.click(getByTestId("breadcrumb-home"));
     expect(mockNavigateToFolder).toHaveBeenCalledWith(null);
+  });
+
+  it("switching from trash back to browse calls fetchContents to refresh", async () => {
+    const { getByText, getAllByText } = render(<HomePage />);
+    mockFetchContents.mockClear();
+    fireEvent.click(getByText("Trash"));
+    await waitFor(() => expect(mockFetchTrash).toHaveBeenCalled());
+
+    fireEvent.click(getAllByText("Files")[0]);
+    await waitFor(() => {
+      expect(mockFetchContents).toHaveBeenCalled();
+    });
   });
 
   // --- Confirm cancel ---

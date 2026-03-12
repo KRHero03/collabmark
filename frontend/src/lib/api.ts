@@ -70,6 +70,14 @@ export interface FolderContents {
   permission?: "view" | "edit";
 }
 
+export interface TrashFolderContents {
+  folders: FolderItem[];
+  documents: MarkdownDocument[];
+  parent_name: string;
+  parent_id: string;
+  ancestors: { id: string; name: string }[];
+}
+
 export interface SharedFolder {
   id: string;
   name: string;
@@ -153,6 +161,7 @@ export const foldersApi = {
   restore: (id: string) => api.post<FolderItem>(`/folders/${id}/restore`),
   hardDelete: (id: string) => api.delete(`/folders/${id}/permanent`),
   listTrash: () => api.get<FolderItem[]>("/folders/trash"),
+  listTrashContents: (folderId: string) => api.get<TrashFolderContents>(`/folders/trash/${folderId}/contents`),
   listShared: () => api.get<SharedFolder[]>("/folders/shared"),
   recordView: (folderId: string) => api.post(`/folders/${folderId}/view`),
   listRecentlyViewed: () => api.get<RecentlyViewedFolder[]>("/folders/recent"),

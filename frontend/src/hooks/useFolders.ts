@@ -14,6 +14,14 @@ interface FoldersState {
   trashLoading: boolean;
   accessError: string | null;
 
+  trashCurrentFolderId: string | null;
+  trashCurrentFolderName: string | null;
+  trashSubFolders: FolderItem[];
+  trashDocuments: MarkdownDocument[];
+  trashBreadcrumbs: { id: string; name: string }[];
+  trashContentsLoading: boolean;
+  deletedFolderRedirect: string | null;
+
   navigateToFolder: (folderId: string | null) => Promise<void>;
   fetchContents: (folderId?: string | null) => Promise<void>;
   fetchBreadcrumbs: (folderId: string | null) => Promise<void>;
@@ -23,7 +31,9 @@ interface FoldersState {
   restoreFolder: (id: string) => Promise<void>;
   hardDeleteFolder: (id: string) => Promise<void>;
   fetchTrashFolders: () => Promise<void>;
+  navigateTrashFolder: (folderId: string | null) => Promise<void>;
   clearAccessError: () => void;
+  clearDeletedFolderRedirect: () => void;
 }
 
 export const useFolders = create<FoldersState>((set, get) => ({
@@ -37,7 +47,16 @@ export const useFolders = create<FoldersState>((set, get) => ({
   trashLoading: false,
   accessError: null,
 
+  trashCurrentFolderId: null,
+  trashCurrentFolderName: null,
+  trashSubFolders: [],
+  trashDocuments: [],
+  trashBreadcrumbs: [],
+  trashContentsLoading: false,
+  deletedFolderRedirect: null,
+
   clearAccessError: () => set({ accessError: null }),
+  clearDeletedFolderRedirect: () => set({ deletedFolderRedirect: null }),
 
   navigateToFolder: async (folderId: string | null) => {
     set({ currentFolderId: folderId, loading: true, accessError: null });
@@ -60,8 +79,8 @@ export const useFolders = create<FoldersState>((set, get) => ({
         accessError: null,
       });
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 403) {
+      const resp = (err as { response?: { status?: number; data?: { detail?: { folder_id?: string } } } })?.response;
+      if (resp?.status === 403) {
         set({
           folders: [],
           documents: [],
@@ -69,9 +88,31 @@ export const useFolders = create<FoldersState>((set, get) => ({
           accessError: "You don't have access to this folder anymore.",
           currentFolderPermission: "view",
         });
+      } else if (resp?.status === 410) {
+        const folderId = resp.data?.detail?.folder_id ?? id ?? null;
+        set({
+          currentFolderId: null,
+          folders: [],
+          documents: [],
+          loading: false,
+          deletedFolderRedirect: folderId,
+        });
+      } else if (resp?.status === 404) {
+        set({
+          currentFolderId: null,
+          folders: [],
+          documents: [],
+          loading: false,
+          accessError: "Folder not found.",
+        });
       } else {
-        set({ loading: false });
-        throw err;
+        set({
+          currentFolderId: null,
+          folders: [],
+          documents: [],
+          loading: false,
+          accessError: "Something went wrong. Please try again.",
+        });
       }
     }
   },
@@ -108,21 +149,64 @@ export const useFolders = create<FoldersState>((set, get) => ({
 
   restoreFolder: async (id: string) => {
     await foldersApi.restore(id);
-    set({
-      trashFolders: get().trashFolders.filter((f) => f.id !== id),
-    });
+    const { trashCurrentFolderId } = get();
+    if (trashCurrentFolderId) {
+      set({ trashSubFolders: get().trashSubFolders.filter((f) => f.id !== id) });
+    } else {
+      set({ trashFolders: get().trashFolders.filter((f) => f.id !== id) });
+    }
   },
 
   hardDeleteFolder: async (id: string) => {
     await foldersApi.hardDelete(id);
-    set({
-      trashFolders: get().trashFolders.filter((f) => f.id !== id),
-    });
+    const { trashCurrentFolderId } = get();
+    if (trashCurrentFolderId) {
+      set({ trashSubFolders: get().trashSubFolders.filter((f) => f.id !== id) });
+    } else {
+      set({ trashFolders: get().trashFolders.filter((f) => f.id !== id) });
+    }
   },
 
   fetchTrashFolders: async () => {
     set({ trashLoading: true });
     const { data } = await foldersApi.listTrash();
     set({ trashFolders: data, trashLoading: false });
+  },
+
+  navigateTrashFolder: async (folderId: string | null) => {
+    if (folderId === null) {
+      set({
+        trashCurrentFolderId: null,
+        trashCurrentFolderName: null,
+        trashSubFolders: [],
+        trashDocuments: [],
+        trashBreadcrumbs: [],
+        trashContentsLoading: false,
+      });
+      return;
+    }
+
+    set({
+      trashCurrentFolderId: folderId,
+      trashContentsLoading: true,
+      trashSubFolders: [],
+      trashDocuments: [],
+    });
+    try {
+      const { data } = await foldersApi.listTrashContents(folderId);
+
+      set({
+        trashCurrentFolderName: data.parent_name,
+        trashSubFolders: data.folders,
+        trashDocuments: data.documents,
+        trashBreadcrumbs: data.ancestors ?? [{ id: data.parent_id, name: data.parent_name }],
+        trashContentsLoading: false,
+      });
+    } catch {
+      set({
+        trashCurrentFolderId: null,
+        trashContentsLoading: false,
+      });
+    }
   },
 }));
