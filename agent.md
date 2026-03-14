@@ -214,7 +214,66 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - LandingPage: removed Google login button from navbar, replaced with "Sign In" anchor
   - Backend: deterministic trash sort (secondary `_id` tiebreaker)
 
-**Total: 723 backend tests, 878 frontend tests (49 test files), all passing.**
+- **Phase 16**: CLI Sync Tool (End-to-End)
+  - Python CLI (`pip install collabmark`) for bidirectional markdown sync with CollabMark cloud
+  - Built with Click + Rich for UX, httpx for async REST, keyring for OS keychain credential storage
+  - Browser-based OAuth login flow: CLI opens `/cli-login` page, user authenticates, token relays back via localhost callback
+  - API key fallback for headless environments
+  - `collabmark login/logout/init/start/stop/status/logs` commands
+  - Sync engine: three-way reconciliation (local filesystem vs sync.json state vs cloud tree)
+  - Content hash (SHA-256) based change detection with folder structure preservation
+  - File watcher: debounced OS filesystem events via `watchdog` (recursive, `.md`-only filtering)
+  - Daemon mode with double-fork pattern, PID file management, SIGTERM handling
+  - Structured JSON logging with rotating file handler and credential masking
+  - Frontend: `/cli-login` page with OAuth flow, `/cli-login/success` confirmation page (matching landing page design, dark/light mode)
+  - Backend: `POST /api/auth/cli/token` endpoint for CLI API key exchange, `GET /api/folders/tree` for full folder tree
+  - 207 CLI tests covering all modules
+
+- **Phase 17**: CRDT-Based Bidirectional Sync
+  - Replaced REST-based content push/pull with WebSocket CRDT sync using pycrdt
+  - `crdt_sync.py`: `write_content_via_ws` (new docs), `update_content_via_ws` (existing docs), `read_content_via_ws` (pull)
+  - CLI connects to the same `/ws/doc/{id}` endpoint as the web editor
+  - Yjs sync protocol handshake implemented in Python (sync step 1/2, awareness)
+  - Edits from web editor propagate to CLI in real time (and vice versa)
+  - Empty content guards: skip CRDT writes for empty/null content to prevent accidental overwrites
+  - `sync_engine.py` updated to use CRDT functions instead of REST for content operations
+
+- **Phase 18**: CLI Sync Observatory (Monitoring & Management)
+  - Centralized sync registry at `~/.collabmark/registry.json` tracking all syncs (status, PID, last sync, errors)
+  - File locking (`fcntl`) for concurrent registry access safety
+  - Per-project PID files (`~/.collabmark/pids/{folder_id}.pid`) for concurrent daemon support
+  - Per-project log files (`~/.collabmark/logs/{folder_id}.log`) for isolated logging
+  - `collabmark status`: global overview (all syncs table) or project-specific detail view
+  - `collabmark list`: alias for global sync overview
+  - `collabmark stop`: interactive selection when multiple syncs running, `--all` and `--path` flags
+  - `collabmark logs`: per-project viewing, `--all-syncs` for interleaved view, `--folder` for specific project
+  - `collabmark clean`: remove stale registry entries (stopped syncs, missing directories), `--all` and `--force` flags
+  - Heartbeat tracking: `start` command reports last_synced_at, action count, and errors to registry
+  - Dead process detection: `status` prunes crashed processes by checking PID liveness
+  - 313 CLI tests total (106 new tests for observatory features)
+
+- **Phase 19**: Google Docs-Style Trash & Restore
+  - Hierarchy-aware soft-delete: deleting a folder cascades to all children (nested folders + documents)
+  - ACL deactivation on delete: collaborator access disabled for trashed items
+  - ACL restoration on restore: own ACLs preserved, parent inheritance broken (restored to root)
+  - Trash view: folders clickable to browse contents, documents shown at root when individually deleted
+  - Breadcrumb navigation in trash view for deleted folder hierarchies
+  - Individual document restore: if parent is deleted, document restores to root level
+  - Folder restore: all children restored automatically, own ACLs preserved
+  - Redirect to trash view when navigating to a deleted folder URL
+  - 404/deleted state handling with proper UI feedback
+  - Playwright E2E tests covering all trash/restore scenarios
+  - Homepage refresh after restore operations
+
+- **Phase 20**: Production Deployment & CI/CD Enhancements
+  - Default CLI API URL switched from localhost to Railway production (`https://web-production-5e1bc.up.railway.app`)
+  - Environment variable overrides (`COLLABMARK_API_URL`, `COLLABMARK_FRONTEND_URL`) for local development
+  - CI pipeline: added `lint-cli` and `test-cli` jobs to `.github/workflows/ci.yml`
+  - PyPI release workflow: `.github/workflows/cli-release.yml` triggered by `cli-v*` tags
+  - Trusted publishing via `pypa/gh-action-pypi-publish` (OIDC-based, no API token needed)
+  - Build and deploy gates include CLI checks
+
+**Total: 723 backend tests, 878 frontend tests, 313 CLI tests (all passing).**
 
 ## Tech Stack
 
@@ -233,6 +292,8 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 | Message Bus | Redis (future: pub/sub for WS horizontal scaling) |
 | Testing BE  | pytest, pytest-asyncio, httpx, mongomock-motor    |
 | Testing FE  | Vitest, React Testing Library, jsdom              |
+| CLI         | Python 3.12+, Click, Rich, httpx, pycrdt, watchdog, keyring     |
+| Testing CLI | pytest, pytest-asyncio, respx                                   |
 | Deployment  | Docker, Railway (with MongoDB, Redis & MinIO/S3 add-ons), Gunicorn |
 
 ## Project Structure
@@ -280,6 +341,12 @@ collabmark/
       lib/           # API client, utilities
         api.ts       # Axios client with all API methods
         dateUtils.ts # Local time formatting utilities
+  cli/               # Python CLI tool (pip install collabmark)
+    src/collabmark/
+      commands/      # CLI commands (init, login, start, stop, status, logs, list, clean)
+      lib/           # Core libraries (api, auth, config, crdt_sync, daemon, logger, registry, sync_engine, watcher)
+    tests/           # 313 CLI tests
+    pyproject.toml   # hatchling build + CLI entry point
   Dockerfile         # Multi-stage (build frontend + bundle with backend)
   docker-compose.yml # MongoDB + Redis for local dev
   docker-compose.prod.yml # Production compose
@@ -325,6 +392,7 @@ collabmark/
 - `GET /api/folders/shared` -- list folders shared with me
 - `GET /api/folders/contents` -- list contents of a folder (or root)
 - `GET /api/folders/breadcrumbs` -- get breadcrumb path for a folder
+- `GET /api/folders/tree` -- full folder tree with documents (used by CLI sync)
 - `POST /api/folders/{id}/collaborators` -- add folder collaborator
 - `GET /api/folders/{id}/collaborators` -- list folder collaborators
 - `DELETE /api/folders/{id}/collaborators/{user_id}` -- remove folder collaborator
@@ -360,8 +428,13 @@ collabmark/
 - `GET /api/keys` -- list API keys
 - `DELETE /api/keys/{id}` -- revoke API key
 
+### CLI Auth
+- `POST /api/auth/cli/token` -- exchange session cookie for a CLI API key (reuses existing key if present)
+- `GET /cli-login` -- browser-based CLI login page (OAuth redirect + token relay)
+- `GET /cli-login/success` -- CLI login success confirmation page
+
 ### WebSocket
-- `WS /ws/doc/{document_id}` -- CRDT collaboration (VIEW or EDIT access required)
+- `WS /ws/doc/{document_id}` -- CRDT collaboration (VIEW or EDIT access required, used by both web editor and CLI)
 
 ### Organizations
 - `GET /api/orgs/my` -- current user's org (or null for personal users)
@@ -386,6 +459,8 @@ collabmark/
 - `/api-docs` -- Interactive API documentation (public, no auth required)
 - `/admin` -- Super admin dashboard (create/manage organizations, view members)
 - `/org/:orgId/settings` -- Organization settings (General, Members, SSO config)
+- `/cli-login` -- CLI browser-based login (OAuth flow with token relay back to CLI)
+- `/cli-login/success` -- CLI login success confirmation
 
 ## Coding Guidelines
 
@@ -545,3 +620,72 @@ are shown in a separate "Orphaned" section at the bottom of the panel.
   - `S3_REGION` -- Region (default: `us-east-1`)
 - **Architecture**: `blob_storage.py` service wraps boto3. Uploads go to S3, served via `/media/{key}` proxy route in `main.py`. Bucket is auto-created if missing.
 - **MinIO console**: Accessible at `http://localhost:9003` for local debugging.
+
+## Release Process
+
+### Web Application (Backend + Frontend)
+
+Deployed automatically via GitHub Actions CI/CD pipeline:
+
+1. Push to `main` triggers the `CI` workflow (`.github/workflows/ci.yml`)
+2. Pipeline: lint (backend + frontend + CLI) -> test (backend + frontend + CLI) -> build -> deploy
+3. Deploy step uses Railway CLI with `RAILWAY_TOKEN` and `RAILWAY_SERVICE_ID` secrets
+4. If any test/build step fails, the `rollback` job auto-reverts the commit on `main`
+5. Production URL: `https://web-production-5e1bc.up.railway.app`
+
+### CLI Tool (PyPI)
+
+Published via GitHub Actions on tagged releases:
+
+1. Update version in `cli/src/collabmark/__init__.py` and `cli/pyproject.toml`
+2. Commit: `git commit -m "chore: bump CLI version to X.Y.Z"`
+3. Tag: `git tag cli-vX.Y.Z`
+4. Push: `git push origin main --tags`
+5. The `cli-release.yml` workflow runs lint, tests, builds via `hatch`, and publishes to PyPI
+6. Uses trusted publishing (OIDC `id-token: write`) -- requires PyPI "Trusted Publisher" configuration:
+   - PyPI project: `collabmark`
+   - GitHub owner: `KRHero03`
+   - Repository: `collabmark`
+   - Workflow: `cli-release.yml`
+   - Environment: `pypi`
+7. Users install via: `pip install collabmark`
+
+### Pre-Release Checklist
+
+1. `ruff check` + `ruff format --check` on all Python code (backend + CLI)
+2. `yarn run check` on frontend (tsc + eslint + prettier)
+3. All tests passing: backend (641), frontend (860), CLI (313)
+4. Security audit: no hardcoded secrets, all routes have auth, typed Pydantic schemas
+5. Frontend production build succeeds (`yarn build`)
+6. Dead code scan: no unused imports, functions, or test cases
+
+### Environment Configuration
+
+The CLI defaults to the Railway production URL. For local development, override via environment variables:
+
+```bash
+export COLLABMARK_API_URL=http://localhost:8000
+export COLLABMARK_FRONTEND_URL=http://localhost:5173
+```
+
+## CLI Architecture
+
+### Sync Flow (CRDT-based)
+
+1. **Authentication**: Browser OAuth -> API key stored in OS keychain via `keyring`
+2. **Init**: Create `.collabmark/` directory, link to cloud folder, register in global registry
+3. **Sync cycle**:
+   - Local scan: recursive `.md` file discovery with SHA-256 content hashing
+   - Cloud scan: `GET /api/folders/tree` for full folder+document tree
+   - Three-way reconciliation: compare local state, `sync.json` (last known), cloud state
+   - Actions: PUSH_NEW, PUSH_UPDATE, PULL_NEW, PULL_UPDATE, DELETE_LOCAL, DELETE_REMOTE, CONFLICT
+   - CRDT operations: connect to `/ws/doc/{id}` via WebSocket, apply pycrdt document updates
+4. **Watch**: `watchdog` filesystem events (debounced 2s) + periodic cloud polling
+5. **Registry**: heartbeat updates to `~/.collabmark/registry.json` after each cycle
+
+### Credential Security
+
+- API keys stored in OS keychain via `keyring` (macOS Keychain, Windows Credential Locker, Linux SecretService)
+- `credentials.json` contains only non-sensitive metadata (email, name, server URL)
+- Logger masks API keys and tokens in all log output
+- No credentials in `.collabmark/config.json` (only folder ID, server URL, user display info)

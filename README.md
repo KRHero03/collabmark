@@ -7,6 +7,7 @@ programmatic API access. Built with FastAPI, React, and CRDTs.
 ## Features
 
 - **Real-time collaboration** via CRDTs (Yjs + pycrdt) with cursor presence
+- **CLI sync tool** -- bidirectional markdown sync between local files and cloud via CRDTs (`pip install collabmark`)
 - **Authentication**: Google OAuth, SAML 2.0, OIDC, and API keys
 - **Google Docs-style sharing**: general access levels, email-based collaborators, org-scoped ACLs
 - **Organizations**: multi-tenant with SSO, admin dashboard, member management
@@ -14,6 +15,7 @@ programmatic API access. Built with FastAPI, React, and CRDTs.
 - **Inline & document-level comments** with Yjs-anchored positions and reply threads
 - **Version history** with line-level diffs, restore, and auto-versioning
 - **Spaces (folders)** with hierarchical organization and access inheritance
+- **Google Docs-style trash** -- soft-delete with hierarchy-aware restore and ACL deactivation
 - **Mermaid diagrams**, syntax-highlighted code blocks, dark mode
 - **Interactive API docs** at `/api-docs` with live request execution
 - **PDF and Markdown export**
@@ -49,6 +51,40 @@ yarn dev
 ```
 
 The app is available at **http://localhost:5173**. The API is at **http://localhost:8000** (Swagger docs at `/docs`).
+
+## CLI Tool
+
+CollabMark ships a Python CLI that bidirectionally syncs local `.md` files with your cloud workspace -- powered by the same CRDTs that drive the web editor.
+
+### Install
+
+```bash
+pip install collabmark
+```
+
+### Quick start
+
+```bash
+collabmark login          # One-click browser login (Google/SSO)
+collabmark start           # Sync the current directory
+```
+
+That's it. Your markdown files are now live-synced. Edits on the web or locally propagate in seconds.
+
+### Key commands
+
+| Command | Description |
+|---------|-------------|
+| `collabmark login` | Authenticate via browser (credentials stored in OS keychain) |
+| `collabmark start` | Start syncing (foreground or `--daemon`) |
+| `collabmark start <link>` | Join a shared folder by link |
+| `collabmark status` | Show sync state (global or per-project) |
+| `collabmark list` | List all active/stopped syncs across projects |
+| `collabmark stop` | Stop sync (interactive, `--all`, or `--path`) |
+| `collabmark logs` | View per-project logs (`--all-syncs` for interleaved view) |
+| `collabmark clean` | Remove stale registry entries |
+
+See [`cli/README.md`](cli/README.md) for the full reference.
 
 ## Step-by-Step Setup
 
@@ -117,7 +153,7 @@ The UI is at `http://localhost:5173`. Vite proxies `/api` and `/ws` to the backe
 make test
 ```
 
-This runs both backend (641 tests) and frontend (860 tests).
+This runs backend (641 tests), frontend (860 tests), and CLI (313 tests).
 
 ### Backend tests only
 
@@ -146,6 +182,14 @@ Or directly:
 ```bash
 cd frontend
 yarn test
+```
+
+### CLI tests only
+
+```bash
+cd cli
+pip install -e ".[dev]"
+python -m pytest -v
 ```
 
 ### Watch mode (frontend)
@@ -312,11 +356,13 @@ Run `make help` to see all available commands:
 ## Architecture
 
 ```
-Browser (React + CodeMirror 6 + Yjs)
-    |
-    |-- REST API (/api/*) --> FastAPI --> MongoDB (Beanie ODM)
-    |
-    |-- WebSocket (/ws/doc/{id}) --> pycrdt-websocket --> MongoYStore
+Browser (React + CodeMirror 6 + Yjs)             CLI (Python + pycrdt)
+    |                                                |
+    |-- REST API (/api/*) --> FastAPI --> MongoDB     |-- REST API (metadata, auth)
+    |                                                |
+    |-- WebSocket (/ws/doc/{id}) -+- pycrdt-websocket --> MongoYStore
+                                  |
+                                  +-- CLI CRDT sync (bidirectional)
 ```
 
 | Layer        | Technology                                              |
@@ -332,6 +378,7 @@ Browser (React + CodeMirror 6 + Yjs)
 | Lint (FE)    | ESLint 9 + Prettier 3                                   |
 | Testing (BE) | pytest, pytest-asyncio, pytest-cov, httpx, mongomock-motor |
 | Testing (FE) | Vitest 4, React Testing Library, jsdom                  |
+| CLI          | Python 3.12+, Click, Rich, httpx, pycrdt, watchdog     |
 | Deployment   | Docker, Railway, Gunicorn                               |
 
 ## Project Structure
@@ -358,6 +405,10 @@ collabmark/
     eslint.config.js # ESLint 9 flat config
     .prettierrc      # Prettier config
     vite.config.ts   # Vite + Vitest configuration
+  cli/
+    src/collabmark/  # CLI package (commands/, lib/)
+    tests/           # 313 CLI tests
+    pyproject.toml   # hatchling build + CLI entry point
   Makefile           # Unified lint/format/test/build/ci commands
   Dockerfile         # Multi-stage production build
   docker-compose.yml # Local dev infrastructure (MongoDB + Redis)
@@ -438,12 +489,18 @@ collabmark/
 - `GET /api/orgs/{org_id}/sso` -- get SSO config
 - `PUT /api/orgs/{org_id}/sso` -- update SSO config
 
+### CLI Auth
+- `POST /api/auth/cli/token` -- exchange session cookie for a CLI API key
+- `GET /cli-login` -- browser-based CLI login page (OAuth redirect flow)
+- `GET /cli-login/success` -- CLI login success confirmation page
+
 ### Other
 - `GET /api/users/me` -- current user profile
 - `PUT /api/users/me` -- update profile
 - `POST /api/keys` -- create API key
 - `GET /api/keys` -- list API keys
 - `DELETE /api/keys/{id}` -- revoke API key
+- `GET /api/folders/tree` -- full folder tree for CLI sync
 - `WS /ws/doc/{document_id}` -- CRDT collaboration WebSocket
 
 ## API Key Access
