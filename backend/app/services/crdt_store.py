@@ -6,10 +6,8 @@ updates are stored as individual records, enabling incremental persistence
 and later compaction.
 """
 
-import json
 import time
-from collections import deque
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from logging import Logger, getLogger
 
 from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
@@ -31,15 +29,9 @@ class MongoYStore(BaseYStore):
             "version":   int       # store protocol version
         }
 
-    User attribution works via a FIFO queue: the WebSocket adapter pushes
-    the authenticated user's ID into ``_user_queue`` for every Y.Doc-modifying
-    message it forwards. When ``write()`` is called (once per applied update),
-    it pops the next user ID from the queue and embeds it in the metadata.
-
     Args:
         path: The room name (used as the grouping key in MongoDB).
-        metadata_callback: Ignored (kept for BaseYStore compat); use
-            ``enqueue_user`` instead.
+        metadata_callback: Optional async/sync callable returning metadata bytes.
         log: Optional logger instance.
     """
 
@@ -60,17 +52,12 @@ class MongoYStore(BaseYStore):
     def __init__(
         self,
         path: str,
-        metadata_callback: None = None,
+        metadata_callback: Callable[[], Awaitable[bytes] | bytes] | None = None,
         log: Logger | None = None,
     ) -> None:
         self.path = path
-        self.metadata_callback = None
+        self.metadata_callback = metadata_callback
         self.log = log or getLogger(__name__)
-        self._user_queue: deque[str | None] = deque()
-
-    def enqueue_user(self, user_id: str | None) -> None:
-        """Record which user is responsible for the next Y.Doc write."""
-        self._user_queue.append(user_id)
 
     @property
     def _collection(self) -> AsyncIOMotorCollection:
@@ -83,23 +70,13 @@ class MongoYStore(BaseYStore):
             raise RuntimeError("MongoYStore.set_database() must be called before using the store")
         return self._db["crdt_updates"]
 
-    def _pop_user_metadata(self) -> bytes:
-        """Pop the next user ID from the queue and return JSON metadata bytes."""
-        try:
-            uid = self._user_queue.popleft()
-        except IndexError:
-            uid = None
-        if uid:
-            return json.dumps({"user_id": uid}).encode()
-        return b""
-
     async def write(self, data: bytes) -> None:
         """Persist a single Y.Doc update to MongoDB.
 
         Args:
             data: The binary CRDT update to store.
         """
-        metadata = self._pop_user_metadata()
+        metadata = await self.get_metadata()
         await self._collection.insert_one(
             {
                 "room": self.path,
@@ -129,13 +106,13 @@ class MongoYStore(BaseYStore):
 
         This reduces storage size and speeds up room initialization by
         replacing N incremental updates with one full-state update.
-        Compaction is a server-internal operation so metadata is empty.
         """
         doc = Doc()
         async for update, _meta, _ts in self.read():
             doc.apply_update(update)
 
         full_update = doc.get_update()
+        metadata = await self.get_metadata()
 
         async with await self._db.client.start_session() as session, session.start_transaction():
             await self._collection.delete_many({"room": self.path}, session=session)
@@ -143,7 +120,7 @@ class MongoYStore(BaseYStore):
                 {
                     "room": self.path,
                     "update": full_update,
-                    "metadata": b"",
+                    "metadata": metadata,
                     "timestamp": time.time(),
                     "version": self.version,
                 },

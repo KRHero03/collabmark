@@ -1,12 +1,9 @@
 """Tests for the MongoYStore custom CRDT persistence layer.
 
 Validates that Y.Doc updates can be written to and read from MongoDB,
-that compaction correctly merges incremental updates into a single
-state snapshot, and that user attribution via the enqueue/dequeue
-mechanism works correctly.
+and that compaction correctly merges incremental updates into a single
+state snapshot.
 """
-
-import json
 
 import pytest
 from app.services.crdt_store import MongoYStore
@@ -158,93 +155,3 @@ class TestMongoYStoreApplyUpdates:
 
         rebuilt_text = rebuilt.get("content", type=Text)
         assert str(rebuilt_text) == "Hello, World!"
-
-
-class TestEnqueueUser:
-    def test_enqueue_populates_queue(self, store: MongoYStore):
-        """enqueue_user should add an entry to the internal queue."""
-        store.enqueue_user("user-42")
-        assert len(store._user_queue) == 1
-
-    def test_pop_metadata_returns_json(self, store: MongoYStore):
-        """After enqueuing a user, _pop_user_metadata returns JSON bytes."""
-        store.enqueue_user("user-42")
-        meta = store._pop_user_metadata()
-        parsed = json.loads(meta)
-        assert parsed == {"user_id": "user-42"}
-
-    def test_pop_metadata_empty_when_no_enqueue(self, store: MongoYStore):
-        """Without enqueue, _pop_user_metadata returns empty bytes."""
-        assert store._pop_user_metadata() == b""
-
-    def test_pop_metadata_none_user_returns_empty(self, store: MongoYStore):
-        """Enqueuing None should produce empty metadata."""
-        store.enqueue_user(None)
-        assert store._pop_user_metadata() == b""
-
-    def test_fifo_order(self, store: MongoYStore):
-        """Users should be dequeued in FIFO order."""
-        store.enqueue_user("alice")
-        store.enqueue_user("bob")
-        meta1 = json.loads(store._pop_user_metadata())
-        meta2 = json.loads(store._pop_user_metadata())
-        assert meta1["user_id"] == "alice"
-        assert meta2["user_id"] == "bob"
-
-
-class TestMongoYStoreUserAttribution:
-    @pytest.fixture
-    def attr_store(self, mock_db) -> MongoYStore:
-        MongoYStore.set_database(mock_db)
-        return MongoYStore(path="attributed-room")
-
-    @pytest.mark.asyncio
-    async def test_write_stores_user_id_in_metadata(self, attr_store, mock_db):
-        """Enqueuing a user before write should embed user_id in the record."""
-        attr_store.enqueue_user("user-42")
-
-        doc = Doc()
-        text = doc.get("content", type=Text)
-        text += "attributed edit"
-        await attr_store.write(doc.get_update())
-
-        record = await mock_db["crdt_updates"].find_one({"room": "attributed-room"})
-        metadata = json.loads(record["metadata"])
-        assert metadata["user_id"] == "user-42"
-
-    @pytest.mark.asyncio
-    async def test_write_without_enqueue_stores_empty_metadata(self, attr_store, mock_db):
-        """A write with no enqueued user should store empty metadata."""
-        doc = Doc()
-        text = doc.get("content", type=Text)
-        text += "anonymous edit"
-        await attr_store.write(doc.get_update())
-
-        record = await mock_db["crdt_updates"].find_one({"room": "attributed-room"})
-        assert record["metadata"] == b""
-
-    @pytest.mark.asyncio
-    async def test_consecutive_writes_track_different_users(self, attr_store, mock_db):
-        """Each write should consume the next enqueued user in FIFO order."""
-        doc = Doc()
-        text = doc.get("content", type=Text)
-
-        attr_store.enqueue_user("alice")
-        text += "alice's edit"
-        await attr_store.write(doc.get_update())
-
-        attr_store.enqueue_user("bob")
-        text += " bob's edit"
-        await attr_store.write(doc.get_update())
-
-        cursor = mock_db["crdt_updates"].find(
-            {"room": "attributed-room"},
-            sort=[("timestamp", 1)],
-        )
-        records = await cursor.to_list(length=10)
-        assert len(records) == 2
-
-        meta_0 = json.loads(records[0]["metadata"])
-        meta_1 = json.loads(records[1]["metadata"])
-        assert meta_0["user_id"] == "alice"
-        assert meta_1["user_id"] == "bob"

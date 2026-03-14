@@ -73,7 +73,6 @@ class CollabWebsocketServer(WebsocketServer):
 
 
 YJS_MSG_SYNC = 0
-YJS_SYNC_STEP2 = 1
 YJS_SYNC_UPDATE = 2
 
 
@@ -100,7 +99,6 @@ class FastAPIWebsocketAdapter:
         *,
         read_only: bool = False,
         user: Any = None,
-        store: MongoYStore | None = None,
     ) -> None:
         """Initialize the adapter.
 
@@ -109,13 +107,11 @@ class FastAPIWebsocketAdapter:
             path: The room path (document ID).
             read_only: If True, block incoming document update messages.
             user: The authenticated User object (needed for permission re-checks).
-            store: The MongoYStore for this room, used for user attribution.
         """
         self.websocket = websocket
         self.path = path
         self.read_only = read_only
         self._user = user
-        self._store = store
         self._last_perm_check = time.monotonic()
 
     async def send(self, message: bytes) -> None:
@@ -134,18 +130,6 @@ class FastAPIWebsocketAdapter:
         Sync updates are type 0, sub-type 2.
         """
         return len(data) >= 2 and data[0] == YJS_MSG_SYNC and data[1] == YJS_SYNC_UPDATE
-
-    def _modifies_ydoc(self, data: bytes) -> bool:
-        """Check if this message will modify the server's Y.Doc.
-
-        Both SYNC_STEP2 (sub-type 1, initial diff from client) and
-        SYNC_UPDATE (sub-type 2, incremental edit) apply changes.
-        """
-        return (
-            len(data) >= 2
-            and data[0] == YJS_MSG_SYNC
-            and data[1] in (YJS_SYNC_STEP2, YJS_SYNC_UPDATE)
-        )
 
     def __aiter__(self):
         """Return the async iterator for incoming messages."""
@@ -194,10 +178,6 @@ class FastAPIWebsocketAdapter:
         dropped (the loop continues to the next message). Permission is
         re-checked periodically so mid-session ACL changes take effect.
 
-        For every message that will modify the Y.Doc (SYNC_STEP2 and
-        SYNC_UPDATE), the authenticated user's ID is pushed into the
-        store's queue so the subsequent ``write()`` can attribute it.
-
         Returns:
             The binary message data.
 
@@ -217,11 +197,6 @@ class FastAPIWebsocketAdapter:
                 if self.read_only:
                     logger.debug("Dropped write message from read-only client on room %s", self.path)
                     continue
-
-            if self._modifies_ydoc(data) and self._store is not None:
-                uid = str(self._user.id) if self._user else None
-                self._store.enqueue_user(uid)
-
             return data
 
 
