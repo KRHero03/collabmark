@@ -301,7 +301,9 @@ class TestCLIBareInvocation:
         runner = CliRunner()
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        assert "0.1.0" in result.output
+        from collabmark import __version__
+
+        assert __version__ in result.output
 
 
 # ===================================================================
