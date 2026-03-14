@@ -205,6 +205,108 @@ class TestReadContentsBatch:
         assert result == {}
 
 
+class TestApplyIncrementalDiff:
+    """Verify that apply_incremental_diff produces correct Y.Text state
+    and that the CRDT update is proportional to the change, not the
+    full document."""
+
+    @staticmethod
+    def _make_ytext(initial: str = "") -> tuple[Doc, Text]:
+        from pycrdt import Doc, Text
+
+        doc = Doc()
+        yt = doc.get("content", type=Text)
+        if initial:
+            yt += initial
+        return doc, yt
+
+    def test_no_change_returns_false(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        _doc, yt = self._make_ytext("hello")
+        assert apply_incremental_diff(yt, "hello", "hello") is False
+        assert str(yt) == "hello"
+
+    def test_append_line(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        _doc, yt = self._make_ytext("line one\nline two")
+        changed = apply_incremental_diff(yt, "line one\nline two", "line one\nline two\nline three")
+        assert changed is True
+        assert str(yt) == "line one\nline two\nline three"
+
+    def test_delete_middle(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        _doc, yt = self._make_ytext("ABCDE")
+        apply_incremental_diff(yt, "ABCDE", "ADE")
+        assert str(yt) == "ADE"
+
+    def test_replace_word(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        old = "The quick brown fox"
+        new = "The slow brown fox"
+        _doc, yt = self._make_ytext(old)
+        apply_incremental_diff(yt, old, new)
+        assert str(yt) == new
+
+    def test_insert_at_start(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        _doc, yt = self._make_ytext("world")
+        apply_incremental_diff(yt, "world", "hello world")
+        assert str(yt) == "hello world"
+
+    def test_empty_to_content(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        _doc, yt = self._make_ytext("")
+        apply_incremental_diff(yt, "", "brand new content")
+        assert str(yt) == "brand new content"
+
+    def test_content_to_empty(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        _doc, yt = self._make_ytext("doomed text")
+        apply_incremental_diff(yt, "doomed text", "")
+        assert str(yt) == ""
+
+    def test_unicode_diff(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        old = "Hello World"
+        _doc, yt = self._make_ytext(old)
+        apply_incremental_diff(yt, old, "Hello World!")
+        assert str(yt) == "Hello World!"
+
+    def test_multiline_replace(self) -> None:
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        old = "# Title\n\nParagraph one.\nParagraph two."
+        new = "# Title\n\nParagraph one.\nParagraph two.\nParagraph three."
+        _doc, yt = self._make_ytext(old)
+        apply_incremental_diff(yt, old, new)
+        assert str(yt) == new
+
+    def test_update_size_proportional_to_change(self) -> None:
+        """The CRDT diff for a small edit in a large doc should be small."""
+        from collabmark.lib.crdt_sync import apply_incremental_diff
+
+        big_doc = "word " * 2000  # ~10 000 chars
+        new_doc = big_doc + "appended."
+
+        doc, yt = self._make_ytext(big_doc)
+        state_before = doc.get_state()
+
+        with doc.transaction():
+            apply_incremental_diff(yt, big_doc, new_doc)
+
+        diff = doc.get_update(state_before)
+        assert len(diff) < 100, f"Diff should be tiny but was {len(diff)} bytes"
+        assert str(yt) == new_doc
+
+
 class TestBackwardCompat:
     def test_sync_content_alias(self) -> None:
         from collabmark.lib.crdt_sync import sync_content_via_ws, write_content_via_ws

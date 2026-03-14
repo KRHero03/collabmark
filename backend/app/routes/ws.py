@@ -105,6 +105,7 @@ async def websocket_endpoint(websocket: WebSocket, document_id: str):
         path=document_id,
         read_only=read_only,
         user=user,
+        store=room.ystore,
     )
 
     with contextlib.suppress(WebSocketDisconnect):
