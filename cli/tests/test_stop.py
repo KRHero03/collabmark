@@ -66,8 +66,9 @@ class TestInteractiveStop:
         with (
             patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path / "home")}),
             patch("collabmark.commands.stop.find_project_root", return_value=None),
-            patch("collabmark.commands.stop.is_process_alive", return_value=True),
-            patch("collabmark.commands.stop.os.kill"),
+            patch("collabmark.lib.registry._is_pid_alive", return_value=True),
+            patch("os.kill"),
+            patch("collabmark.lib.daemon.remove_pid_file"),
         ):
             register_sync(str(dir_a), "f1", "Alpha", "http://x", "a@a.com", pid=88888)
             register_sync(str(dir_b), "f2", "Beta", "http://x", "b@b.com", pid=88889)

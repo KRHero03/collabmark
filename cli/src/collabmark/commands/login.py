@@ -18,8 +18,18 @@ from collabmark.lib.auth import (
     validate_api_key,
 )
 from collabmark.lib.browser_auth import browser_login
+from collabmark.lib.registry import clear_stopped_entries, prune_dead
 
 console = Console()
+
+
+def _prune_stale_registry() -> None:
+    """Prune dead processes and remove stopped entries from the registry."""
+    pruned = prune_dead()
+    cleaned = clear_stopped_entries()
+    total = pruned + cleaned
+    if total:
+        console.print(f"[dim]Cleaned up {total} stale registry entry/entries.[/dim]")
 
 
 def _show_success(name: str, email: str, api_key: str, method: str) -> None:
@@ -84,6 +94,7 @@ def _login_with_browser(server: str | None) -> None:
         raise SystemExit(1) from exc
 
     save_metadata(LoginMetadata(email=user_info.email, name=user_info.name, server_url=server))
+    _prune_stale_registry()
     _show_success(user_info.name, user_info.email, raw_key, "Browser OAuth")
 
 
@@ -107,4 +118,5 @@ def _login_with_api_key(api_key: str, server: str | None) -> None:
         raise SystemExit(1) from exc
 
     save_metadata(LoginMetadata(email=user_info.email, name=user_info.name, server_url=server))
+    _prune_stale_registry()
     _show_success(user_info.name, user_info.email, api_key, "API Key")

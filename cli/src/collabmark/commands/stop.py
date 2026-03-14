@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-import signal
 from pathlib import Path
 
 import click
@@ -11,33 +9,22 @@ from rich.console import Console
 from rich.prompt import Prompt
 
 from collabmark.lib.config import find_project_root, load_sync_config
-from collabmark.lib.daemon import is_process_alive, remove_pid_file
-from collabmark.lib.registry import get_running_syncs, mark_stopped
+from collabmark.lib.registry import get_running_syncs, stop_sync_process
 
 console = Console()
 
 
 def _stop_one(entry) -> bool:
-    """Send SIGTERM to a single sync process. Returns True on success."""
-    if entry.pid is None or not is_process_alive(entry.pid):
-        mark_stopped(entry.local_path)
-        if entry.folder_id:
-            remove_pid_file(entry.folder_id)
-        return False
-
-    try:
-        os.kill(entry.pid, signal.SIGTERM)
+    """Send SIGTERM to a single sync process with Rich output."""
+    pid = entry.pid
+    ok = stop_sync_process(entry)
+    if ok:
         console.print(
-            f"[green]✓[/green] Stopped [bold]{entry.folder_name}[/bold]"
-            f"  [dim]{entry.local_path}[/dim]  (PID {entry.pid})"
+            f"[green]✓[/green] Stopped [bold]{entry.folder_name}[/bold]  [dim]{entry.local_path}[/dim]  (PID {pid})"
         )
-        mark_stopped(entry.local_path)
-        if entry.folder_id:
-            remove_pid_file(entry.folder_id)
-        return True
-    except OSError as exc:
-        console.print(f"[red]✗[/red] Failed to stop PID {entry.pid}: {exc}")
-        return False
+    else:
+        console.print(f"[yellow]Sync '{entry.folder_name}' was not running.[/yellow]")
+    return ok
 
 
 @click.command()

@@ -11,11 +11,14 @@ import pytest
 
 from collabmark.lib.registry import (
     SyncRegistry,
+    clear_stopped_entries,
     list_syncs,
     load_registry,
     mark_stopped,
     prune_dead,
     register_sync,
+    stop_all_syncs,
+    stop_sync_process,
     unregister_sync,
     update_heartbeat,
 )
@@ -224,3 +227,109 @@ class TestLoadRegistry:
         reg_file.write_text(json.dumps(data), encoding="utf-8")
         reg = load_registry()
         assert len(reg.syncs) == 0
+
+
+class TestStopSyncProcess:
+    def test_stops_running_process(self, registry_home: Path) -> None:
+        register_sync("/tmp/notes", "abc", "Notes", "http://x", "t@t.com", pid=88888)
+        reg = load_registry()
+        resolved = str(Path("/tmp/notes").resolve())
+        entry = reg.syncs[resolved]
+
+        with (
+            patch("collabmark.lib.registry._is_pid_alive", return_value=True),
+            patch("os.kill") as mock_kill,
+            patch("collabmark.lib.daemon.remove_pid_file"),
+        ):
+            result = stop_sync_process(entry)
+        assert result is True
+        mock_kill.assert_called_once()
+        reg = load_registry()
+        assert reg.syncs[resolved].status == "stopped"
+        assert reg.syncs[resolved].pid is None
+
+    def test_handles_already_dead_process(self, registry_home: Path) -> None:
+        register_sync("/tmp/notes", "abc", "Notes", "http://x", "t@t.com", pid=999999999)
+        reg = load_registry()
+        resolved = str(Path("/tmp/notes").resolve())
+        entry = reg.syncs[resolved]
+
+        with patch("collabmark.lib.daemon.remove_pid_file"):
+            result = stop_sync_process(entry)
+        assert result is False
+        reg = load_registry()
+        assert reg.syncs[resolved].status == "stopped"
+
+    def test_handles_no_pid(self, registry_home: Path) -> None:
+        register_sync("/tmp/notes", "abc", "Notes", "http://x", "t@t.com", pid=1)
+        mark_stopped("/tmp/notes")
+        reg = load_registry()
+        resolved = str(Path("/tmp/notes").resolve())
+        entry = reg.syncs[resolved]
+
+        with patch("collabmark.lib.daemon.remove_pid_file"):
+            result = stop_sync_process(entry)
+        assert result is False
+
+
+class TestStopAllSyncs:
+    def test_stops_all_running(self, registry_home: Path) -> None:
+        register_sync("/tmp/a", "f1", "A", "http://x", "a@a.com", pid=88888)
+        register_sync("/tmp/b", "f2", "B", "http://x", "b@b.com", pid=88889)
+
+        with (
+            patch("collabmark.lib.registry._is_pid_alive", return_value=True),
+            patch("os.kill"),
+            patch("collabmark.lib.daemon.remove_pid_file"),
+        ):
+            stopped, total = stop_all_syncs()
+        assert stopped == 2
+        assert total == 2
+
+    def test_returns_zero_when_none_running(self, registry_home: Path) -> None:
+        stopped, total = stop_all_syncs()
+        assert stopped == 0
+        assert total == 0
+
+    def test_counts_dead_processes_correctly(self, registry_home: Path) -> None:
+        register_sync("/tmp/a", "f1", "A", "http://x", "a@a.com", pid=999999999)
+        register_sync("/tmp/b", "f2", "B", "http://x", "b@b.com", pid=999999998)
+
+        with patch("collabmark.lib.daemon.remove_pid_file"):
+            stopped, total = stop_all_syncs()
+        assert stopped == 0
+        assert total == 0
+
+
+class TestClearStoppedEntries:
+    def test_removes_stopped_entries(self, registry_home: Path) -> None:
+        register_sync("/tmp/a", "f1", "A", "http://x", "a@a.com", pid=1)
+        register_sync("/tmp/b", "f2", "B", "http://x", "b@b.com", pid=2)
+        mark_stopped("/tmp/a")
+        mark_stopped("/tmp/b")
+
+        removed = clear_stopped_entries()
+        assert removed == 2
+        reg = load_registry()
+        assert len(reg.syncs) == 0
+
+    def test_removes_error_entries(self, registry_home: Path) -> None:
+        register_sync("/tmp/a", "f1", "A", "http://x", "a@a.com")
+        update_heartbeat("/tmp/a", actions_count=0, error="fail")
+
+        removed = clear_stopped_entries()
+        assert removed == 1
+
+    def test_keeps_running_entries(self, registry_home: Path) -> None:
+        register_sync("/tmp/a", "f1", "A", "http://x", "a@a.com", pid=os.getpid())
+        register_sync("/tmp/b", "f2", "B", "http://x", "b@b.com", pid=1)
+        mark_stopped("/tmp/b")
+
+        removed = clear_stopped_entries()
+        assert removed == 1
+        reg = load_registry()
+        assert len(reg.syncs) == 1
+
+    def test_returns_zero_when_nothing_to_clean(self, registry_home: Path) -> None:
+        removed = clear_stopped_entries()
+        assert removed == 0

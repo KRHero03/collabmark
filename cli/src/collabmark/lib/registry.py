@@ -14,6 +14,7 @@ import fcntl
 import json
 import logging
 import os
+import signal
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -242,6 +243,60 @@ def list_syncs() -> list[SyncRegistryEntry]:
 def get_running_syncs() -> list[SyncRegistryEntry]:
     """Return only syncs with status 'running' (after pruning)."""
     return [s for s in list_syncs() if s.status == "running"]
+
+
+def stop_sync_process(entry: SyncRegistryEntry) -> bool:
+    """Send SIGTERM to a sync process, mark it stopped, and clean its PID file.
+
+    Returns True if the process was successfully signalled, False if it
+    was already dead or couldn't be stopped.
+    """
+    from collabmark.lib.daemon import remove_pid_file
+
+    if entry.pid is None or not _is_pid_alive(entry.pid):
+        mark_stopped(entry.local_path)
+        if entry.folder_id:
+            remove_pid_file(entry.folder_id)
+        return False
+
+    try:
+        os.kill(entry.pid, signal.SIGTERM)
+        mark_stopped(entry.local_path)
+        if entry.folder_id:
+            remove_pid_file(entry.folder_id)
+        return True
+    except OSError:
+        logger.warning("Failed to stop PID %d for %s", entry.pid, entry.local_path)
+        return False
+
+
+def stop_all_syncs() -> tuple[int, int]:
+    """Stop all running sync processes.
+
+    Returns (stopped_count, total_running_count).
+    """
+    running = get_running_syncs()
+    stopped = sum(1 for entry in running if stop_sync_process(entry))
+    return stopped, len(running)
+
+
+def clear_stopped_entries() -> int:
+    """Remove all stopped/error entries from the registry.
+
+    Returns the number of entries removed.
+    """
+    removed = 0
+
+    def _update(reg: SyncRegistry) -> SyncRegistry | None:
+        nonlocal removed
+        to_remove = [k for k, v in reg.syncs.items() if v.status in ("stopped", "error")]
+        for k in to_remove:
+            del reg.syncs[k]
+            removed += 1
+        return reg if removed else None
+
+    _with_lock(_update)
+    return removed
 
 
 def _is_pid_alive(pid: int) -> bool:
