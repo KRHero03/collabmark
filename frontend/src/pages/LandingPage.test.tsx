@@ -13,10 +13,10 @@ describe("LandingPage", () => {
 
   afterEach(cleanup);
 
-  it("renders the hero headline 'Collaborative Markdown, Supercharged'", () => {
+  it("renders the hero headline", () => {
     const { getByText } = render(<LandingPage />);
-    expect(getByText("Collaborative Markdown,")).toBeInTheDocument();
-    expect(getByText("Supercharged")).toBeInTheDocument();
+    expect(getByText("Write with AI,")).toBeInTheDocument();
+    expect(getByText("share with everyone")).toBeInTheDocument();
   });
 
   it("renders navbar without Sign In link and SSOLoginFlow in hero/footer", () => {
@@ -33,22 +33,23 @@ describe("LandingPage", () => {
     expect(continueBtns.length).toBe(2);
   });
 
-  it("renders View API Docs link to /api-docs", () => {
+  it("renders API Docs link in footer", () => {
     const { getByText } = render(<LandingPage />);
-    const apiDocsLink = getByText("View API Docs");
+    const footer = document.querySelector("footer");
+    const apiDocsLink = footer?.querySelector('a[href="/api-docs"]');
     expect(apiDocsLink).toBeInTheDocument();
-    expect(apiDocsLink).toHaveAttribute("href", "/api-docs");
+    expect(getByText("API Docs")).toBeInTheDocument();
   });
 
   it("renders all 6 feature cards in the feature grid section", () => {
     render(<LandingPage />);
     const featureTitles = [
       "Real-time Collaboration",
-      "Version History & Diff",
+      "Full Version History",
       "Inline Comments",
-      "Spaces & Folders",
-      "Markdown & Mermaid",
-      "Seamless Sharing",
+      "Folders & Organization",
+      "Beautiful Markdown",
+      "Share in One Click",
     ];
     featureTitles.forEach((title) => {
       const all = document.querySelectorAll(`*`);
@@ -118,12 +119,10 @@ describe("LandingPage", () => {
 
   it("renders the stats section with correct labels", () => {
     const { getByText } = render(<LandingPage />);
-    expect(getByText("Real-time")).toBeInTheDocument();
-    expect(getByText("Collaboration")).toBeInTheDocument();
-    expect(getByText("Auto")).toBeInTheDocument();
-    expect(getByText("Versioning")).toBeInTheDocument();
-    expect(getByText("Granular")).toBeInTheDocument();
-    expect(getByText("Access Control")).toBeInTheDocument();
+    expect(getByText("Instant")).toBeInTheDocument();
+    expect(getByText("AI-ready")).toBeInTheDocument();
+    expect(getByText("Secure")).toBeInTheDocument();
+    expect(getByText("Global")).toBeInTheDocument();
   });
 
   it("does not mention Google Docs anywhere on the page", () => {
@@ -140,9 +139,9 @@ describe("LandingPage", () => {
     expect(getByText("API Docs")).toBeInTheDocument();
   });
 
-  it("renders the final CTA section with sign-in option", () => {
+  it("renders the final CTA section", () => {
     const { getByText, getAllByPlaceholderText } = render(<LandingPage />);
-    expect(getByText("Start collaborating now")).toBeInTheDocument();
+    expect(getByText("Ready to let AI handle your docs?")).toBeInTheDocument();
     const emailInputs = getAllByPlaceholderText("Enter your work email");
     expect(emailInputs.length).toBeGreaterThanOrEqual(1);
   });

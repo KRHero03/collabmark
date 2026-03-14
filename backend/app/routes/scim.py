@@ -9,6 +9,8 @@ resolved by the :func:`get_scim_org` dependency.  Discovery endpoints
 are public (no auth required per spec).
 """
 
+import logging
+import traceback
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
@@ -53,9 +55,6 @@ def register_scim_error_handler(app: Any) -> None:
         try:
             return await call_next(request)
         except Exception:
-            import logging
-            import traceback
-
             logging.getLogger("scim").error("Unhandled SCIM error:\n%s", traceback.format_exc())
             body = SCIMError(500, "Internal server error").to_dict()
             return JSONResponse(content=body, status_code=500, media_type=SCIM_CONTENT_TYPE)

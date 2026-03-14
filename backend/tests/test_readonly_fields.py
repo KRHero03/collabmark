@@ -6,12 +6,14 @@ schema-level input validation for all create/update endpoints.
 
 import pytest
 from app.auth.jwt import create_access_token
-from app.models.document import DocumentCreate
-from app.models.folder import FolderCreate
+from app.config import settings as cfg
+from app.models.document import DocumentCreate, DocumentUpdate
+from app.models.folder import FolderAccess, FolderCreate, FolderUpdate
 from app.models.organization import Organization, OrgMembership, OrgRole
-from app.models.share_link import Permission
+from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 from app.services import document_service, folder_service
+from fastapi import HTTPException
 from httpx import AsyncClient
 
 
@@ -130,9 +132,6 @@ class TestDocumentFolderIdValidation:
         doc = await document_service.create_document(owner_a, DocumentCreate(title="MyDoc"))
         folder = await folder_service.create_folder(owner_b, FolderCreate(name="Private"))
 
-        from app.models.document import DocumentUpdate
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await document_service.update_document(str(doc.id), owner_a, DocumentUpdate(folder_id=str(folder.id)))
         assert exc_info.value.status_code == 403
@@ -158,9 +157,6 @@ class TestDocumentFolderIdValidation:
         )
         await access.insert()
 
-        from app.models.document import DocumentUpdate
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await document_service.update_document(str(doc.id), owner, DocumentUpdate(folder_id=str(folder.id)))
         assert exc_info.value.status_code == 403
@@ -172,8 +168,6 @@ class TestDocumentFolderIdValidation:
         owner = await _make_user("own@move-c.com", org_id=str(org.id))
         doc = await document_service.create_document(owner, DocumentCreate(title="OrgDoc"))
         folder = await folder_service.create_folder(owner, FolderCreate(name="MyFolder"))
-
-        from app.models.document import DocumentUpdate
 
         updated = await document_service.update_document(str(doc.id), owner, DocumentUpdate(folder_id=str(folder.id)))
         assert updated.folder_id == str(folder.id)
@@ -193,9 +187,6 @@ class TestFolderParentIdValidation:
         folder = await folder_service.create_folder(owner_a, FolderCreate(name="MyFolder"))
         target = await folder_service.create_folder(owner_b, FolderCreate(name="Private"))
 
-        from app.models.folder import FolderUpdate
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await folder_service.update_folder(str(folder.id), owner_a, FolderUpdate(parent_id=str(target.id)))
         assert exc_info.value.status_code == 403
@@ -210,8 +201,6 @@ class TestFolderParentIdValidation:
         folder = await folder_service.create_folder(owner, FolderCreate(name="A"))
         target = await folder_service.create_folder(other, FolderCreate(name="B"))
 
-        from app.models.folder import FolderAccess
-
         access = FolderAccess(
             folder_id=str(target.id),
             user_id=str(owner.id),
@@ -219,9 +208,6 @@ class TestFolderParentIdValidation:
             granted_by=str(other.id),
         )
         await access.insert()
-
-        from app.models.folder import FolderUpdate
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await folder_service.update_folder(str(folder.id), owner, FolderUpdate(parent_id=str(target.id)))
@@ -237,8 +223,6 @@ class TestFolderParentIdValidation:
 
         parent = await folder_service.create_folder(other, FolderCreate(name="OtherOrgParent"))
 
-        from app.models.folder import FolderAccess
-
         access = FolderAccess(
             folder_id=str(parent.id),
             user_id=str(owner.id),
@@ -246,8 +230,6 @@ class TestFolderParentIdValidation:
             granted_by=str(other.id),
         )
         await access.insert()
-
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await folder_service.create_folder(owner, FolderCreate(name="Nested", parent_id=str(parent.id)))
@@ -263,8 +245,6 @@ class TestFolderParentIdValidation:
 
         folder = await folder_service.create_folder(other, FolderCreate(name="OtherOrgFolder"))
 
-        from app.models.folder import FolderAccess
-
         access = FolderAccess(
             folder_id=str(folder.id),
             user_id=str(owner.id),
@@ -272,8 +252,6 @@ class TestFolderParentIdValidation:
             granted_by=str(other.id),
         )
         await access.insert()
-
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await document_service.create_document(owner, DocumentCreate(title="Doc", folder_id=str(folder.id)))
@@ -289,8 +267,6 @@ class TestFolderParentIdValidation:
 class TestOrgMemberAddSchema:
     @pytest.mark.asyncio
     async def test_add_member_rejects_invalid_role(self, async_client: AsyncClient):
-        from app.config import settings as cfg
-
         admin = await _make_user("superadmin@test.com")
         cfg.super_admin_emails = [admin.email]
 
@@ -308,8 +284,6 @@ class TestOrgMemberAddSchema:
 
     @pytest.mark.asyncio
     async def test_add_member_rejects_missing_user_id(self, async_client: AsyncClient):
-        from app.config import settings as cfg
-
         admin = await _make_user("superadmin2@test.com")
         cfg.super_admin_emails = [admin.email]
 
@@ -344,8 +318,6 @@ class TestGeneralAccessProtection:
             json={"title": "Protected"},
         )
         doc_id = resp.json()["id"]
-
-        from app.models.share_link import DocumentAccess
 
         access = DocumentAccess(
             document_id=doc_id,

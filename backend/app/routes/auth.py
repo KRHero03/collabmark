@@ -10,8 +10,11 @@ from app.auth.cookie_utils import clear_auth_cookie, set_auth_cookie
 from app.auth.google_oauth import get_google_oauth
 from app.auth.jwt import create_access_token, decode_access_token
 from app.auth.sso_common import detect_org_by_email_domain, find_or_create_sso_user
+from app.auth.sso_oidc import initiate_oidc_login, process_oidc_callback
+from app.auth.sso_saml import create_saml_auth_request, process_saml_response
 from app.config import AUTH_COOKIE_NAME, settings
 from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
+from app.models.organization import Organization
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
@@ -189,8 +192,6 @@ async def saml_login(org_id: str, request: Request):
     Returns:
         RedirectResponse to the IdP's SSO URL.
     """
-    from app.auth.sso_saml import create_saml_auth_request
-
     sso_config = await _get_enabled_sso_config(org_id)
     if sso_config is None:
         return _error_redirect("sso_not_configured")
@@ -212,8 +213,6 @@ async def saml_callback(request: Request):
     Returns:
         RedirectResponse to frontend with JWT cookie set.
     """
-    from app.auth.sso_saml import process_saml_response
-
     form = await request.form()
     saml_response = form.get("SAMLResponse")
     relay_state = form.get("RelayState", "")
@@ -234,8 +233,6 @@ async def saml_callback(request: Request):
     except ValueError:
         logger.warning("SAML validation failed for org %s", org_id, exc_info=True)
         return _error_redirect("saml_invalid")
-
-    from app.models.organization import Organization
 
     org = await Organization.get(org_id)
     if org is None:
@@ -265,8 +262,6 @@ async def oidc_login(org_id: str, request: Request):
     Returns:
         RedirectResponse to the IdP's authorization URL.
     """
-    from app.auth.sso_oidc import initiate_oidc_login
-
     sso_config = await _get_enabled_sso_config(org_id)
     if sso_config is None:
         return _error_redirect("sso_not_configured")
@@ -297,8 +292,6 @@ async def oidc_callback(request: Request, code: str = Query(default=""), state: 
     Returns:
         RedirectResponse to frontend with JWT cookie set.
     """
-    from app.auth.sso_oidc import process_oidc_callback
-
     if not code:
         return _error_redirect("oidc_missing_code")
 
@@ -322,8 +315,6 @@ async def oidc_callback(request: Request, code: str = Query(default=""), state: 
     except ValueError:
         logger.warning("OIDC callback failed for org %s", org_id, exc_info=True)
         return _error_redirect("oidc_failed")
-
-    from app.models.organization import Organization
 
     org = await Organization.get(org_id)
     if org is None:

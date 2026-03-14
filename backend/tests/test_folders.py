@@ -1,5 +1,7 @@
 """Comprehensive tests for folder (Spaces) CRUD, nesting, cascade delete/restore, access, sharing."""
 
+from unittest.mock import patch
+
 import pytest
 import pytest_asyncio
 from app.auth.jwt import create_access_token
@@ -7,9 +9,17 @@ from app.models.comment import Comment
 from app.models.document import Document_
 from app.models.document_version import DocumentVersion
 from app.models.document_view import DocumentView
-from app.models.folder import Folder, FolderAccess, FolderView
+from app.models.folder import Folder, FolderAccess, FolderCreate, FolderView
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
+from app.services.folder_service import (
+    MAX_FOLDER_DEPTH,
+    create_folder,
+    get_breadcrumbs,
+    list_recently_viewed_folders,
+    list_shared_folders,
+)
+from beanie import PydanticObjectId
 from httpx import AsyncClient
 
 
@@ -1203,11 +1213,6 @@ class TestFolderServiceEdgeCases:
 
     @pytest.mark.asyncio
     async def test_create_folder_exceeds_max_per_user(self, async_client: AsyncClient, test_user: User):
-        from unittest.mock import patch
-
-        from app.models.folder import FolderCreate
-        from app.services.folder_service import create_folder
-
         with patch("app.services.folder_service.MAX_FOLDERS_PER_USER", 2):
             await create_folder(test_user, FolderCreate(name="F1"))
             await create_folder(test_user, FolderCreate(name="F2"))
@@ -1221,9 +1226,6 @@ class TestFolderServiceEdgeCases:
     async def test_list_shared_folders_invalid_folder_id_in_access(
         self, async_client: AsyncClient, test_user: User, other_user: User
     ):
-        from app.models.folder import FolderAccess
-        from app.services.folder_service import list_shared_folders
-
         fa = FolderAccess(
             folder_id="invalid-folder-id",
             user_id=str(other_user.id),
@@ -1255,9 +1257,6 @@ class TestFolderServiceEdgeCases:
     async def test_list_shared_folders_owner_not_found(
         self, async_client: AsyncClient, test_user: User, other_user: User
     ):
-        from app.models.folder import Folder, FolderAccess
-        from app.services.folder_service import list_shared_folders
-
         folder = Folder(
             name="Orphan",
             owner_id="000000000000000000000001",
@@ -1304,9 +1303,6 @@ class TestFolderServiceEdgeCases:
 
     @pytest.mark.asyncio
     async def test_get_breadcrumbs_missing_folder_in_chain(self, async_client: AsyncClient, test_user: User):
-        from app.models.folder import Folder
-        from app.services.folder_service import get_breadcrumbs
-
         folder = Folder(name="Solo", owner_id=str(test_user.id))
         await folder.insert()
         folder.parent_id = "000000000000000000000000"
@@ -1360,8 +1356,6 @@ class TestFolderServiceEdgeCases:
     async def test_list_recently_viewed_owner_not_found(
         self, async_client: AsyncClient, test_user: User, other_user: User
     ):
-        from app.models.folder import Folder, FolderView
-
         folder = Folder(name="Orphan", owner_id="000000000000000000000001")
         await folder.insert()
         folder.root_folder_id = str(folder.id)
@@ -1377,8 +1371,6 @@ class TestFolderServiceEdgeCases:
         fv = FolderView(user_id=str(other_user.id), folder_id=str(folder.id))
         await fv.insert()
 
-        from app.services.folder_service import list_recently_viewed_folders
-
         results = await list_recently_viewed_folders(other_user)
         assert len(results) >= 1
         item = next((r for r in results if str(r["folder"].id) == str(folder.id)), None)
@@ -1388,8 +1380,6 @@ class TestFolderServiceEdgeCases:
 
     @pytest.mark.asyncio
     async def test_create_folder_exceeds_depth(self, async_client: AsyncClient, test_user: User):
-        from app.services.folder_service import MAX_FOLDER_DEPTH
-
         async_client.cookies.update(_auth(test_user))
         parent = await _create_folder(async_client, "L1")
         for i in range(MAX_FOLDER_DEPTH - 1):
@@ -1557,10 +1547,7 @@ class TestFolderBranchCoverage:
             f"/api/folders/{folder_id}/collaborators",
             json={"email": other_user.email, "permission": "view"},
         )
-        from app.models.folder import Folder as FolderModel
-        from beanie import PydanticObjectId
-
-        db_folder = await FolderModel.get(PydanticObjectId(folder_id))
+        db_folder = await Folder.get(PydanticObjectId(folder_id))
         db_folder.owner_id = "invalid-owner-id"
         await db_folder.save()
         async_client.cookies.update(_auth(other_user))

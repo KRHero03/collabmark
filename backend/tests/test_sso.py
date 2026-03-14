@@ -10,8 +10,18 @@ from app.auth.sso_common import (
     detect_org_by_email_domain,
     find_or_create_sso_user,
 )
-from app.auth.sso_oidc import create_oidc_client
-from app.auth.sso_saml import build_saml_settings, prepare_saml_request
+from app.auth.sso_oidc import (
+    create_oidc_client,
+    get_oidc_discovery,
+    initiate_oidc_login,
+    process_oidc_callback,
+)
+from app.auth.sso_saml import (
+    build_saml_settings,
+    create_saml_auth_request,
+    prepare_saml_request,
+    process_saml_response,
+)
 from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
 from app.models.organization import Organization, OrgMembership, OrgRole
 from app.models.user import User
@@ -313,7 +323,7 @@ class TestSamlLoginRoute:
         config.idp_sso_url = "https://idp.example.com/sso"
         await config.save()
 
-        with patch("app.auth.sso_saml.create_saml_auth_request", new_callable=AsyncMock) as mock_create:
+        with patch("app.routes.auth.create_saml_auth_request", new_callable=AsyncMock) as mock_create:
             mock_create.return_value = "https://idp.example.com/sso?SAMLRequest=xxx"
             response = await async_client.get(
                 f"/api/auth/sso/saml/login/{org.id}",
@@ -346,7 +356,7 @@ class TestSamlCallbackRoute:
         config.enabled = True
         await config.save()
 
-        with patch("app.auth.sso_saml.process_saml_response", new_callable=AsyncMock) as mock_process:
+        with patch("app.routes.auth.process_saml_response", new_callable=AsyncMock) as mock_process:
             mock_process.return_value = SSOCallbackResult(
                 email="saml-user@sso-org.com",
                 name="SAML User",
@@ -372,7 +382,7 @@ class TestSamlCallbackRoute:
         config.enabled = True
         await config.save()
 
-        with patch("app.auth.sso_saml.process_saml_response", new_callable=AsyncMock) as mock_process:
+        with patch("app.routes.auth.process_saml_response", new_callable=AsyncMock) as mock_process:
             mock_process.side_effect = ValueError("SAML validation failed")
             response = await async_client.post(
                 "/api/auth/sso/saml/callback",
@@ -403,7 +413,7 @@ class TestOidcLoginRoute:
     async def test_get_with_valid_org_id_redirects_to_idp(self, async_client, sso_org_and_config):
         org, _config = sso_org_and_config
 
-        with patch("app.auth.sso_oidc.initiate_oidc_login", new_callable=AsyncMock) as mock_initiate:
+        with patch("app.routes.auth.initiate_oidc_login", new_callable=AsyncMock) as mock_initiate:
             mock_initiate.return_value = "https://idp.example.com/authorize?state=xxx"
             response = await async_client.get(
                 f"/api/auth/sso/oidc/login/{org.id}",
@@ -436,13 +446,13 @@ class TestOidcCallbackRoute:
         state = f"{org.id}:{fixed_token}"
 
         with patch("app.routes.auth.secrets.token_urlsafe", return_value=fixed_token):
-            with patch("app.auth.sso_oidc.process_oidc_callback", new_callable=AsyncMock) as mock_process:
+            with patch("app.routes.auth.process_oidc_callback", new_callable=AsyncMock) as mock_process:
                 mock_process.return_value = SSOCallbackResult(
                     email="oidc-user@sso-org.com",
                     name="OIDC User",
                     avatar_url=None,
                 )
-                with patch("app.auth.sso_oidc.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
+                with patch("app.routes.auth.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
                     mock_init.return_value = f"https://idp.example.com/authorize?state={state}"
                     login_resp = await async_client.get(
                         f"/api/auth/sso/oidc/login/{org.id}",
@@ -505,7 +515,7 @@ class TestSsoIntegration:
         fixed_token = "integration-test-token"
         state = f"{org.id}:{fixed_token}"
         with patch("app.routes.auth.secrets.token_urlsafe", return_value=fixed_token):
-            with patch("app.auth.sso_oidc.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
+            with patch("app.routes.auth.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
                 mock_init.return_value = f"https://idp.example.com/auth?state={state}"
                 login_resp = await async_client.get(
                     f"/api/auth/sso/oidc/login/{org.id}",
@@ -514,7 +524,7 @@ class TestSsoIntegration:
             cookies = login_resp.cookies
 
             # 3. Callback (mock)
-            with patch("app.auth.sso_oidc.process_oidc_callback", new_callable=AsyncMock) as mock_process:
+            with patch("app.routes.auth.process_oidc_callback", new_callable=AsyncMock) as mock_process:
                 mock_process.return_value = SSOCallbackResult(
                     email="integration@sso-org.com",
                     name="Integration User",
@@ -598,8 +608,6 @@ class TestBuildSamlSettingsDefaults:
 class TestCreateSamlAuthRequest:
     @pytest.mark.asyncio
     async def test_creates_auth_request_and_returns_redirect_url(self):
-        from app.auth.sso_saml import create_saml_auth_request
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.SAML,
@@ -620,8 +628,6 @@ class TestCreateSamlAuthRequest:
 
     @pytest.mark.asyncio
     async def test_http_url_sets_port_80_and_https_off(self):
-        from app.auth.sso_saml import create_saml_auth_request
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.SAML,
@@ -646,8 +652,6 @@ class TestCreateSamlAuthRequest:
 class TestProcessSamlResponse:
     @pytest.mark.asyncio
     async def test_valid_response_returns_callback_result(self):
-        from app.auth.sso_saml import process_saml_response
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.SAML,
@@ -673,8 +677,6 @@ class TestProcessSamlResponse:
 
     @pytest.mark.asyncio
     async def test_response_with_errors_raises_value_error(self):
-        from app.auth.sso_saml import process_saml_response
-
         config = OrgSSOConfig(org_id="org1", protocol=SSOProtocol.SAML)
         mock_auth = MagicMock()
         mock_auth.process_response.return_value = None
@@ -686,8 +688,6 @@ class TestProcessSamlResponse:
 
     @pytest.mark.asyncio
     async def test_response_missing_email_raises_value_error(self):
-        from app.auth.sso_saml import process_saml_response
-
         config = OrgSSOConfig(org_id="org1", protocol=SSOProtocol.SAML)
         mock_auth = MagicMock()
         mock_auth.process_response.return_value = None
@@ -701,8 +701,6 @@ class TestProcessSamlResponse:
 
     @pytest.mark.asyncio
     async def test_uses_claims_uri_fallback_for_email_and_name(self):
-        from app.auth.sso_saml import process_saml_response
-
         config = OrgSSOConfig(org_id="org1", protocol=SSOProtocol.SAML)
         mock_auth = MagicMock()
         mock_auth.process_response.return_value = None
@@ -720,8 +718,6 @@ class TestProcessSamlResponse:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_nameid_for_email(self):
-        from app.auth.sso_saml import process_saml_response
-
         config = OrgSSOConfig(org_id="org1", protocol=SSOProtocol.SAML)
         mock_auth = MagicMock()
         mock_auth.process_response.return_value = None
@@ -743,8 +739,6 @@ class TestProcessSamlResponse:
 class TestGetOidcDiscovery:
     @pytest.mark.asyncio
     async def test_fetches_discovery_document(self):
-        from app.auth.sso_oidc import get_oidc_discovery
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.OIDC,
@@ -769,8 +763,6 @@ class TestGetOidcDiscovery:
 
     @pytest.mark.asyncio
     async def test_raises_for_missing_discovery_url(self):
-        from app.auth.sso_oidc import get_oidc_discovery
-
         config = OrgSSOConfig(org_id="org1", protocol=SSOProtocol.OIDC, oidc_discovery_url=None)
         with pytest.raises(ValueError, match="OIDC discovery URL not configured"):
             await get_oidc_discovery(config)
@@ -784,8 +776,6 @@ class TestGetOidcDiscovery:
 class TestInitiateOidcLogin:
     @pytest.mark.asyncio
     async def test_returns_authorization_url(self):
-        from app.auth.sso_oidc import initiate_oidc_login
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.OIDC,
@@ -805,8 +795,6 @@ class TestInitiateOidcLogin:
 
     @pytest.mark.asyncio
     async def test_raises_for_missing_authorization_endpoint(self):
-        from app.auth.sso_oidc import initiate_oidc_login
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.OIDC,
@@ -827,8 +815,6 @@ class TestInitiateOidcLogin:
 class TestProcessOidcCallback:
     @pytest.mark.asyncio
     async def test_exchanges_code_and_returns_callback_result(self):
-        from app.auth.sso_oidc import process_oidc_callback
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.OIDC,
@@ -868,8 +854,6 @@ class TestProcessOidcCallback:
 
     @pytest.mark.asyncio
     async def test_raises_for_missing_token_endpoint(self):
-        from app.auth.sso_oidc import process_oidc_callback
-
         config = OrgSSOConfig(org_id="org1", protocol=SSOProtocol.OIDC)
         discovery = {"userinfo_endpoint": "https://idp.test.com/userinfo"}
 
@@ -879,8 +863,6 @@ class TestProcessOidcCallback:
 
     @pytest.mark.asyncio
     async def test_raises_for_failed_token_exchange(self):
-        from app.auth.sso_oidc import process_oidc_callback
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.OIDC,
@@ -900,8 +882,6 @@ class TestProcessOidcCallback:
 
     @pytest.mark.asyncio
     async def test_raises_for_missing_email_in_userinfo(self):
-        from app.auth.sso_oidc import process_oidc_callback
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.OIDC,
@@ -934,8 +914,6 @@ class TestProcessOidcCallback:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_token_userinfo_when_no_userinfo_endpoint(self):
-        from app.auth.sso_oidc import process_oidc_callback
-
         config = OrgSSOConfig(
             org_id="org1",
             protocol=SSOProtocol.OIDC,
@@ -982,7 +960,7 @@ class TestSamlCallbackEdgeCases:
         config.enabled = True
         await config.save()
 
-        with patch("app.auth.sso_saml.process_saml_response", new_callable=AsyncMock) as mock_proc:
+        with patch("app.routes.auth.process_saml_response", new_callable=AsyncMock) as mock_proc:
             mock_proc.return_value = SSOCallbackResult(email="x@sso-org.com", name="X")
             response = await async_client.post(
                 "/api/auth/sso/saml/callback",
@@ -1004,7 +982,7 @@ class TestOidcLoginEdgeCases:
     async def test_oidc_login_with_config_error_redirects(self, async_client, sso_org_and_config):
         org, _config = sso_org_and_config
 
-        with patch("app.auth.sso_oidc.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
+        with patch("app.routes.auth.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
             mock_init.side_effect = ValueError("Discovery failed")
             response = await async_client.get(
                 f"/api/auth/sso/oidc/login/{org.id}",
@@ -1027,7 +1005,7 @@ class TestOidcCallbackEdgeCases:
         state = f"{org.id}:{fixed_token}"
 
         with patch("app.routes.auth.secrets.token_urlsafe", return_value=fixed_token):
-            with patch("app.auth.sso_oidc.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
+            with patch("app.routes.auth.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
                 mock_init.return_value = f"https://idp.example.com/auth?state={state}"
                 login_resp = await async_client.get(
                     f"/api/auth/sso/oidc/login/{org.id}",
@@ -1035,7 +1013,7 @@ class TestOidcCallbackEdgeCases:
                 )
             cookies = login_resp.cookies
 
-            with patch("app.auth.sso_oidc.process_oidc_callback", new_callable=AsyncMock) as mock_proc:
+            with patch("app.routes.auth.process_oidc_callback", new_callable=AsyncMock) as mock_proc:
                 mock_proc.side_effect = ValueError("Token exchange failed")
                 response = await async_client.get(
                     f"/api/auth/sso/oidc/callback?code=bad-code&state={state}",
@@ -1053,7 +1031,7 @@ class TestOidcCallbackEdgeCases:
         state = f"{fake_org_id}:{fixed_token}"
 
         with patch("app.routes.auth.secrets.token_urlsafe", return_value=fixed_token):
-            with patch("app.auth.sso_oidc.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
+            with patch("app.routes.auth.initiate_oidc_login", new_callable=AsyncMock) as mock_init:
                 mock_init.return_value = f"https://idp.example.com/auth?state={state}"
                 login_resp = await async_client.get(
                     f"/api/auth/sso/oidc/login/{org.id}",
@@ -1061,7 +1039,7 @@ class TestOidcCallbackEdgeCases:
                 )
             cookies = login_resp.cookies
 
-            with patch("app.auth.sso_oidc.process_oidc_callback", new_callable=AsyncMock) as mock_proc:
+            with patch("app.routes.auth.process_oidc_callback", new_callable=AsyncMock) as mock_proc:
                 mock_proc.return_value = SSOCallbackResult(email="x@sso-org.com", name="X")
                 # Manually set session state to match
                 response = await async_client.get(

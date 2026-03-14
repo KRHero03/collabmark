@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from unittest.mock import MagicMock
 
+from watchdog.events import DirCreatedEvent, FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, FileMovedEvent
+
 from collabmark.lib.watcher import DebouncedWatcher, _MarkdownHandler
 
 # ===================================================================
@@ -18,8 +20,6 @@ class TestMarkdownHandler:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
 
-        from watchdog.events import FileCreatedEvent
-
         event = FileCreatedEvent(str(tmp_path / "doc.md"))
         handler.on_created(event)
         cb.assert_called_once_with(str(tmp_path / "doc.md"))
@@ -27,8 +27,6 @@ class TestMarkdownHandler:
     def test_ignores_non_md_file(self, tmp_path: Path) -> None:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
-
-        from watchdog.events import FileCreatedEvent
 
         event = FileCreatedEvent(str(tmp_path / "image.png"))
         handler.on_created(event)
@@ -38,8 +36,6 @@ class TestMarkdownHandler:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
 
-        from watchdog.events import FileModifiedEvent
-
         event = FileModifiedEvent(str(tmp_path / ".collabmark" / "sync.md"))
         handler.on_modified(event)
         cb.assert_not_called()
@@ -47,8 +43,6 @@ class TestMarkdownHandler:
     def test_accepts_nested_md_file(self, tmp_path: Path) -> None:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
-
-        from watchdog.events import FileCreatedEvent
 
         event = FileCreatedEvent(str(tmp_path / "sub" / "deep" / "note.md"))
         handler.on_created(event)
@@ -58,8 +52,6 @@ class TestMarkdownHandler:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
 
-        from watchdog.events import DirCreatedEvent
-
         event = DirCreatedEvent(str(tmp_path / "newdir"))
         handler.on_created(event)
         cb.assert_not_called()
@@ -67,8 +59,6 @@ class TestMarkdownHandler:
     def test_handles_modify_event(self, tmp_path: Path) -> None:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
-
-        from watchdog.events import FileModifiedEvent
 
         event = FileModifiedEvent(str(tmp_path / "doc.md"))
         handler.on_modified(event)
@@ -78,8 +68,6 @@ class TestMarkdownHandler:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
 
-        from watchdog.events import FileDeletedEvent
-
         event = FileDeletedEvent(str(tmp_path / "doc.md"))
         handler.on_deleted(event)
         cb.assert_called_once()
@@ -88,8 +76,6 @@ class TestMarkdownHandler:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
 
-        from watchdog.events import FileMovedEvent
-
         event = FileMovedEvent(str(tmp_path / "old.txt"), str(tmp_path / "new.md"))
         handler.on_moved(event)
         cb.assert_called_once_with(str(tmp_path / "new.md"))
@@ -97,8 +83,6 @@ class TestMarkdownHandler:
     def test_handles_move_event_both_md(self, tmp_path: Path) -> None:
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
-
-        from watchdog.events import FileMovedEvent
 
         event = FileMovedEvent(str(tmp_path / "old.md"), str(tmp_path / "new.md"))
         handler.on_moved(event)

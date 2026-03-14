@@ -7,10 +7,15 @@ from beanie import PydanticObjectId
 from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
+from app.models.comment import Comment
 from app.models.document import Document_, GeneralAccess
+from app.models.document_version import DocumentVersion
+from app.models.document_view import DocumentView as DV
 from app.models.folder import Folder, FolderAccess, FolderCreate, FolderUpdate, FolderView
-from app.models.share_link import Permission
+from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
+from app.services.acl_service import get_base_permission, resolve_effective_permission
+from app.services.crdt_store import MongoYStore
 
 logger = logging.getLogger(__name__)
 
@@ -255,8 +260,6 @@ async def get_folder_permission(folder_id: str, user: User) -> Permission | None
 
     Uses acl_service.get_base_permission with org boundary enforcement.
     """
-    from app.services.acl_service import get_base_permission
-
     return await get_base_permission("folder", folder_id, str(user.id), user.org_id)
 
 
@@ -378,8 +381,6 @@ async def get_breadcrumbs(folder_id: str, user: User) -> list[dict]:
 
 async def _assert_can_share_folder(folder: Folder, user: User) -> None:
     """ACL-aware share check: only users with can_share may manage collaborators."""
-    from app.services.acl_service import resolve_effective_permission
-
     perm = await resolve_effective_permission("folder", str(folder.id), user)
     if not perm.can_share:
         raise HTTPException(
@@ -517,8 +518,6 @@ async def _find_folder_or_none(folder_id: str) -> Folder | None:
 
 async def _assert_can_delete_folder(folder: Folder, user: User) -> None:
     """ACL-aware delete check: root owner or entity owner with all children owned."""
-    from app.services.acl_service import resolve_effective_permission
-
     perm = await resolve_effective_permission("folder", str(folder.id), user)
     if not perm.can_delete:
         raise HTTPException(
@@ -667,19 +666,11 @@ async def _cascade_hard_delete(folder: Folder) -> None:
         Document_.folder_id == str(folder.id),
     ).to_list()
     for doc in child_docs:
-        from app.models.comment import Comment
-        from app.models.document_version import DocumentVersion
-        from app.models.share_link import DocumentAccess
-
         str_id = str(doc.id)
         await Comment.find(Comment.document_id == str_id).delete()
         await DocumentVersion.find(DocumentVersion.document_id == str_id).delete()
         await DocumentAccess.find(DocumentAccess.document_id == str_id).delete()
-        from app.models.document_view import DocumentView as DV
-
         await DV.find(DV.document_id == str_id).delete()
-        from app.services.crdt_store import MongoYStore
-
         if MongoYStore._db is not None:
             await MongoYStore._db["crdt_updates"].delete_many({"room": str_id})
         await doc.delete()

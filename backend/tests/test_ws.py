@@ -5,11 +5,13 @@ unauthenticated) for the WebSocket endpoint, and verifies the
 FastAPIWebsocketAdapter interface.
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from app.services.crdt_store import MongoYStore
 from app.ws.handler import CollabWebsocketServer, FastAPIWebsocketAdapter
 from fastapi import WebSocketDisconnect
+from mongomock_motor import AsyncMongoMockClient
 
 
 class TestFastAPIWebsocketAdapter:
@@ -84,14 +86,12 @@ class TestPermissionRecheck:
     @pytest.mark.asyncio
     async def test_recheck_upgrades_read_only_to_writable(self):
         """When DB permission changes to EDIT, read_only should become False."""
-        from unittest.mock import patch
-
         mock_ws = MagicMock()
         mock_user = MagicMock()
         adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=mock_user)
         adapter._last_perm_check = 0
 
-        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+        with patch("app.ws.handler.get_user_permission", new_callable=AsyncMock) as mock_perm:
             mock_perm.return_value = "edit"
             await adapter._recheck_permission()
 
@@ -100,14 +100,12 @@ class TestPermissionRecheck:
     @pytest.mark.asyncio
     async def test_recheck_downgrades_writable_to_read_only(self):
         """When DB permission changes to VIEW, read_only should become True."""
-        from unittest.mock import patch
-
         mock_ws = MagicMock()
         mock_user = MagicMock()
         adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=False, user=mock_user)
         adapter._last_perm_check = 0
 
-        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+        with patch("app.ws.handler.get_user_permission", new_callable=AsyncMock) as mock_perm:
             mock_perm.return_value = "view"
             await adapter._recheck_permission()
 
@@ -116,14 +114,12 @@ class TestPermissionRecheck:
     @pytest.mark.asyncio
     async def test_recheck_revoked_access_sets_read_only(self):
         """When DB permission is None (revoked), read_only should be True."""
-        from unittest.mock import patch
-
         mock_ws = MagicMock()
         mock_user = MagicMock()
         adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=False, user=mock_user)
         adapter._last_perm_check = 0
 
-        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+        with patch("app.ws.handler.get_user_permission", new_callable=AsyncMock) as mock_perm:
             mock_perm.return_value = None
             await adapter._recheck_permission()
 
@@ -132,13 +128,11 @@ class TestPermissionRecheck:
     @pytest.mark.asyncio
     async def test_recheck_skipped_within_interval(self):
         """Re-check should be skipped if interval has not elapsed."""
-        from unittest.mock import patch
-
         mock_ws = MagicMock()
         mock_user = MagicMock()
         adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=mock_user)
 
-        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+        with patch("app.ws.handler.get_user_permission", new_callable=AsyncMock) as mock_perm:
             mock_perm.return_value = "edit"
             await adapter._recheck_permission()
 
@@ -148,13 +142,11 @@ class TestPermissionRecheck:
     @pytest.mark.asyncio
     async def test_recheck_skipped_when_no_user(self):
         """Re-check should be a no-op when user is None."""
-        from unittest.mock import patch
-
         mock_ws = MagicMock()
         adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=None)
         adapter._last_perm_check = 0
 
-        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+        with patch("app.ws.handler.get_user_permission", new_callable=AsyncMock) as mock_perm:
             await adapter._recheck_permission()
 
         assert adapter.read_only is True
@@ -163,8 +155,6 @@ class TestPermissionRecheck:
     @pytest.mark.asyncio
     async def test_write_message_allowed_after_upgrade(self):
         """After permission upgrade, sync-update messages should pass through."""
-        from unittest.mock import patch
-
         mock_ws = MagicMock()
         mock_user = MagicMock()
         sync_update_msg = bytes([0, 2]) + b"\x01\x02\x03"
@@ -173,7 +163,7 @@ class TestPermissionRecheck:
         adapter = FastAPIWebsocketAdapter(mock_ws, path="doc-perm", read_only=True, user=mock_user)
         adapter._last_perm_check = 0
 
-        with patch("app.services.share_service.get_user_permission", new_callable=AsyncMock) as mock_perm:
+        with patch("app.ws.handler.get_user_permission", new_callable=AsyncMock) as mock_perm:
             mock_perm.return_value = "edit"
             result = await adapter.__anext__()
 
@@ -200,9 +190,6 @@ class TestCollabWebsocketServer:
     @pytest.mark.asyncio
     async def test_get_room_creates_room_with_store(self):
         """get_room() should create a YRoom with a MongoYStore attached."""
-        from app.services.crdt_store import MongoYStore
-        from mongomock_motor import AsyncMongoMockClient
-
         client = AsyncMongoMockClient()
         MongoYStore.set_database(client["test_ws_server"])
 
@@ -218,9 +205,6 @@ class TestCollabWebsocketServer:
     @pytest.mark.asyncio
     async def test_get_room_returns_same_room_for_same_name(self):
         """Calling get_room twice with the same name should return the same instance."""
-        from app.services.crdt_store import MongoYStore
-        from mongomock_motor import AsyncMongoMockClient
-
         client = AsyncMongoMockClient()
         MongoYStore.set_database(client["test_ws_server2"])
 
@@ -234,9 +218,6 @@ class TestCollabWebsocketServer:
     @pytest.mark.asyncio
     async def test_different_room_names_create_different_rooms(self):
         """Different document IDs should produce different rooms."""
-        from app.services.crdt_store import MongoYStore
-        from mongomock_motor import AsyncMongoMockClient
-
         client = AsyncMongoMockClient()
         MongoYStore.set_database(client["test_ws_server3"])
 

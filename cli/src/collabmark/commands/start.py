@@ -25,7 +25,7 @@ from collabmark.lib.config import (
 from collabmark.lib.daemon import daemonize, remove_pid_file, write_pid_file
 from collabmark.lib.logger import setup_logging
 from collabmark.lib.registry import mark_stopped, register_sync, update_heartbeat
-from collabmark.lib.sync_engine import run_sync_cycle
+from collabmark.lib.sync_engine import ActionKind, run_sync_cycle
 from collabmark.lib.watcher import DebouncedWatcher
 from collabmark.types import SyncConfig
 
@@ -271,8 +271,6 @@ def _print_sync_summary(actions: list) -> None:
     if not actions:
         console.print("[green]✓[/green] Everything is up to date.")
         return
-
-    from collabmark.lib.sync_engine import ActionKind
 
     counts: dict[str, int] = {}
     for a in actions:

@@ -9,6 +9,11 @@ from pathlib import Path
 import click
 from rich.console import Console
 
+from collabmark.commands.start import (
+    _extract_folder_id_from_link,
+    _init_project_config,
+    _interactive_folder_picker,
+)
 from collabmark.lib.api import CollabMarkClient
 from collabmark.lib.auth import AuthError, ensure_authenticated
 from collabmark.lib.config import find_project_root
@@ -59,12 +64,6 @@ async def _init_async(link: str | None, path_str: str | None) -> None:
         sys.exit(1)
 
     console.print(f"[green]✓[/green] Authenticated as {user_info.name} ({user_info.email})")
-
-    from collabmark.commands.start import (
-        _extract_folder_id_from_link,
-        _init_project_config,
-        _interactive_folder_picker,
-    )
 
     async with CollabMarkClient(api_key) as client:
         if link:

@@ -3,19 +3,24 @@
 from __future__ import annotations
 
 import threading
+import time
+import urllib.request
 from unittest.mock import MagicMock, patch
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
 import respx
+from click.testing import CliRunner
 
-from collabmark.lib.auth import AuthError
+from collabmark.lib.auth import AuthError, UserInfo
 from collabmark.lib.browser_auth import (
     _CallbackHandler,
     _find_free_port,
     _reuse_or_create_api_key,
     browser_login,
 )
+from collabmark.main import cli
 
 FAKE_JWT = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.test.sig"
 FAKE_RAW_KEY = "cm_" + "ab12cd34" * 8
@@ -108,8 +113,6 @@ class TestReuseOrCreateApiKey:
     @patch("collabmark.lib.browser_auth.validate_api_key")
     @patch("collabmark.lib.browser_auth.load_api_key", return_value="cm_existing_key_1234")
     async def test_reuses_valid_local_key(self, _mock_load, mock_validate) -> None:
-        from collabmark.lib.auth import UserInfo
-
         expected_info = UserInfo(
             id="user123",
             email="pm@acme.com",
@@ -182,10 +185,6 @@ class TestBrowserLogin:
 
         def simulate_callback(url: str) -> None:
             """Parse the port from the frontend URL and hit the callback with a token."""
-            import time
-            import urllib.request
-            from urllib.parse import parse_qs, urlparse
-
             parsed = urlparse(url)
             qs = parse_qs(parsed.query)
             port = int(qs["port"][0])
@@ -239,10 +238,6 @@ class TestLoginCommand:
     @patch("collabmark.lib.browser_auth.save_api_key")
     @patch("collabmark.lib.browser_auth.webbrowser.open")
     def test_login_help_shows_browser_default(self, _a: MagicMock, _b: MagicMock) -> None:
-        from click.testing import CliRunner
-
-        from collabmark.main import cli
-
         runner = CliRunner()
         result = runner.invoke(cli, ["login", "--help"])
         assert result.exit_code == 0

@@ -11,6 +11,7 @@ the user's permission from the database so that mid-session ACL changes
 within ``_PERM_RECHECK_INTERVAL`` seconds.
 """
 
+import asyncio
 import contextlib
 import logging
 import time
@@ -20,7 +21,9 @@ from fastapi import WebSocket, WebSocketDisconnect
 from pycrdt import Doc
 from pycrdt.websocket import WebsocketServer, YRoom
 
+from app.models.share_link import Permission
 from app.services.crdt_store import MongoYStore
+from app.services.share_service import get_user_permission
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +76,7 @@ class CollabWebsocketServer(WebsocketServer):
 
 
 YJS_MSG_SYNC = 0
+YJS_SYNC_STEP2 = 1
 YJS_SYNC_UPDATE = 2
 
 
@@ -99,6 +103,7 @@ class FastAPIWebsocketAdapter:
         *,
         read_only: bool = False,
         user: Any = None,
+        store: MongoYStore | None = None,
     ) -> None:
         """Initialize the adapter.
 
@@ -107,11 +112,13 @@ class FastAPIWebsocketAdapter:
             path: The room path (document ID).
             read_only: If True, block incoming document update messages.
             user: The authenticated User object (needed for permission re-checks).
+            store: The MongoYStore for this room, used for user attribution.
         """
         self.websocket = websocket
         self.path = path
         self.read_only = read_only
         self._user = user
+        self._store = store
         self._last_perm_check = time.monotonic()
 
     async def send(self, message: bytes) -> None:
@@ -131,6 +138,14 @@ class FastAPIWebsocketAdapter:
         """
         return len(data) >= 2 and data[0] == YJS_MSG_SYNC and data[1] == YJS_SYNC_UPDATE
 
+    def _modifies_ydoc(self, data: bytes) -> bool:
+        """Check if this message will modify the server's Y.Doc.
+
+        Both SYNC_STEP2 (sub-type 1, initial diff from client) and
+        SYNC_UPDATE (sub-type 2, incremental edit) apply changes.
+        """
+        return len(data) >= 2 and data[0] == YJS_MSG_SYNC and data[1] in (YJS_SYNC_STEP2, YJS_SYNC_UPDATE)
+
     def __aiter__(self):
         """Return the async iterator for incoming messages."""
         return self
@@ -149,9 +164,6 @@ class FastAPIWebsocketAdapter:
         if now - self._last_perm_check < _PERM_RECHECK_INTERVAL:
             return
         self._last_perm_check = now
-
-        from app.models.share_link import Permission
-        from app.services.share_service import get_user_permission
 
         perm = await get_user_permission(self.path, self._user)
         if perm is None or perm == Permission.VIEW:
@@ -178,6 +190,10 @@ class FastAPIWebsocketAdapter:
         dropped (the loop continues to the next message). Permission is
         re-checked periodically so mid-session ACL changes take effect.
 
+        For every message that will modify the Y.Doc (SYNC_STEP2 and
+        SYNC_UPDATE), the authenticated user's ID is pushed into the
+        store's queue so the subsequent ``write()`` can attribute it.
+
         Returns:
             The binary message data.
 
@@ -197,6 +213,11 @@ class FastAPIWebsocketAdapter:
                 if self.read_only:
                     logger.debug("Dropped write message from read-only client on room %s", self.path)
                     continue
+
+            if self._modifies_ydoc(data) and self._store is not None:
+                uid = str(self._user.id) if self._user else None
+                self._store.enqueue_user(uid)
+
             return data
 
 
@@ -222,8 +243,6 @@ async def start_websocket_server() -> None:
     """Start the global WebsocketServer (called during app lifespan startup)."""
     server = await get_websocket_server()
     if server._task_group is None:
-        import asyncio
-
         _bg_task = asyncio.create_task(server.start())  # noqa: RUF006 - prevent GC
         await server.started.wait()
         logger.info("CollabWebsocketServer started")

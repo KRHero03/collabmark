@@ -5,7 +5,7 @@ from app.auth.jwt import create_access_token
 from app.config import settings
 from app.models.document import Document_
 from app.models.folder import Folder
-from app.models.organization import Organization, OrgMembership, OrgRole
+from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate, OrgMembership, OrgRole
 from app.models.user import User
 from app.services import org_service
 from beanie import PydanticObjectId
@@ -526,8 +526,6 @@ class TestOrgEdgeCases:
     @pytest.mark.asyncio
     async def test_update_org_with_invalid_id_returns_404(self):
         """Service update_org raises 404 for invalid org_id (HTTP layer returns 403 first)."""
-        from app.models.organization import OrganizationUpdate
-
         with pytest.raises(HTTPException) as exc_info:
             await org_service.update_org("invalid-id", OrganizationUpdate(name="Updated"))
         assert exc_info.value.status_code == 404
@@ -598,8 +596,6 @@ class TestOrgEdgeCases:
 
     @pytest.mark.asyncio
     async def test_create_org_sets_creator_org_id(self, test_user: User):
-        from app.models.organization import OrganizationCreate
-
         payload = OrganizationCreate(name="Creator Org", slug="creator-org")
         org = await org_service.create_org(payload, test_user)
         try:

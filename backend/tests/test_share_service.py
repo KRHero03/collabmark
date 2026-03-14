@@ -23,6 +23,7 @@ from app.services.share_service import (
     revoke_share_link,
     update_general_access,
 )
+from fastapi import HTTPException
 
 
 class TestCreateShareLink:
@@ -43,7 +44,6 @@ class TestCreateShareLink:
         await owner.insert()
         doc = Document_(title="D", content="", owner_id=str(owner.id))
         await doc.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await create_share_link(str(doc.id), test_user)
@@ -85,7 +85,6 @@ class TestListShareLinks:
         await owner.insert()
         doc = Document_(title="D", content="", owner_id=str(owner.id))
         await doc.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await list_share_links(str(doc.id), test_user)
@@ -111,8 +110,6 @@ class TestRevokeShareLink:
 
     @pytest.mark.asyncio
     async def test_invalid_link_id_404(self, test_user: User):
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await revoke_share_link("000000000000000000000001", test_user)
         assert exc_info.value.status_code == 404
@@ -125,7 +122,6 @@ class TestRevokeShareLink:
         doc = Document_(title="D", content="", owner_id=str(owner.id))
         await doc.insert()
         link = await create_share_link(str(doc.id), owner)
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await revoke_share_link(str(link.id), test_user)
@@ -144,8 +140,6 @@ class TestResolveShareLink:
 
     @pytest.mark.asyncio
     async def test_invalid_token_404(self):
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await resolve_share_link("nonexistent-token-xyz")
         assert exc_info.value.status_code == 404
@@ -163,7 +157,6 @@ class TestResolveShareLink:
             expires_at=datetime.now(UTC) - timedelta(hours=1),
         )
         await link.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await resolve_share_link(link.token)
@@ -177,7 +170,6 @@ class TestResolveShareLink:
         link = await create_share_link(str(doc.id), test_user)
         doc.soft_delete()
         await doc.save()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await resolve_share_link(link.token)
@@ -411,7 +403,6 @@ class TestUpdateGeneralAccess:
     async def test_invalid_value_400(self, test_user: User):
         doc = Document_(title="D", content="", owner_id=str(test_user.id))
         await doc.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await update_general_access(str(doc.id), test_user, "invalid")
@@ -424,7 +415,6 @@ class TestUpdateGeneralAccess:
         await owner.insert()
         doc = Document_(title="D", content="", owner_id=str(owner.id))
         await doc.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await update_general_access(str(doc.id), test_user, "anyone_view")
@@ -452,7 +442,6 @@ class TestAddCollaborator:
         await owner.insert()
         doc = Document_(title="D", content="", owner_id=str(owner.id))
         await doc.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await add_collaborator(str(doc.id), test_user, "x@x.com", Permission.EDIT)
@@ -462,7 +451,6 @@ class TestAddCollaborator:
     async def test_self_add_400(self, test_user: User):
         doc = Document_(title="D", content="", owner_id=str(test_user.id))
         await doc.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await add_collaborator(str(doc.id), test_user, test_user.email, Permission.EDIT)
@@ -473,7 +461,6 @@ class TestAddCollaborator:
     async def test_nonexistent_email_404(self, test_user: User):
         doc = Document_(title="D", content="", owner_id=str(test_user.id))
         await doc.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await add_collaborator(str(doc.id), test_user, "nonexistent@example.com", Permission.EDIT)
@@ -557,7 +544,6 @@ class TestRemoveCollaborator:
             permission=Permission.EDIT,
             granted_by=str(owner.id),
         ).insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await remove_collaborator(str(doc.id), test_user, str(collab.id))
@@ -568,7 +554,6 @@ class TestRemoveCollaborator:
         doc = Document_(title="D", content="", owner_id=str(test_user.id))
         await doc.insert()
         fake_user_id = "000000000000000000000001"
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await remove_collaborator(str(doc.id), test_user, fake_user_id)
@@ -672,8 +657,6 @@ class TestListRecentlyViewed:
 
     @pytest.mark.asyncio
     async def test_skips_invalid_document_ids_in_views(self, test_user: User):
-        from app.models.document_view import DocumentView
-
         view = DocumentView(
             user_id=str(test_user.id),
             document_id="invalid-doc-id",
@@ -712,8 +695,6 @@ class TestListRecentlyViewed:
 class TestShareServiceEdgeCases:
     @pytest.mark.asyncio
     async def test_revoke_share_link_invalid_id_format(self, test_user: User):
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await revoke_share_link("invalid-link-id", test_user)
         assert exc_info.value.status_code == 404

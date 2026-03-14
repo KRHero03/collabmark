@@ -8,7 +8,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from click.testing import CliRunner
 
+from collabmark import __version__
 from collabmark.lib.api import CollabMarkClient
+from collabmark.lib.auth import AuthError
 from collabmark.lib.config import (
     PROJECT_DIR_NAME,
     init_project,
@@ -301,8 +303,6 @@ class TestCLIBareInvocation:
         runner = CliRunner()
         result = runner.invoke(cli, ["--version"])
         assert result.exit_code == 0
-        from collabmark import __version__
-
         assert __version__ in result.output
 
 
@@ -364,8 +364,6 @@ class TestInitCommand:
     async def test_requires_auth(self) -> None:
         runner = CliRunner()
         with patch("collabmark.commands.init.ensure_authenticated") as mock_auth:
-            from collabmark.lib.auth import AuthError
-
             mock_auth.side_effect = AuthError("Not logged in")
             result = runner.invoke(cli, ["init", "--path", "/tmp"])
             assert result.exit_code == 1

@@ -9,6 +9,7 @@ from app.services.version_service import (
     list_versions,
     save_snapshot,
 )
+from fastapi import HTTPException
 
 
 class TestSaveSnapshot:
@@ -103,7 +104,6 @@ class TestGetVersion:
     async def test_nonexistent_version_raises_404(self, test_user: User):
         doc = Document_(title="D", content="", owner_id=str(test_user.id))
         await doc.insert()
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await get_version(str(doc.id), 99)
@@ -121,8 +121,6 @@ class TestFindDocOr404:
 
     @pytest.mark.asyncio
     async def test_invalid_id_format_raises_404(self):
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await _find_doc_or_404("invalid")
         assert exc_info.value.status_code == 404
@@ -130,8 +128,6 @@ class TestFindDocOr404:
 
     @pytest.mark.asyncio
     async def test_nonexistent_doc_raises_404(self):
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await _find_doc_or_404("000000000000000000000001")
         assert exc_info.value.status_code == 404

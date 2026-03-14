@@ -6,12 +6,16 @@ messages with the server over WebSocket.
 
 Content always flows through the CRDT layer (never via the REST
 ``content`` field), keeping the CLI, browser, and server in sync.
+
+Updates use incremental text diffing so that only the changed
+characters are sent over the wire (not a full clear + re-insert).
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+from difflib import SequenceMatcher
 
 from pycrdt import Doc, Text
 from websockets.asyncio.client import connect
@@ -213,17 +217,43 @@ async def write_content_via_ws(
         logger.warning("CRDT write failed for doc %s: %s", doc_id, exc)
 
 
+def apply_incremental_diff(ytext: Text, old: str, new: str) -> bool:
+    """Apply only the changed characters from *old* to *new* on a Y.Text.
+
+    Uses ``SequenceMatcher`` to identify equal/insert/delete/replace
+    regions and applies targeted operations in reverse index order so
+    that earlier indices stay valid.
+
+    Returns True if any mutations were applied, False if texts are equal.
+    """
+    if old == new:
+        return False
+
+    ops: list[tuple[str, int, int, int, int]] = SequenceMatcher(None, old, new, autojunk=False).get_opcodes()
+
+    for tag, i1, i2, j1, j2 in reversed(ops):
+        if tag == "equal":
+            continue
+        elif tag == "replace":
+            ytext[i1:i2] = new[j1:j2]
+        elif tag == "delete":
+            del ytext[i1:i2]
+        elif tag == "insert":
+            ytext.insert(i1, new[j1:j2])
+
+    return True
+
+
 async def update_content_via_ws(
     doc_id: str,
     new_content: str,
     api_key: str,
     api_url: str | None = None,
 ) -> None:
-    """Replace document content in the CRDT store via WebSocket.
+    """Update document content in the CRDT store via WebSocket.
 
-    Connects, syncs the existing state, clears the text, then inserts
-    the new content -- all within a single Y.Doc transaction so it
-    appears as one atomic update to other clients.
+    Connects, syncs the existing state, then applies an incremental
+    text diff so only the changed characters are sent over the wire.
     """
     if not new_content:
         logger.debug("Skipping CRDT update for doc %s: empty content", doc_id)
@@ -245,9 +275,7 @@ async def update_content_via_ws(
             state_before = ydoc.get_state()
 
             with ydoc.transaction():
-                if len(ytext):
-                    ytext.clear()
-                ytext += new_content
+                apply_incremental_diff(ytext, current, new_content)
 
             diff = ydoc.get_update(state_before)
             await ws.send(_encode_sync_update(diff))

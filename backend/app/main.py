@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from beanie import init_beanie
+from botocore.exceptions import ClientError
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
@@ -31,6 +32,7 @@ from app.models.organization import Organization, OrgMembership
 from app.models.share_link import DocumentAccess, ShareLink
 from app.models.user import User
 from app.routes import auth, comments, documents, folders, keys, orgs, scim, sharing, users, versions, ws
+from app.services.blob_storage import MIME_TYPES, _get_s3_client
 from app.services.crdt_store import MongoYStore
 from app.ws.handler import start_websocket_server, stop_websocket_server
 
@@ -143,10 +145,6 @@ async def serve_media(file_path: str):
     Streams the object and sets appropriate Content-Type and cache headers.
     Returns 404 if the object does not exist.
     """
-    from botocore.exceptions import ClientError
-
-    from app.services.blob_storage import MIME_TYPES, _get_s3_client
-
     client = _get_s3_client()
     try:
         obj = client.get_object(Bucket=settings.s3_bucket, Key=file_path)

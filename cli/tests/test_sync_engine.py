@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from collabmark.lib.api import CollabMarkClient
+from collabmark.lib.api import CollabMarkClient, NotFoundError
 from collabmark.lib.config import PROJECT_DIR_NAME, load_sync_state, save_sync_state
 from collabmark.lib.sync_engine import (
     ActionKind,
@@ -18,6 +18,7 @@ from collabmark.lib.sync_engine import (
     _list_local_md_files,
     content_hash,
     delete_local,
+    delete_remote,
     pull_file,
     push_new_file,
     push_update,
@@ -412,8 +413,6 @@ class TestDeleteLocal:
 class TestDeleteRemote:
     @pytest.mark.asyncio
     async def test_soft_deletes_document(self, tmp_path: Path) -> None:
-        from collabmark.lib.sync_engine import delete_remote
-
         project_dir = tmp_path / PROJECT_DIR_NAME
         project_dir.mkdir()
 
@@ -428,9 +427,6 @@ class TestDeleteRemote:
 
     @pytest.mark.asyncio
     async def test_handles_already_deleted_remote(self, tmp_path: Path) -> None:
-        from collabmark.lib.api import NotFoundError
-        from collabmark.lib.sync_engine import delete_remote
-
         project_dir = tmp_path / PROJECT_DIR_NAME
         project_dir.mkdir()
 

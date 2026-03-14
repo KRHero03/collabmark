@@ -16,6 +16,8 @@ from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 from app.services import acl_service, folder_service, share_service
 from app.services.acl_service import org_allows_general_access
+from app.services.document_service import get_document
+from fastapi import HTTPException
 
 # ---------------------------------------------------------------------------
 # Unit tests for org_allows_general_access
@@ -264,8 +266,6 @@ class TestCrossOrgSharingBlocked:
         outsider = await _create_user("out@sb.com", org_id=str(org_b.id))
         doc = await _create_doc(owner, ga="restricted", org_id=str(org_a.id))
 
-        from fastapi import HTTPException
-
         with pytest.raises(HTTPException) as exc_info:
             await share_service.add_collaborator(str(doc.id), owner, outsider.email, Permission.VIEW)
         assert exc_info.value.status_code == 403
@@ -299,8 +299,6 @@ class TestCrossOrgSharingBlocked:
         owner = await _create_user("own@fsa.com", org_id=str(org_a.id))
         outsider = await _create_user("out@fsb.com", org_id=str(org_b.id))
         folder = await _create_folder(owner, ga="restricted", org_id=str(org_a.id))
-
-        from fastapi import HTTPException
 
         with pytest.raises(HTTPException) as exc_info:
             await folder_service.add_folder_collaborator(str(folder.id), owner, outsider.email, Permission.VIEW)
@@ -389,9 +387,6 @@ class TestResolveEffectivePermissionOrgBoundary:
 class TestDocumentServiceOrgBoundary:
     @pytest.mark.asyncio
     async def test_org_doc_anyone_view_outsider_denied(self):
-        from app.services.document_service import get_document
-        from fastapi import HTTPException
-
         org_a = await _create_org("docsvc-a")
         org_b = await _create_org("docsvc-b")
         owner = await _create_user("own@da.com", org_id=str(org_a.id))
@@ -404,8 +399,6 @@ class TestDocumentServiceOrgBoundary:
 
     @pytest.mark.asyncio
     async def test_org_doc_anyone_view_same_org_allowed(self):
-        from app.services.document_service import get_document
-
         org = await _create_org("docsvc-c")
         owner = await _create_user("own@dc.com", org_id=str(org.id))
         peer = await _create_user("peer@dc.com", org_id=str(org.id))
@@ -416,8 +409,6 @@ class TestDocumentServiceOrgBoundary:
 
     @pytest.mark.asyncio
     async def test_personal_doc_anyone_view_always_allowed(self):
-        from app.services.document_service import get_document
-
         owner = await _create_user("personal-ds@gmail.com", org_id=None)
         org = await _create_org("docsvc-d")
         viewer = await _create_user("v@dd.com", org_id=str(org.id))

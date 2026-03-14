@@ -11,6 +11,7 @@ from app.models.document import Document_, GeneralAccess
 from app.models.document_view import DocumentView
 from app.models.share_link import DocumentAccess, Permission, ShareLink
 from app.models.user import User
+from app.services.acl_service import get_base_permission
 
 logger = logging.getLogger(__name__)
 
@@ -215,8 +216,6 @@ async def get_user_permission(doc_id: str, user: User) -> Permission | None:
     Returns:
         Permission level, or None if no access.
     """
-    from app.services.acl_service import get_base_permission
-
     return await get_base_permission("document", doc_id, str(user.id), user.org_id)
 
 

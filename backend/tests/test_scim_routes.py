@@ -1,10 +1,14 @@
 """Tests for SCIM 2.0 provisioning routes (HTTP-level)."""
 
 import pytest
+from app.auth.jwt import create_access_token
 from app.auth.scim_auth import hash_scim_token
+from app.config import settings
 from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization, OrgMembership
 from app.models.user import User
+from app.services.scim_service import user_to_scim
+from beanie import PydanticObjectId
 from httpx import AsyncClient
 
 
@@ -123,7 +127,6 @@ class TestScimCreateUser:
             json={"userName": "provider-check@acme.com", "displayName": "Provider Check"},
         )
         user_id = response.json()["id"]
-        from beanie import PydanticObjectId
 
         user = await User.get(PydanticObjectId(user_id))
         assert user.auth_provider == "scim"
@@ -617,8 +620,6 @@ class TestScimDeleteUser:
 
         await async_client.delete(f"/scim/v2/Users/{user_id}", headers=headers)
 
-        from beanie import PydanticObjectId
-
         user = await User.get(PydanticObjectId(user_id))
         assert user is not None
         assert user.org_id is None
@@ -642,9 +643,6 @@ class TestScimDeleteUser:
         )
         user_id = create_resp.json()["id"]
         await async_client.delete(f"/scim/v2/Users/{user_id}", headers=headers)
-
-        from app.services.scim_service import user_to_scim
-        from beanie import PydanticObjectId
 
         user = await User.get(PydanticObjectId(user_id))
         scim_resource = user_to_scim(user, str(org.id))
@@ -699,9 +697,6 @@ class TestScimTokenManagement:
     @pytest.fixture
     async def admin_org(self, async_client: AsyncClient, test_user: User):
         """Create org with test_user as admin, return (org_id, cookies)."""
-        from app.auth.jwt import create_access_token
-        from app.config import settings
-
         original = settings.super_admin_emails
         settings.super_admin_emails = [test_user.email]
         try:

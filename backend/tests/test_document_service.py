@@ -10,6 +10,7 @@ from app.models.document_view import DocumentView
 from app.models.folder import Folder, FolderAccess
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
+from app.services.crdt_store import MongoYStore
 from app.services.document_service import (
     _find_doc,
     create_document,
@@ -615,8 +616,6 @@ class TestHardDeleteDocumentCrdtSkip:
 
     @pytest.mark.asyncio
     async def test_hard_delete_skips_crdt_when_db_none(self, test_user: User):
-        from app.services.crdt_store import MongoYStore
-
         doc = Document_(title="CRDT Doc", content="", owner_id=str(test_user.id))
         await doc.insert()
         doc_id = str(doc.id)

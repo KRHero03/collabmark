@@ -10,9 +10,11 @@ from click.testing import CliRunner
 from collabmark.commands.start import (
     _extract_folder_id_from_link,
     _print_sync_summary,
+    _resolve_folder,
     start,
 )
 from collabmark.lib.auth import UserInfo
+from collabmark.lib.config import init_project, load_sync_config
 from collabmark.lib.sync_engine import ActionKind, SyncAction
 from collabmark.types import FolderInfo, SyncConfig
 
@@ -117,9 +119,6 @@ _FAKE_USER = UserInfo(id="u1", email="test@test.com", name="Test User")
 class TestResumeDetection:
     @pytest.mark.asyncio
     async def test_resumes_from_existing_config(self, tmp_path) -> None:
-        from collabmark.commands.start import _resolve_folder
-        from collabmark.lib.config import init_project
-
         config = SyncConfig(
             server_url="http://localhost:8000",
             folder_id="f_existing",
@@ -138,8 +137,6 @@ class TestResumeDetection:
 
     @pytest.mark.asyncio
     async def test_link_overrides_when_no_existing_config(self, tmp_path) -> None:
-        from collabmark.commands.start import _resolve_folder
-
         mock_client = AsyncMock()
         mock_client.get_folder.return_value = FolderInfo(id="f_link", name="Linked Folder", owner_id="u1")
 
@@ -150,9 +147,6 @@ class TestResumeDetection:
 
     @pytest.mark.asyncio
     async def test_link_config_stores_user_info(self, tmp_path) -> None:
-        from collabmark.commands.start import _resolve_folder
-        from collabmark.lib.config import load_sync_config
-
         mock_client = AsyncMock()
         mock_client.get_folder.return_value = FolderInfo(id="f1", name="F1", owner_id="u1")
 

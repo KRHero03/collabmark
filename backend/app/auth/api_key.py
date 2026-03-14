@@ -1,5 +1,6 @@
 """API key authentication for programmatic access."""
 
+from beanie import PydanticObjectId
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
@@ -37,8 +38,6 @@ async def get_user_from_api_key(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
         )
-
-    from beanie import PydanticObjectId
 
     user = await User.get(PydanticObjectId(record.user_id))
     if user is None:

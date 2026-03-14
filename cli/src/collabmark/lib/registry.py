@@ -20,6 +20,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from collabmark.lib.config import get_cli_home
+from collabmark.lib.daemon import remove_pid_file
 
 logger = logging.getLogger(__name__)
 
@@ -251,8 +252,6 @@ def stop_sync_process(entry: SyncRegistryEntry) -> bool:
     Returns True if the process was successfully signalled, False if it
     was already dead or couldn't be stopped.
     """
-    from collabmark.lib.daemon import remove_pid_file
-
     if entry.pid is None or not _is_pid_alive(entry.pid):
         mark_stopped(entry.local_path)
         if entry.folder_id:

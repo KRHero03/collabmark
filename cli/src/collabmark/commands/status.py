@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import click
@@ -25,8 +26,6 @@ def _format_ago(iso_ts: str | None) -> str:
     """Convert an ISO timestamp to a human-readable 'ago' string."""
     if not iso_ts:
         return "[dim]never[/dim]"
-    from datetime import UTC, datetime
-
     try:
         dt = datetime.fromisoformat(iso_ts)
         delta = datetime.now(UTC) - dt

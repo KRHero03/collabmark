@@ -1,5 +1,7 @@
 """API key management routes: create, list, revoke."""
 
+from beanie import PydanticObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import get_current_user
@@ -72,9 +74,6 @@ async def revoke_api_key(
     Raises:
         HTTPException: 404 if key not found or not owned by user.
     """
-    from beanie import PydanticObjectId
-    from bson.errors import InvalidId
-
     try:
         api_key = await ApiKey.get(PydanticObjectId(key_id))
     except (InvalidId, ValueError):

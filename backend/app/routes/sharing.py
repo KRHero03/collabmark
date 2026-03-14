@@ -62,8 +62,6 @@ async def add_collaborator(
         CollaboratorRead with user info and permission.
     """
     access = await share_service.add_collaborator(doc_id, user, payload.email, payload.permission)
-    from beanie import PydanticObjectId
-
     collab_user = await User.get(PydanticObjectId(access.user_id))
     return CollaboratorRead(
         id=str(access.id),

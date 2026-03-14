@@ -1,5 +1,6 @@
 import pytest
 from app.auth.jwt import create_access_token
+from app.models.api_key import ApiKey
 from app.models.user import User
 from httpx import AsyncClient
 
@@ -72,8 +73,6 @@ class TestApiKeyLifecycle:
 
     @pytest.mark.asyncio
     async def test_revoke_key_not_owned_by_user_404(self, async_client: AsyncClient, test_user: User):
-        from app.models.api_key import ApiKey
-
         other = User(
             google_id="other-keys",
             email="other-keys@example.com",

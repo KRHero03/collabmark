@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from unittest.mock import patch
 
@@ -67,8 +69,6 @@ class TestJsonFormatter:
         try:
             raise ValueError("test error")
         except ValueError:
-            import sys
-
             record = logging.LogRecord("collabmark", logging.ERROR, "", 0, "Failed", (), sys.exc_info())
         output = fmt.format(record)
         data = json.loads(output)
@@ -97,8 +97,6 @@ class TestSetupLogging:
         with patch("collabmark.lib.logger.logging.getLogger") as mock_get:
             mock_get.return_value = test_logger
             setup_logging(log_to_file=False)
-
-        from logging.handlers import RotatingFileHandler
 
         file_handlers = [h for h in test_logger.handlers if isinstance(h, RotatingFileHandler)]
         assert len(file_handlers) == 0

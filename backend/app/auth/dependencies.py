@@ -6,8 +6,9 @@ from fastapi import Cookie, Depends, HTTPException, Security, status
 
 from app.auth.api_key import get_user_from_api_key
 from app.auth.jwt import decode_access_token
-from app.config import AUTH_COOKIE_NAME
+from app.config import AUTH_COOKIE_NAME, settings
 from app.models.user import User
+from app.services.org_service import is_org_admin
 
 
 async def get_current_user(
@@ -72,8 +73,6 @@ async def get_super_admin_user(
     Raises:
         HTTPException: 403 if the user is not a super admin.
     """
-    from app.config import settings
-
     if user.email not in settings.super_admin_emails:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -98,9 +97,6 @@ async def get_org_admin_user(
     Raises:
         HTTPException: 403 if the user is neither an org admin nor a super admin.
     """
-    from app.config import settings
-    from app.services.org_service import is_org_admin
-
     if user.email in settings.super_admin_emails:
         return user
 
