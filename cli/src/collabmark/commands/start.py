@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import os
 import signal
 import sys
 from pathlib import Path
@@ -12,20 +14,23 @@ from rich.console import Console
 from rich.prompt import Prompt
 
 from collabmark.lib.api import CollabMarkClient
-from collabmark.lib.auth import AuthError, ensure_authenticated
+from collabmark.lib.auth import AuthError, UserInfo, ensure_authenticated
 from collabmark.lib.config import (
     find_project_root,
+    get_api_url,
     init_project,
     load_sync_config,
     load_sync_state,
 )
-from collabmark.lib.sync_engine import (
-    run_sync_cycle,
-)
+from collabmark.lib.daemon import daemonize, remove_pid_file, write_pid_file
+from collabmark.lib.logger import setup_logging
+from collabmark.lib.registry import mark_stopped, register_sync, update_heartbeat
+from collabmark.lib.sync_engine import run_sync_cycle
 from collabmark.lib.watcher import DebouncedWatcher
 from collabmark.types import SyncConfig
 
 console = Console()
+logger = logging.getLogger(__name__)
 
 
 @click.command()
@@ -50,7 +55,7 @@ def start(link: str | None, daemon: bool, path: str | None, interval: float) -> 
 
     \b
     Examples:
-      collabmark start                   Sync current dir interactively
+      collabmark start                   Sync current dir (foreground)
       collabmark start <share-link>      Join a shared folder by link
       collabmark start -d                Run sync in the background
       collabmark start -p ~/notes        Sync a specific directory
@@ -59,17 +64,31 @@ def start(link: str | None, daemon: bool, path: str | None, interval: float) -> 
     them in sync bidirectionally. Press Ctrl+C to stop when running
     in the foreground, or use `collabmark stop` for background mode.
     """
+    if daemon:
+        _launch_daemon(link, path, interval)
+    else:
+        try:
+            asyncio.run(_start_async(link, path, interval))
+        except KeyboardInterrupt:
+            console.print("\n[dim]Stopped.[/dim]")
+
+
+def _launch_daemon(link: str | None, path_str: str | None, interval: float) -> None:
+    """Fork to background and start the sync loop as a daemon."""
+    console.print("[dim]Starting background sync daemon...[/dim]")
+    daemonize()
+    setup_logging(log_to_file=True)
     try:
-        asyncio.run(_start_async(link, daemon, path, interval))
-    except KeyboardInterrupt:
-        console.print("\n[dim]Stopped.[/dim]")
+        asyncio.run(_start_async(link, path_str, interval, is_daemon=True))
+    finally:
+        pass
 
 
 async def _start_async(
     link: str | None,
-    daemon: bool,
     path_str: str | None,
     interval: float,
+    is_daemon: bool = False,
 ) -> None:
     sync_root = Path(path_str) if path_str else Path.cwd()
 
@@ -77,20 +96,40 @@ async def _start_async(
     console.print(f"[green]✓[/green] {user_info.name} ({user_info.email})")
 
     async with CollabMarkClient(api_key) as client:
-        folder_id, folder_name = await _resolve_folder(client, sync_root, link)
+        folder_id, folder_name = await _resolve_folder(client, sync_root, link, user_info)
         console.print(f"[green]✓[/green] Syncing [bold]{sync_root.name}/[/bold] ↔ [bold]{folder_name}[/bold]")
+
+        setup_logging(log_to_file=True, folder_id=folder_id)
+
+        if is_daemon:
+            write_pid_file(os.getpid(), folder_id)
+
+        config = load_sync_config(sync_root / ".collabmark")
+        register_sync(
+            local_path=str(sync_root),
+            folder_id=folder_id,
+            folder_name=folder_name,
+            server_url=config.server_url if config else get_api_url(),
+            user_email=user_info.email,
+            pid=os.getpid(),
+        )
 
         project_dir = sync_root / ".collabmark"
         state = load_sync_state(project_dir)
 
-        console.print("[dim]Running initial sync...[/dim]")
-        actions = await run_sync_cycle(client, sync_root, folder_id, state, project_dir, api_key)
-        _print_sync_summary(actions)
+        try:
+            console.print("[dim]Running initial sync...[/dim]")
+            actions = await run_sync_cycle(client, sync_root, folder_id, state, project_dir, api_key)
+            _print_sync_summary(actions)
+            update_heartbeat(str(sync_root), len(actions))
 
-        if daemon:
             console.print(f"[green]✓[/green] Watching for changes (poll every {interval}s)")
             console.print("[dim]Press Ctrl+C to stop.[/dim]")
             await _watch_loop(client, sync_root, folder_id, state, project_dir, interval, api_key)
+        finally:
+            mark_stopped(str(sync_root))
+            if is_daemon:
+                remove_pid_file(folder_id)
 
 
 async def _authenticate() -> tuple:
@@ -106,12 +145,13 @@ async def _resolve_folder(
     client: CollabMarkClient,
     sync_root: Path,
     link: str | None,
+    user_info: UserInfo | None = None,
 ) -> tuple[str, str]:
     """Determine the cloud folder to sync with.
 
     Priority:
     1. Existing .collabmark/config.json in sync_root (resume)
-    2. Link argument (join via URL — extract folder ID)
+    2. Link argument (join via URL -- extract folder ID)
     3. Interactive folder picker
     """
     existing_root = find_project_root(sync_root)
@@ -125,10 +165,10 @@ async def _resolve_folder(
         folder_id = _extract_folder_id_from_link(link)
         if folder_id:
             folder = await client.get_folder(folder_id)
-            _init_project_config(sync_root, client, folder.id, folder.name)
+            _init_project_config(sync_root, client, folder.id, folder.name, user_info)
             return folder.id, folder.name
 
-    return await _interactive_folder_picker(client, sync_root)
+    return await _interactive_folder_picker(client, sync_root, user_info)
 
 
 def _extract_folder_id_from_link(link: str) -> str | None:
@@ -156,16 +196,15 @@ def _init_project_config(
     client: CollabMarkClient,
     folder_id: str,
     folder_name: str,
+    user_info: UserInfo | None = None,
 ) -> None:
     """Initialise .collabmark/ with config for the given folder."""
-    from collabmark.lib.config import get_api_url
-
     config = SyncConfig(
         server_url=get_api_url(),
         folder_id=folder_id,
         folder_name=folder_name,
-        user_id="",
-        user_email="",
+        user_id=user_info.id if user_info else "",
+        user_email=user_info.email if user_info else "",
     )
     init_project(sync_root, config)
 
@@ -173,6 +212,7 @@ def _init_project_config(
 async def _interactive_folder_picker(
     client: CollabMarkClient,
     sync_root: Path,
+    user_info: UserInfo | None = None,
 ) -> tuple[str, str]:
     """Let the user choose from their folders or create a new one."""
     console.print("\n[bold]Choose a cloud folder to sync:[/bold]\n")
@@ -214,12 +254,12 @@ async def _interactive_folder_picker(
         name = Prompt.ask("Folder name", default=sync_root.name)
         folder = await client.create_folder(name)
         console.print(f"[green]✓[/green] Created folder '{folder.name}'")
-        _init_project_config(sync_root, client, folder.id, folder.name)
+        _init_project_config(sync_root, client, folder.id, folder.name, user_info)
         return folder.id, folder.name
 
     if 1 <= num <= len(choices):
         folder_id, folder_name = choices[num - 1]
-        _init_project_config(sync_root, client, folder_id, folder_name)
+        _init_project_config(sync_root, client, folder_id, folder_name, user_info)
         return folder_id, folder_name
 
     console.print("[red]Invalid selection.[/red]")
@@ -296,6 +336,10 @@ async def _watch_loop(
 async def _sync_once(client, sync_root, folder_id, state, project_dir, api_key=None):
     """Run a single sync cycle, catching and logging errors."""
     try:
-        await run_sync_cycle(client, sync_root, folder_id, state, project_dir, api_key)
+        actions = await run_sync_cycle(client, sync_root, folder_id, state, project_dir, api_key)
+        update_heartbeat(str(sync_root), len(actions))
+        tracked = len(state.files)
+        logger.debug("Sync cycle: %d actions (%d files tracked)", len(actions), tracked)
     except Exception as exc:
+        update_heartbeat(str(sync_root), 0, error=str(exc))
         console.print(f"[yellow]⚠[/yellow] Sync error: {exc}")

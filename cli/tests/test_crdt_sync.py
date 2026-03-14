@@ -1,4 +1,4 @@
-"""Tests for collabmark.lib.crdt_sync — WebSocket-based CRDT content push."""
+"""Tests for collabmark.lib.crdt_sync — WebSocket-based CRDT content sync."""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from collabmark.lib.crdt_sync import (
     SYNC_STEP1,
     SYNC_STEP2,
     SYNC_UPDATE,
+    _build_ws_url,
     _encode_sync_step1,
     _encode_sync_step2,
     _encode_sync_update,
@@ -92,6 +93,20 @@ class TestMessageEncoding:
         assert payload == update
 
 
+class TestBuildWsUrl:
+    def test_http_to_ws(self) -> None:
+        url = _build_ws_url("doc123", "key1", api_url="http://localhost:8000")
+        assert url == "ws://localhost:8000/ws/doc/doc123?api_key=key1"
+
+    def test_https_to_wss(self) -> None:
+        url = _build_ws_url("doc123", "key1", api_url="https://app.example.com")
+        assert url == "wss://app.example.com/ws/doc/doc123?api_key=key1"
+
+    def test_strips_trailing_slash(self) -> None:
+        url = _build_ws_url("d1", "k1", api_url="http://localhost:8000/")
+        assert "//" not in url.split("://", 1)[1]
+
+
 class TestYDocRoundTrip:
     def test_content_round_trip_via_protocol(self) -> None:
         """Simulate the full sync protocol between a client and server doc."""
@@ -141,15 +156,57 @@ class TestYDocRoundTrip:
         assert str(server_text) == "日本語テスト 🎉"
 
 
-class TestSyncContentViaWs:
+class TestWriteContentViaWs:
     @pytest.mark.asyncio
     async def test_handles_connection_failure_gracefully(self) -> None:
         """Should not raise when the server is unreachable."""
-        from collabmark.lib.crdt_sync import sync_content_via_ws
+        from collabmark.lib.crdt_sync import write_content_via_ws
 
-        await sync_content_via_ws(
+        await write_content_via_ws(
             doc_id="nonexistent",
             content="test",
             api_key="cm_fake_key",
             api_url="http://localhost:1",
         )
+
+
+class TestReadContentViaWs:
+    @pytest.mark.asyncio
+    async def test_handles_connection_failure_gracefully(self) -> None:
+        """Should return empty string when the server is unreachable."""
+        from collabmark.lib.crdt_sync import read_content_via_ws
+
+        result = await read_content_via_ws(
+            doc_id="nonexistent",
+            api_key="cm_fake_key",
+            api_url="http://localhost:1",
+        )
+        assert result == ""
+
+
+class TestReadContentsBatch:
+    @pytest.mark.asyncio
+    async def test_handles_connection_failures_gracefully(self) -> None:
+        """Should return empty dict when all connections fail."""
+        from collabmark.lib.crdt_sync import read_contents_batch
+
+        result = await read_contents_batch(
+            doc_ids=["d1", "d2"],
+            api_key="cm_fake_key",
+            api_url="http://localhost:1",
+        )
+        assert isinstance(result, dict)
+
+    @pytest.mark.asyncio
+    async def test_empty_list_returns_empty_dict(self) -> None:
+        from collabmark.lib.crdt_sync import read_contents_batch
+
+        result = await read_contents_batch([], "cm_fake_key")
+        assert result == {}
+
+
+class TestBackwardCompat:
+    def test_sync_content_alias(self) -> None:
+        from collabmark.lib.crdt_sync import sync_content_via_ws, write_content_via_ws
+
+        assert sync_content_via_ws is write_content_via_ws

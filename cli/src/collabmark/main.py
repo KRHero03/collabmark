@@ -5,7 +5,9 @@ from rich.console import Console
 from rich.panel import Panel
 
 from collabmark import __version__
+from collabmark.commands.clean import clean
 from collabmark.commands.init import init
+from collabmark.commands.list_syncs import list_syncs
 from collabmark.commands.login import login
 from collabmark.commands.logout import logout
 from collabmark.commands.logs import logs
@@ -65,3 +67,5 @@ cli.add_command(start)
 cli.add_command(status)
 cli.add_command(stop)
 cli.add_command(logs)
+cli.add_command(list_syncs, name="list")
+cli.add_command(clean)

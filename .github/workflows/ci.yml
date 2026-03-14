@@ -37,6 +37,43 @@ jobs:
         run: yarn run check
         working-directory: frontend
 
+  lint-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: CLI ruff lint
+        run: ruff check src/ tests/
+        working-directory: cli
+
+      - name: CLI ruff format check
+        run: ruff format --check src/ tests/
+        working-directory: cli
+
+  test-cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CLI dependencies
+        run: pip install -e ".[dev]"
+        working-directory: cli
+
+      - name: Run CLI tests
+        run: python -m pytest -v
+        working-directory: cli
+
   test-backend:
     runs-on: ubuntu-latest
     steps:
@@ -78,7 +115,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint, test-backend, test-frontend]
+    needs: [lint, lint-cli, test-backend, test-frontend, test-cli]
     steps:
       - uses: actions/checkout@v4
 
@@ -110,7 +147,7 @@ jobs:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   rollback:
-    needs: [test-backend, test-frontend, build]
+    needs: [test-backend, test-frontend, test-cli, build]
     if: failure() && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:

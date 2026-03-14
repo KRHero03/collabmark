@@ -3,6 +3,10 @@
 Handles the three-way comparison between the local filesystem,
 the persisted sync state (``.collabmark/sync.json``), and the remote
 cloud state fetched via the API client.
+
+Content always flows through the CRDT layer (WebSocket).  The REST
+API is used only for metadata: folder structure, document IDs, titles,
+and document lifecycle (create / delete).
 """
 
 from __future__ import annotations
@@ -16,9 +20,14 @@ from pathlib import Path
 
 from collabmark.lib.api import CollabMarkClient, NotFoundError
 from collabmark.lib.config import save_sync_state
+from collabmark.lib.crdt_sync import (
+    read_content_via_ws,
+    read_contents_batch,
+    update_content_via_ws,
+    write_content_via_ws,
+)
 from collabmark.types import (
     DocumentInfo,
-    FolderContents,
     SyncFileEntry,
     SyncFolderEntry,
     SyncState,
@@ -85,17 +94,6 @@ def _list_local_md_files(sync_root: Path) -> dict[str, str]:
     return result
 
 
-def _build_remote_file_index(
-    contents: FolderContents,
-) -> dict[str, DocumentInfo]:
-    """Map document title (used as filename) to ``DocumentInfo``."""
-    index: dict[str, DocumentInfo] = {}
-    for doc in contents.documents:
-        filename = _doc_title_to_filename(doc.title)
-        index[filename] = doc
-    return index
-
-
 def _doc_title_to_filename(title: str) -> str:
     """Convert a cloud document title to a local filename."""
     name = title.strip()
@@ -117,13 +115,15 @@ def reconcile(
     local_files: dict[str, str],
     state: SyncState,
     remote_files: dict[str, DocumentInfo],
+    remote_hashes: dict[str, str],
 ) -> list[SyncAction]:
     """Compare local filesystem, sync state, and cloud to produce actions.
 
     Args:
         local_files: ``{relative_path: content_hash}`` from the filesystem.
         state: The last-known sync state from ``sync.json``.
-        remote_files: ``{relative_path: DocumentInfo}`` from the cloud.
+        remote_files: ``{relative_path: DocumentInfo}`` from the cloud (metadata).
+        remote_hashes: ``{relative_path: content_hash}`` from CRDT content.
 
     Returns:
         A list of ``SyncAction`` items to execute.
@@ -135,8 +135,9 @@ def reconcile(
         local_hash = local_files.get(rel)
         entry = state.files.get(rel)
         remote_doc = remote_files.get(rel)
+        remote_hash = remote_hashes.get(rel)
 
-        action = _decide_action(rel, local_hash, entry, remote_doc)
+        action = _decide_action(rel, local_hash, entry, remote_doc, remote_hash)
         if action:
             actions.append(action)
 
@@ -148,8 +149,8 @@ def _decide_action(
     local_hash: str | None,
     entry: SyncFileEntry | None,
     remote_doc: DocumentInfo | None,
+    remote_hash: str | None,
 ) -> SyncAction | None:
-    remote_hash = content_hash(remote_doc.content) if remote_doc else None
     doc_id = entry.doc_id if entry else (remote_doc.id if remote_doc else None)
 
     is_local = local_hash is not None
@@ -164,7 +165,7 @@ def _decide_action(
 
     if is_local and is_tracked and is_remote:
         local_changed = local_hash != entry.content_hash
-        remote_changed = remote_hash != entry.content_hash
+        remote_changed = remote_hash is not None and remote_hash != entry.content_hash
         if local_changed and remote_changed:
             return SyncAction(
                 ActionKind.CONFLICT,
@@ -189,7 +190,7 @@ def _decide_action(
         return None
 
     if is_local and not is_tracked and is_remote:
-        if local_hash == remote_hash:
+        if remote_hash is not None and local_hash == remote_hash:
             return None
         return SyncAction(
             ActionKind.CONFLICT,
@@ -218,17 +219,16 @@ async def push_new_file(
     rel_path: str,
     folder_id: str,
     project_dir: Path,
-    api_key: str | None = None,
+    api_key: str,
 ) -> None:
-    """Create a new cloud document from a local ``.md`` file."""
+    """Create a new cloud document and push content via CRDT."""
     file_path = sync_root / rel_path
     text = file_path.read_text(encoding="utf-8")
     title = _filename_to_doc_title(Path(rel_path).name)
 
-    doc = await client.create_document(title, text, folder_id=folder_id)
+    doc = await client.create_document(title, "", folder_id=folder_id)
 
-    if api_key and text:
-        await _sync_crdt(doc.id, text, api_key)
+    await _crdt_write(doc.id, text, api_key)
 
     state.files[rel_path] = SyncFileEntry(
         doc_id=doc.id,
@@ -240,22 +240,18 @@ async def push_new_file(
 
 
 async def push_update(
-    client: CollabMarkClient,
     sync_root: Path,
     state: SyncState,
     rel_path: str,
     doc_id: str,
     project_dir: Path,
-    api_key: str | None = None,
+    api_key: str,
 ) -> None:
-    """Update an existing cloud document with local changes."""
+    """Update an existing cloud document via CRDT."""
     file_path = sync_root / rel_path
     text = file_path.read_text(encoding="utf-8")
 
-    await client.update_document(doc_id, content=text)
-
-    if api_key:
-        await _sync_crdt(doc_id, text, api_key)
+    await _crdt_update(doc_id, text, api_key)
 
     state.files[rel_path] = SyncFileEntry(
         doc_id=doc_id,
@@ -266,33 +262,48 @@ async def push_update(
     logger.info("↑ pushed (update) %s", rel_path)
 
 
-async def _sync_crdt(doc_id: str, content: str, api_key: str) -> None:
+async def _crdt_write(doc_id: str, content: str, api_key: str) -> None:
     """Push content to the CRDT store via WebSocket (best-effort)."""
     try:
-        from collabmark.lib.crdt_sync import sync_content_via_ws
-
-        await sync_content_via_ws(doc_id, content, api_key)
+        await write_content_via_ws(doc_id, content, api_key)
     except Exception as exc:
-        logger.warning("CRDT sync failed for %s: %s", doc_id, exc)
+        logger.warning("CRDT write failed for %s: %s", doc_id, exc)
+
+
+async def _crdt_update(doc_id: str, content: str, api_key: str) -> None:
+    """Replace content in the CRDT store via WebSocket (best-effort)."""
+    try:
+        await update_content_via_ws(doc_id, content, api_key)
+    except Exception as exc:
+        logger.warning("CRDT update failed for %s: %s", doc_id, exc)
+
+
+async def _crdt_read(doc_id: str, api_key: str) -> str:
+    """Read content from the CRDT store via WebSocket."""
+    try:
+        return await read_content_via_ws(doc_id, api_key)
+    except Exception as exc:
+        logger.warning("CRDT read failed for %s: %s", doc_id, exc)
+        return ""
 
 
 async def pull_file(
-    client: CollabMarkClient,
     sync_root: Path,
     state: SyncState,
     rel_path: str,
     doc_id: str,
     project_dir: Path,
+    api_key: str,
 ) -> None:
-    """Download a cloud document and write it locally."""
-    doc = await client.get_document(doc_id)
+    """Download content from CRDT and write it locally."""
+    content = await _crdt_read(doc_id, api_key)
     file_path = sync_root / rel_path
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    file_path.write_text(doc.content, encoding="utf-8")
+    file_path.write_text(content, encoding="utf-8")
 
     state.files[rel_path] = SyncFileEntry(
         doc_id=doc_id,
-        content_hash=content_hash(doc.content),
+        content_hash=content_hash(content),
         last_synced_at=_now_iso(),
     )
     save_sync_state(state, project_dir)
@@ -338,20 +349,18 @@ def delete_local(
 
 
 # ---------------------------------------------------------------------------
-# Full sync cycle
+# Remote metadata + CRDT content fetching
 # ---------------------------------------------------------------------------
 
 
-async def fetch_remote_files(
+async def fetch_remote_metadata(
     client: CollabMarkClient,
     folder_id: str,
     prefix: str = "",
 ) -> dict[str, DocumentInfo]:
-    """Fetch all documents under *folder_id* from the cloud.
+    """Fetch document metadata (IDs, titles, folder structure) via REST.
 
-    Uses the ``/tree`` endpoint for a single request when available,
-    falling back to recursive ``list_folder_contents`` calls.
-
+    Content is NOT included; it will be read separately from CRDT.
     Returns ``{relative_path: DocumentInfo}``.
     """
     try:
@@ -359,7 +368,7 @@ async def fetch_remote_files(
         return _flatten_tree(tree, prefix)
     except Exception:
         logger.debug("Tree endpoint unavailable, falling back to recursive listing")
-        return await _fetch_remote_files_recursive(client, folder_id, prefix)
+        return await _fetch_remote_metadata_recursive(client, folder_id, prefix)
 
 
 def _flatten_tree(tree: dict, prefix: str = "") -> dict[str, DocumentInfo]:
@@ -371,7 +380,7 @@ def _flatten_tree(tree: dict, prefix: str = "") -> dict[str, DocumentInfo]:
         result[rel] = DocumentInfo(
             id=doc_data["id"],
             title=doc_data["title"],
-            content=doc_data.get("content", ""),
+            content="",
             owner_id=doc_data.get("owner_id", ""),
             folder_id=tree.get("id"),
             content_length=doc_data.get("content_length", 0),
@@ -387,7 +396,7 @@ def _flatten_tree(tree: dict, prefix: str = "") -> dict[str, DocumentInfo]:
     return result
 
 
-async def _fetch_remote_files_recursive(
+async def _fetch_remote_metadata_recursive(
     client: CollabMarkClient,
     folder_id: str,
     prefix: str = "",
@@ -399,14 +408,64 @@ async def _fetch_remote_files_recursive(
     for doc in contents.documents:
         filename = _doc_title_to_filename(doc.title)
         rel = f"{prefix}{filename}" if not prefix else f"{prefix}/{filename}"
-        result[rel] = doc
+        result[rel] = DocumentInfo(
+            id=doc.id,
+            title=doc.title,
+            content="",
+            owner_id=doc.owner_id,
+            folder_id=doc.folder_id,
+            content_length=doc.content_length,
+            created_at=doc.created_at,
+            updated_at=doc.updated_at,
+        )
 
     for folder in contents.folders:
         sub_prefix = f"{prefix}{folder.name}" if not prefix else f"{prefix}/{folder.name}"
-        sub_docs = await _fetch_remote_files_recursive(client, folder.id, sub_prefix)
+        sub_docs = await _fetch_remote_metadata_recursive(client, folder.id, sub_prefix)
         result.update(sub_docs)
 
     return result
+
+
+async def _fetch_crdt_hashes(
+    remote_files: dict[str, DocumentInfo],
+    state: SyncState,
+    local_files: dict[str, str],
+    api_key: str,
+) -> dict[str, str]:
+    """Read CRDT content and compute hashes for documents that need comparison.
+
+    Only fetches content for documents that exist remotely AND either:
+    - are tracked (need change detection), or
+    - exist locally but untracked (potential conflict)
+    New-remote-only docs are skipped here; their content is read at pull time.
+    """
+    need_content: list[tuple[str, str]] = []
+    for rel, doc_info in remote_files.items():
+        is_tracked = rel in state.files
+        is_local = rel in local_files
+        if is_tracked or is_local:
+            need_content.append((rel, doc_info.id))
+
+    if not need_content:
+        return {}
+
+    doc_ids = [doc_id for _, doc_id in need_content]
+    id_to_rel = {doc_id: rel for rel, doc_id in need_content}
+
+    contents = await read_contents_batch(doc_ids, api_key)
+
+    hashes: dict[str, str] = {}
+    for doc_id, text in contents.items():
+        rel = id_to_rel.get(doc_id)
+        if rel:
+            hashes[rel] = content_hash(text)
+    return hashes
+
+
+# ---------------------------------------------------------------------------
+# Cloud folder management
+# ---------------------------------------------------------------------------
 
 
 async def _ensure_cloud_folders(
@@ -416,12 +475,7 @@ async def _ensure_cloud_folders(
     root_folder_id: str,
     project_dir: Path,
 ) -> None:
-    """Create cloud subfolders for any PUSH_NEW files in nested directories.
-
-    Scans the actions for files that need to be pushed into subdirectories,
-    creates those directories on the cloud (depth-first), and records the
-    mappings in ``state.folders`` so ``_resolve_folder_id`` can find them.
-    """
+    """Create cloud subfolders for any PUSH_NEW files in nested directories."""
     needed_dirs: set[str] = set()
     for action in actions:
         if action.kind == ActionKind.PUSH_NEW:
@@ -452,9 +506,14 @@ async def _ensure_cloud_folders(
         folder_name = Path(dir_path).name
         folder = await client.create_folder(folder_name, parent_id=parent_id)
         state.folders[dir_path] = SyncFolderEntry(folder_id=folder.id)
-        logger.info("📁 created cloud folder  %s", dir_path)
+        logger.info("created cloud folder  %s", dir_path)
 
     save_sync_state(state, project_dir)
+
+
+# ---------------------------------------------------------------------------
+# Full sync cycle
+# ---------------------------------------------------------------------------
 
 
 async def run_sync_cycle(
@@ -463,15 +522,16 @@ async def run_sync_cycle(
     folder_id: str,
     state: SyncState,
     project_dir: Path,
-    api_key: str | None = None,
+    api_key: str,
 ) -> list[SyncAction]:
     """Execute one full sync: scan, reconcile, execute actions.
 
     Returns the list of actions that were taken.
     """
     local_files = _list_local_md_files(sync_root)
-    remote_files = await fetch_remote_files(client, folder_id)
-    actions = reconcile(local_files, state, remote_files)
+    remote_files = await fetch_remote_metadata(client, folder_id)
+    remote_hashes = await _fetch_crdt_hashes(remote_files, state, local_files, api_key)
+    actions = reconcile(local_files, state, remote_files, remote_hashes)
 
     await _ensure_cloud_folders(client, actions, state, folder_id, project_dir)
 
@@ -488,7 +548,7 @@ async def _execute_action(
     action: SyncAction,
     root_folder_id: str,
     project_dir: Path,
-    api_key: str | None = None,
+    api_key: str,
 ) -> None:
     if action.kind == ActionKind.PUSH_NEW:
         folder_id = _resolve_folder_id(action.rel_path, state, root_folder_id)
@@ -496,11 +556,11 @@ async def _execute_action(
 
     elif action.kind == ActionKind.PUSH_UPDATE:
         assert action.doc_id is not None
-        await push_update(client, sync_root, state, action.rel_path, action.doc_id, project_dir, api_key)
+        await push_update(sync_root, state, action.rel_path, action.doc_id, project_dir, api_key)
 
     elif action.kind in (ActionKind.PULL_NEW, ActionKind.PULL_UPDATE):
         assert action.doc_id is not None
-        await pull_file(client, sync_root, state, action.rel_path, action.doc_id, project_dir)
+        await pull_file(sync_root, state, action.rel_path, action.doc_id, project_dir, api_key)
 
     elif action.kind == ActionKind.DELETE_REMOTE:
         assert action.doc_id is not None
@@ -525,8 +585,12 @@ def _resolve_folder_id(rel_path: str, state: SyncState, root_folder_id: str) -> 
 def _handle_conflict(sync_root: Path, action: SyncAction) -> None:
     """Log a conflict without overwriting either side."""
     logger.warning(
-        "⚠ CONFLICT  %s — modified both locally and on cloud. Resolve manually. Local hash: %s, remote hash: %s",
+        "CONFLICT  %s -- modified both locally and on cloud. Resolve manually. Local hash: %s, remote hash: %s",
         action.rel_path,
         action.local_hash,
         action.remote_hash,
     )
+
+
+# Backward-compatible aliases
+fetch_remote_files = fetch_remote_metadata

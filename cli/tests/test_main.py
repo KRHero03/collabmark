@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+from unittest.mock import patch
+
 from click.testing import CliRunner
 
 from collabmark import __version__
@@ -68,6 +71,7 @@ class TestLogsCommandStub:
         assert "--follow" in result.output
         assert "--lines" in result.output
 
-    def test_logs_runs(self, cli_runner: CliRunner) -> None:
-        result = cli_runner.invoke(cli, ["logs"])
+    def test_logs_runs(self, cli_runner: CliRunner, tmp_path) -> None:
+        with patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path)}):
+            result = cli_runner.invoke(cli, ["logs"])
         assert result.exit_code == 0

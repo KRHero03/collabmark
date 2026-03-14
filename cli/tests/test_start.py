@@ -12,6 +12,7 @@ from collabmark.commands.start import (
     _print_sync_summary,
     start,
 )
+from collabmark.lib.auth import UserInfo
 from collabmark.lib.sync_engine import ActionKind, SyncAction
 from collabmark.types import FolderInfo, SyncConfig
 
@@ -99,10 +100,18 @@ class TestStartCommand:
             runner.invoke(start, [])
             mock_asyncio.run.assert_called_once()
 
+    @patch("collabmark.commands.start._launch_daemon")
+    def test_daemon_flag_calls_launch_daemon(self, mock_launch: MagicMock) -> None:
+        runner = CliRunner()
+        runner.invoke(start, ["-d"])
+        mock_launch.assert_called_once()
+
 
 # ===================================================================
 # Resume detection
 # ===================================================================
+
+_FAKE_USER = UserInfo(id="u1", email="test@test.com", name="Test User")
 
 
 class TestResumeDetection:
@@ -121,7 +130,7 @@ class TestResumeDetection:
         init_project(tmp_path, config)
 
         mock_client = AsyncMock()
-        folder_id, folder_name = await _resolve_folder(mock_client, tmp_path, None)
+        folder_id, folder_name = await _resolve_folder(mock_client, tmp_path, None, _FAKE_USER)
 
         assert folder_id == "f_existing"
         assert folder_name == "My Folder"
@@ -134,7 +143,22 @@ class TestResumeDetection:
         mock_client = AsyncMock()
         mock_client.get_folder.return_value = FolderInfo(id="f_link", name="Linked Folder", owner_id="u1")
 
-        folder_id, folder_name = await _resolve_folder(mock_client, tmp_path, "f_link")
+        folder_id, folder_name = await _resolve_folder(mock_client, tmp_path, "f_link", _FAKE_USER)
 
         assert folder_id == "f_link"
         assert folder_name == "Linked Folder"
+
+    @pytest.mark.asyncio
+    async def test_link_config_stores_user_info(self, tmp_path) -> None:
+        from collabmark.commands.start import _resolve_folder
+        from collabmark.lib.config import load_sync_config
+
+        mock_client = AsyncMock()
+        mock_client.get_folder.return_value = FolderInfo(id="f1", name="F1", owner_id="u1")
+
+        await _resolve_folder(mock_client, tmp_path, "f1", _FAKE_USER)
+
+        config = load_sync_config(tmp_path / ".collabmark")
+        assert config is not None
+        assert config.user_id == "u1"
+        assert config.user_email == "test@test.com"

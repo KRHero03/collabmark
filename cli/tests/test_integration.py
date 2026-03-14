@@ -30,6 +30,8 @@ from collabmark.types import (
     SyncState,
 )
 
+_FAKE_API_KEY = "cm_test_key_123"
+
 # ===================================================================
 # Tree flattening
 # ===================================================================
@@ -160,7 +162,8 @@ class TestFetchRemoteFiles:
 
 class TestRunSyncCycle:
     @pytest.mark.asyncio
-    async def test_initial_push_new_files(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.write_content_via_ws", new_callable=AsyncMock)
+    async def test_initial_push_new_files(self, mock_crdt_write, tmp_path: Path) -> None:
         """Local files with no prior state and empty cloud -> PUSH_NEW."""
         sync_root = tmp_path / "root"
         sync_root.mkdir()
@@ -179,15 +182,18 @@ class TestRunSyncCycle:
             "documents": [],
             "permission": "edit",
         }
-        mock_client.create_document.return_value = DocumentInfo(id="d1", title="notes", content="# Notes\n")
+        mock_client.create_document.return_value = DocumentInfo(id="d1", title="notes", content="")
 
-        actions = await run_sync_cycle(mock_client, sync_root, "f1", state, project_dir)
+        actions = await run_sync_cycle(mock_client, sync_root, "f1", state, project_dir, _FAKE_API_KEY)
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.PUSH_NEW
         assert "notes.md" in state.files
+        mock_crdt_write.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_initial_pull_new_files(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    @patch("collabmark.lib.sync_engine.read_contents_batch", new_callable=AsyncMock)
+    async def test_initial_pull_new_files(self, mock_batch_read, mock_crdt_read, tmp_path: Path) -> None:
         """Empty local with cloud docs -> PULL_NEW."""
         sync_root = tmp_path / "root"
         sync_root.mkdir()
@@ -205,15 +211,17 @@ class TestRunSyncCycle:
             "documents": [{"id": "d1", "title": "cloud-doc", "content_length": 14}],
             "permission": "edit",
         }
-        mock_client.get_document.return_value = DocumentInfo(id="d1", title="cloud-doc", content="hello from cloud")
+        mock_batch_read.return_value = {}
+        mock_crdt_read.return_value = "hello from cloud"
 
-        actions = await run_sync_cycle(mock_client, sync_root, "f1", state, project_dir)
+        actions = await run_sync_cycle(mock_client, sync_root, "f1", state, project_dir, _FAKE_API_KEY)
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.PULL_NEW
         assert (sync_root / "cloud-doc.md").read_text(encoding="utf-8") == "hello from cloud"
 
     @pytest.mark.asyncio
-    async def test_no_actions_when_in_sync(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.read_contents_batch", new_callable=AsyncMock)
+    async def test_no_actions_when_in_sync(self, mock_batch_read, tmp_path: Path) -> None:
         """Both sides identical -> no actions."""
         sync_root = tmp_path / "root"
         sync_root.mkdir()
@@ -231,15 +239,17 @@ class TestRunSyncCycle:
             "id": "f1",
             "name": "Root",
             "folders": [],
-            "documents": [{"id": "d1", "title": "doc", "content": "same content", "content_length": 12}],
+            "documents": [{"id": "d1", "title": "doc", "content_length": 12}],
             "permission": "edit",
         }
+        mock_batch_read.return_value = {"d1": "same content"}
 
-        actions = await run_sync_cycle(mock_client, sync_root, "f1", state, project_dir)
+        actions = await run_sync_cycle(mock_client, sync_root, "f1", state, project_dir, _FAKE_API_KEY)
         assert actions == []
 
     @pytest.mark.asyncio
-    async def test_conflict_detection(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.read_contents_batch", new_callable=AsyncMock)
+    async def test_conflict_detection(self, mock_batch_read, tmp_path: Path) -> None:
         """Both local and cloud changed -> CONFLICT."""
         sync_root = tmp_path / "root"
         sync_root.mkdir()
@@ -257,11 +267,12 @@ class TestRunSyncCycle:
             "id": "f1",
             "name": "Root",
             "folders": [],
-            "documents": [{"id": "d1", "title": "doc", "content": "cloud version", "content_length": 13}],
+            "documents": [{"id": "d1", "title": "doc", "content_length": 13}],
             "permission": "edit",
         }
+        mock_batch_read.return_value = {"d1": "cloud version"}
 
-        actions = await run_sync_cycle(mock_client, sync_root, "f1", state, project_dir)
+        actions = await run_sync_cycle(mock_client, sync_root, "f1", state, project_dir, _FAKE_API_KEY)
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.CONFLICT
 

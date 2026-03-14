@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -24,6 +24,8 @@ from collabmark.lib.sync_engine import (
     reconcile,
 )
 from collabmark.types import DocumentInfo, FolderInfo, SyncFileEntry, SyncFolderEntry, SyncState
+
+_FAKE_API_KEY = "cm_test_key_123"
 
 # ===================================================================
 # Content hashing
@@ -125,8 +127,13 @@ class TestListLocalMdFiles:
 # ===================================================================
 
 
-def _doc(doc_id: str, title: str, content: str) -> DocumentInfo:
+def _doc(doc_id: str, title: str, content: str = "") -> DocumentInfo:
     return DocumentInfo(id=doc_id, title=title, content=content)
+
+
+def _hashes_from_content(remote: dict[str, DocumentInfo], content_map: dict[str, str]) -> dict[str, str]:
+    """Build remote_hashes from a mapping of rel_path -> content text."""
+    return {rel: content_hash(text) for rel, text in content_map.items()}
 
 
 class TestReconcile:
@@ -134,8 +141,9 @@ class TestReconcile:
         local = {"new.md": content_hash("hello")}
         state = SyncState()
         remote: dict[str, DocumentInfo] = {}
+        remote_hashes: dict[str, str] = {}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.PUSH_NEW
@@ -144,9 +152,10 @@ class TestReconcile:
     def test_new_remote_file_produces_pull_new(self) -> None:
         local: dict[str, str] = {}
         state = SyncState()
-        remote = {"doc.md": _doc("d1", "doc", "hello")}
+        remote = {"doc.md": _doc("d1", "doc")}
+        remote_hashes: dict[str, str] = {}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.PULL_NEW
@@ -157,9 +166,10 @@ class TestReconcile:
         new_hash = content_hash("new content")
         local = {"doc.md": new_hash}
         state = SyncState(files={"doc.md": SyncFileEntry("d1", old_hash, "t1")})
-        remote = {"doc.md": _doc("d1", "doc", "old")}
+        remote = {"doc.md": _doc("d1", "doc")}
+        remote_hashes = {"doc.md": old_hash}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.PUSH_UPDATE
@@ -169,9 +179,10 @@ class TestReconcile:
         old_hash = content_hash("old")
         local = {"doc.md": old_hash}
         state = SyncState(files={"doc.md": SyncFileEntry("d1", old_hash, "t1")})
-        remote = {"doc.md": _doc("d1", "doc", "new from cloud")}
+        remote = {"doc.md": _doc("d1", "doc")}
+        remote_hashes = {"doc.md": content_hash("new from cloud")}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.PULL_UPDATE
@@ -180,9 +191,10 @@ class TestReconcile:
         old_hash = content_hash("original")
         local = {"doc.md": content_hash("local edit")}
         state = SyncState(files={"doc.md": SyncFileEntry("d1", old_hash, "t1")})
-        remote = {"doc.md": _doc("d1", "doc", "cloud edit")}
+        remote = {"doc.md": _doc("d1", "doc")}
+        remote_hashes = {"doc.md": content_hash("cloud edit")}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.CONFLICT
@@ -191,18 +203,20 @@ class TestReconcile:
         h = content_hash("same")
         local = {"doc.md": h}
         state = SyncState(files={"doc.md": SyncFileEntry("d1", h, "t1")})
-        remote = {"doc.md": _doc("d1", "doc", "same")}
+        remote = {"doc.md": _doc("d1", "doc")}
+        remote_hashes = {"doc.md": h}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
         assert actions == []
 
     def test_local_deleted_produces_delete_remote(self) -> None:
         h = content_hash("content")
         local: dict[str, str] = {}
         state = SyncState(files={"doc.md": SyncFileEntry("d1", h, "t1")})
-        remote = {"doc.md": _doc("d1", "doc", "content")}
+        remote = {"doc.md": _doc("d1", "doc")}
+        remote_hashes = {"doc.md": h}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.DELETE_REMOTE
@@ -213,8 +227,9 @@ class TestReconcile:
         local = {"doc.md": h}
         state = SyncState(files={"doc.md": SyncFileEntry("d1", h, "t1")})
         remote: dict[str, DocumentInfo] = {}
+        remote_hashes: dict[str, str] = {}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.DELETE_LOCAL
@@ -224,8 +239,9 @@ class TestReconcile:
         local: dict[str, str] = {}
         state = SyncState(files={"doc.md": SyncFileEntry("d1", h, "t1")})
         remote: dict[str, DocumentInfo] = {}
+        remote_hashes: dict[str, str] = {}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
         assert actions == []
 
     def test_multiple_files_sorted_by_path(self) -> None:
@@ -235,8 +251,9 @@ class TestReconcile:
         }
         state = SyncState()
         remote: dict[str, DocumentInfo] = {}
+        remote_hashes: dict[str, str] = {}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 2
         assert actions[0].rel_path == "a.md"
@@ -247,17 +264,19 @@ class TestReconcile:
         text = "identical"
         local = {"doc.md": content_hash(text)}
         state = SyncState()
-        remote = {"doc.md": _doc("d1", "doc", text)}
+        remote = {"doc.md": _doc("d1", "doc")}
+        remote_hashes = {"doc.md": content_hash(text)}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
         assert actions == []
 
     def test_untracked_local_and_remote_different_content_conflict(self) -> None:
         local = {"doc.md": content_hash("local")}
         state = SyncState()
-        remote = {"doc.md": _doc("d1", "doc", "cloud")}
+        remote = {"doc.md": _doc("d1", "doc")}
+        remote_hashes = {"doc.md": content_hash("cloud")}
 
-        actions = reconcile(local, state, remote)
+        actions = reconcile(local, state, remote, remote_hashes)
 
         assert len(actions) == 1
         assert actions[0].kind == ActionKind.CONFLICT
@@ -270,7 +289,8 @@ class TestReconcile:
 
 class TestPushNewFile:
     @pytest.mark.asyncio
-    async def test_creates_document_and_updates_state(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.write_content_via_ws", new_callable=AsyncMock)
+    async def test_creates_document_and_updates_state(self, mock_crdt_write, tmp_path: Path) -> None:
         sync_root = tmp_path / "root"
         sync_root.mkdir()
         (sync_root / "new.md").write_text("# Hello", encoding="utf-8")
@@ -280,11 +300,12 @@ class TestPushNewFile:
 
         state = SyncState()
         mock_client = AsyncMock(spec=CollabMarkClient)
-        mock_client.create_document.return_value = DocumentInfo(id="d_new", title="new", content="# Hello")
+        mock_client.create_document.return_value = DocumentInfo(id="d_new", title="new", content="")
 
-        await push_new_file(mock_client, sync_root, state, "new.md", "f1", project_dir)
+        await push_new_file(mock_client, sync_root, state, "new.md", "f1", project_dir, _FAKE_API_KEY)
 
-        mock_client.create_document.assert_called_once_with("new", "# Hello", folder_id="f1")
+        mock_client.create_document.assert_called_once_with("new", "", folder_id="f1")
+        mock_crdt_write.assert_called_once_with("d_new", "# Hello", _FAKE_API_KEY)
         assert "new.md" in state.files
         assert state.files["new.md"].doc_id == "d_new"
         assert state.files["new.md"].content_hash == content_hash("# Hello")
@@ -292,7 +313,8 @@ class TestPushNewFile:
 
 class TestPushUpdate:
     @pytest.mark.asyncio
-    async def test_updates_document_and_state(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.update_content_via_ws", new_callable=AsyncMock)
+    async def test_updates_document_via_crdt(self, mock_crdt_update, tmp_path: Path) -> None:
         sync_root = tmp_path / "root"
         sync_root.mkdir()
         (sync_root / "doc.md").write_text("updated", encoding="utf-8")
@@ -301,18 +323,19 @@ class TestPushUpdate:
         project_dir.mkdir()
 
         state = SyncState(files={"doc.md": SyncFileEntry("d1", content_hash("old"), "t1")})
-        mock_client = AsyncMock(spec=CollabMarkClient)
-        mock_client.update_document.return_value = DocumentInfo(id="d1", title="doc", content="updated")
 
-        await push_update(mock_client, sync_root, state, "doc.md", "d1", project_dir)
+        await push_update(sync_root, state, "doc.md", "d1", project_dir, _FAKE_API_KEY)
 
-        mock_client.update_document.assert_called_once_with("d1", content="updated")
+        mock_crdt_update.assert_called_once_with("d1", "updated", _FAKE_API_KEY)
         assert state.files["doc.md"].content_hash == content_hash("updated")
 
 
 class TestPullFile:
     @pytest.mark.asyncio
-    async def test_downloads_and_writes_file(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    async def test_downloads_and_writes_file(self, mock_crdt_read, tmp_path: Path) -> None:
+        mock_crdt_read.return_value = "cloud content"
+
         sync_root = tmp_path / "root"
         sync_root.mkdir()
 
@@ -320,18 +343,20 @@ class TestPullFile:
         project_dir.mkdir()
 
         state = SyncState()
-        mock_client = AsyncMock(spec=CollabMarkClient)
-        mock_client.get_document.return_value = DocumentInfo(id="d1", title="doc", content="cloud content")
 
-        await pull_file(mock_client, sync_root, state, "doc.md", "d1", project_dir)
+        await pull_file(sync_root, state, "doc.md", "d1", project_dir, _FAKE_API_KEY)
 
+        mock_crdt_read.assert_called_once_with("d1", _FAKE_API_KEY)
         written = (sync_root / "doc.md").read_text(encoding="utf-8")
         assert written == "cloud content"
         assert state.files["doc.md"].doc_id == "d1"
         assert state.files["doc.md"].content_hash == content_hash("cloud content")
 
     @pytest.mark.asyncio
-    async def test_creates_parent_directories(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    async def test_creates_parent_directories(self, mock_crdt_read, tmp_path: Path) -> None:
+        mock_crdt_read.return_value = "content"
+
         sync_root = tmp_path / "root"
         sync_root.mkdir()
 
@@ -339,10 +364,8 @@ class TestPullFile:
         project_dir.mkdir()
 
         state = SyncState()
-        mock_client = AsyncMock(spec=CollabMarkClient)
-        mock_client.get_document.return_value = DocumentInfo(id="d1", title="nested", content="content")
 
-        await pull_file(mock_client, sync_root, state, "sub/deep/nested.md", "d1", project_dir)
+        await pull_file(sync_root, state, "sub/deep/nested.md", "d1", project_dir, _FAKE_API_KEY)
 
         assert (sync_root / "sub" / "deep" / "nested.md").is_file()
 
@@ -426,7 +449,8 @@ class TestDeleteRemote:
 
 class TestStatePersistence:
     @pytest.mark.asyncio
-    async def test_push_new_persists_to_disk(self, tmp_path: Path) -> None:
+    @patch("collabmark.lib.sync_engine.write_content_via_ws", new_callable=AsyncMock)
+    async def test_push_new_persists_to_disk(self, mock_crdt_write, tmp_path: Path) -> None:
         sync_root = tmp_path / "root"
         sync_root.mkdir()
         (sync_root / "file.md").write_text("data", encoding="utf-8")
@@ -437,9 +461,9 @@ class TestStatePersistence:
 
         state = SyncState()
         mock_client = AsyncMock(spec=CollabMarkClient)
-        mock_client.create_document.return_value = DocumentInfo(id="d1", title="file", content="data")
+        mock_client.create_document.return_value = DocumentInfo(id="d1", title="file", content="")
 
-        await push_new_file(mock_client, sync_root, state, "file.md", "f1", project_dir)
+        await push_new_file(mock_client, sync_root, state, "file.md", "f1", project_dir, _FAKE_API_KEY)
 
         reloaded = load_sync_state(project_dir)
         assert "file.md" in reloaded.files

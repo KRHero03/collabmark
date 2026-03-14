@@ -1,34 +1,141 @@
-"""``collabmark stop`` — stop the sync daemon."""
+"""``collabmark stop`` — stop sync daemons."""
 
 from __future__ import annotations
 
+import os
+import signal
+from pathlib import Path
+
 import click
 from rich.console import Console
+from rich.prompt import Prompt
 
-from collabmark.lib.daemon import is_process_alive, read_pid, remove_pid_file, stop_daemon
+from collabmark.lib.config import find_project_root, load_sync_config
+from collabmark.lib.daemon import is_process_alive, remove_pid_file
+from collabmark.lib.registry import get_running_syncs, mark_stopped
 
 console = Console()
 
 
+def _stop_one(entry) -> bool:
+    """Send SIGTERM to a single sync process. Returns True on success."""
+    if entry.pid is None or not is_process_alive(entry.pid):
+        mark_stopped(entry.local_path)
+        if entry.folder_id:
+            remove_pid_file(entry.folder_id)
+        return False
+
+    try:
+        os.kill(entry.pid, signal.SIGTERM)
+        console.print(
+            f"[green]✓[/green] Stopped [bold]{entry.folder_name}[/bold]"
+            f"  [dim]{entry.local_path}[/dim]  (PID {entry.pid})"
+        )
+        mark_stopped(entry.local_path)
+        if entry.folder_id:
+            remove_pid_file(entry.folder_id)
+        return True
+    except OSError as exc:
+        console.print(f"[red]✗[/red] Failed to stop PID {entry.pid}: {exc}")
+        return False
+
+
 @click.command()
-def stop() -> None:
-    """Stop the background sync daemon.
+@click.option(
+    "--path",
+    "-p",
+    type=click.Path(exists=True, file_okay=False, resolve_path=True),
+    default=None,
+    help="Stop the sync for a specific directory.",
+)
+@click.option("--all", "stop_all", is_flag=True, help="Stop all running syncs.")
+def stop(path: str | None, stop_all: bool) -> None:
+    """Stop a running sync.
 
-    Sends a graceful stop signal. The daemon completes any
-    in-progress sync before shutting down.
+    \b
+    Examples:
+      collabmark stop              Stop sync for current directory (or pick)
+      collabmark stop --all        Stop all running syncs
+      collabmark stop -p ~/notes   Stop sync for ~/notes
     """
-    pid = read_pid()
-
-    if pid is None:
-        console.print("[yellow]No daemon is running.[/yellow]")
+    if stop_all:
+        _stop_all_syncs()
         return
 
-    if not is_process_alive(pid):
-        remove_pid_file()
-        console.print("[yellow]Daemon (PID {pid}) is no longer running. Cleaned up PID file.[/yellow]")
+    if path:
+        _stop_by_path(Path(path))
         return
 
-    if stop_daemon():
-        console.print(f"[green]✓[/green] Sent stop signal to daemon (PID {pid}).")
+    project_root = find_project_root()
+    if project_root:
+        _stop_by_path(project_root)
+        return
+
+    running = get_running_syncs()
+    if not running:
+        console.print("[yellow]No syncs are currently running.[/yellow]")
+        return
+
+    if len(running) == 1:
+        _stop_one(running[0])
+        return
+
+    _interactive_stop(running)
+
+
+def _stop_all_syncs() -> None:
+    """Stop every running sync."""
+    running = get_running_syncs()
+    if not running:
+        console.print("[yellow]No syncs are currently running.[/yellow]")
+        return
+
+    stopped = 0
+    for entry in running:
+        if _stop_one(entry):
+            stopped += 1
+
+    console.print(f"\n[dim]{stopped}/{len(running)} syncs stopped.[/dim]")
+
+
+def _stop_by_path(target: Path) -> None:
+    """Stop the sync for a specific directory."""
+    abs_path = str(target.resolve())
+
+    running = get_running_syncs()
+    match = next((s for s in running if s.local_path == abs_path), None)
+
+    if match:
+        _stop_one(match)
+        return
+
+    config = load_sync_config(target / ".collabmark") if (target / ".collabmark").is_dir() else None
+    if config:
+        console.print(f"[yellow]Sync for '{config.folder_name}' is not running.[/yellow]")
     else:
-        console.print(f"[red]✗[/red] Failed to stop daemon (PID {pid}).")
+        console.print("[yellow]No sync found for this directory.[/yellow]")
+
+
+def _interactive_stop(running: list) -> None:
+    """Show a numbered list of running syncs and let the user pick."""
+    console.print("\n[bold]Multiple syncs are running. Choose which to stop:[/bold]\n")
+
+    for i, s in enumerate(running, 1):
+        console.print(f"  {i}. [bold]{s.folder_name}[/bold]  [dim]{s.local_path}[/dim]  (PID {s.pid})")
+
+    all_idx = len(running) + 1
+    console.print(f"  {all_idx}. [red]Stop all[/red]\n")
+
+    selection = Prompt.ask("Enter number", default="1")
+    try:
+        num = int(selection)
+    except ValueError:
+        console.print("[red]Invalid selection.[/red]")
+        return
+
+    if num == all_idx:
+        _stop_all_syncs()
+    elif 1 <= num <= len(running):
+        _stop_one(running[num - 1])
+    else:
+        console.print("[red]Invalid selection.[/red]")

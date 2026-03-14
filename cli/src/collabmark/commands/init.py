@@ -71,13 +71,13 @@ async def _init_async(link: str | None, path_str: str | None) -> None:
             folder_id = _extract_folder_id_from_link(link)
             if folder_id:
                 folder = await client.get_folder(folder_id)
-                _init_project_config(target, client, folder.id, folder.name)
+                _init_project_config(target, client, folder.id, folder.name, user_info)
                 console.print(f"[green]✓[/green] Linked to cloud folder [bold]{folder.name}[/bold]")
             else:
                 console.print("[red]Could not parse folder link.[/red]")
                 sys.exit(1)
         else:
-            folder_id, folder_name = await _interactive_folder_picker(client, target)
+            folder_id, folder_name = await _interactive_folder_picker(client, target, user_info)
             console.print(f"[green]✓[/green] Linked to cloud folder [bold]{folder_name}[/bold]")
 
     console.print(f"\nReady! Run [bold]collabmark start[/bold] in [dim]{target}[/dim] to begin syncing.")

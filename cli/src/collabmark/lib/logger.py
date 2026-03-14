@@ -2,6 +2,10 @@
 
 Provides both console (rich-formatted) and file (JSON lines) logging,
 with automatic credential masking and log rotation.
+
+Each sync project gets its own log file at
+``~/.collabmark/logs/{folder_id}.log`` so logs are not interleaved
+across concurrent syncs.
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ from pathlib import Path
 from collabmark.lib.config import get_cli_home
 
 _LOG_DIR_NAME = "logs"
-_LOG_FILE_NAME = "sync.log"
+_LEGACY_LOG_FILE = "sync.log"
 _MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 _BACKUP_COUNT = 5
 
@@ -66,16 +70,41 @@ def get_log_dir() -> Path:
     return get_cli_home() / _LOG_DIR_NAME
 
 
-def get_log_file() -> Path:
-    return get_log_dir() / _LOG_FILE_NAME
+def get_log_file(folder_id: str | None = None) -> Path:
+    """Return the log file path for a given folder_id.
+
+    Falls back to the legacy ``sync.log`` when no folder_id is given.
+    """
+    if folder_id:
+        return get_log_dir() / f"{folder_id}.log"
+    return get_log_dir() / _LEGACY_LOG_FILE
 
 
-def setup_logging(*, verbose: bool = False, log_to_file: bool = True) -> None:
+def list_log_files() -> list[tuple[str, Path]]:
+    """Return ``[(folder_id, path)]`` for all per-project log files."""
+    log_dir = get_log_dir()
+    if not log_dir.is_dir():
+        return []
+    results = []
+    for f in sorted(log_dir.iterdir()):
+        if f.suffix == ".log" and f.name != _LEGACY_LOG_FILE:
+            results.append((f.stem, f))
+    return results
+
+
+def setup_logging(
+    *,
+    verbose: bool = False,
+    log_to_file: bool = True,
+    folder_id: str | None = None,
+) -> None:
     """Configure logging for the CLI process.
 
     Args:
         verbose: If True, set console level to DEBUG instead of INFO.
-        log_to_file: If True, also write JSON logs to ``~/.collabmark/logs/sync.log``.
+        log_to_file: If True, also write JSON logs to the log file.
+        folder_id: If provided, write to ``~/.collabmark/logs/{folder_id}.log``
+            instead of the legacy ``sync.log``.
     """
     root = logging.getLogger("collabmark")
     root.setLevel(logging.DEBUG)
@@ -95,7 +124,7 @@ def setup_logging(*, verbose: bool = False, log_to_file: bool = True) -> None:
         log_dir = get_log_dir()
         log_dir.mkdir(parents=True, exist_ok=True)
         file_handler = RotatingFileHandler(
-            get_log_file(),
+            get_log_file(folder_id),
             maxBytes=_MAX_BYTES,
             backupCount=_BACKUP_COUNT,
             encoding="utf-8",

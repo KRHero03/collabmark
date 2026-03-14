@@ -1,0 +1,60 @@
+name: CLI Release to PyPI
+
+on:
+  push:
+    tags:
+      - "cli-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install CLI with dev dependencies
+        run: pip install -e ".[dev]"
+        working-directory: cli
+
+      - name: Ruff lint
+        run: ruff check src/ tests/
+        working-directory: cli
+
+      - name: Ruff format check
+        run: ruff format --check src/ tests/
+        working-directory: cli
+
+      - name: Run tests
+        run: python -m pytest -v
+        working-directory: cli
+
+  publish:
+    needs: [lint-and-test]
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: pip install hatch
+
+      - name: Build package
+        run: hatch build
+        working-directory: cli
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: cli/dist/

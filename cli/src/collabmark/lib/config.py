@@ -27,8 +27,8 @@ from collabmark.types import (
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_API_URL = "http://localhost:8000"
-_DEFAULT_FRONTEND_URL = "http://localhost:5173"
+_DEFAULT_API_URL = "https://web-production-5e1bc.up.railway.app"
+_DEFAULT_FRONTEND_URL = "https://web-production-5e1bc.up.railway.app"
 
 API_KEY_HEADER = "X-API-Key"
 PROJECT_DIR_NAME = ".collabmark"
