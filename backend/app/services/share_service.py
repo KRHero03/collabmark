@@ -9,9 +9,11 @@ from fastapi import HTTPException, status
 
 from app.models.document import Document_, GeneralAccess
 from app.models.document_view import DocumentView
+from app.models.notification import NotificationEvent
 from app.models.share_link import DocumentAccess, Permission, ShareLink
 from app.models.user import User
 from app.services.acl_service import get_base_permission
+from app.services.notification_dispatcher import get_dispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +308,9 @@ async def add_collaborator(doc_id: str, owner: User, email: str, permission: Per
         granted_by=str(owner.id),
     )
     await access.insert()
+
+    await _schedule_share_notification(access, doc, owner, target_user)
+
     return access
 
 
@@ -474,6 +479,36 @@ async def list_recently_viewed(user: User) -> list[dict]:
             }
         )
     return results
+
+
+async def _schedule_share_notification(access: DocumentAccess, doc: Document_, owner: User, target_user: User) -> None:
+    """Schedule a delayed document_shared notification for the target user."""
+    try:
+        dispatcher = get_dispatcher()
+    except RuntimeError:
+        return
+    try:
+        await dispatcher.schedule(
+            event_type=NotificationEvent.DOCUMENT_SHARED,
+            recipients=[
+                {
+                    "user_id": str(target_user.id),
+                    "email": target_user.email,
+                    "name": target_user.name,
+                }
+            ],
+            action_ref_id=str(access.id),
+            document_id=str(doc.id),
+            payload={
+                "recipient_name": target_user.name,
+                "shared_by": owner.name,
+                "document_title": doc.title,
+                "document_id": str(doc.id),
+                "permission": access.permission.value,
+            },
+        )
+    except Exception:
+        logger.exception("Failed to schedule share notification")
 
 
 def _assert_owner(doc: Document_, user: User) -> None:

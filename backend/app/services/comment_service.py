@@ -7,7 +7,10 @@ from bson.errors import InvalidId
 from fastapi import HTTPException, status
 
 from app.models.comment import Comment, CommentCreate, CommentRead
+from app.models.document import Document_
+from app.models.notification import NotificationEvent
 from app.models.user import User
+from app.services.notification_dispatcher import get_dispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,9 @@ async def create_comment(doc_id: str, user: User, payload: CommentCreate) -> Com
         quoted_text=payload.quoted_text,
     )
     await comment.insert()
+
+    await _schedule_comment_notification(comment, doc_id, user)
+
     return comment
 
 
@@ -205,6 +211,51 @@ async def delete_comment(comment_id: str, user: User) -> None:
         await Comment.find(Comment.parent_id == str(comment.id)).delete()
 
     await comment.delete()
+
+
+async def _schedule_comment_notification(comment: Comment, doc_id: str, author: User) -> None:
+    """Schedule a comment_added notification to the document owner (direct comments only)."""
+    if comment.parent_id is not None:
+        return
+
+    try:
+        dispatcher = get_dispatcher()
+    except RuntimeError:
+        return
+
+    doc = await Document_.get(PydanticObjectId(doc_id))
+    if doc is None:
+        return
+
+    if doc.owner_id == str(author.id):
+        return
+
+    owner = await User.get(PydanticObjectId(doc.owner_id))
+    if owner is None:
+        return
+
+    try:
+        await dispatcher.schedule(
+            event_type=NotificationEvent.COMMENT_ADDED,
+            recipients=[
+                {
+                    "user_id": str(owner.id),
+                    "email": owner.email,
+                    "name": owner.name,
+                }
+            ],
+            action_ref_id=str(comment.id),
+            document_id=doc_id,
+            payload={
+                "recipient_name": owner.name,
+                "commenter": author.name,
+                "document_title": doc.title,
+                "document_id": doc_id,
+                "comment_preview": comment.content[:150],
+            },
+        )
+    except Exception:
+        logger.exception("Failed to schedule comment notification")
 
 
 async def _find_comment_or_404(comment_id: str) -> Comment:

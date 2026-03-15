@@ -23,6 +23,12 @@ services:
       MINIO_ROOT_PASSWORD: collabmark-secret
     command: server /data --console-address ":9001"
 
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+
   app:
     build: .
     ports:
@@ -31,6 +37,7 @@ services:
       - mongodb
       - redis
       - minio
+      - mailpit
     env_file:
       - .env
     environment:
@@ -40,6 +47,8 @@ services:
       - S3_ACCESS_KEY=collabmark
       - S3_SECRET_KEY=collabmark-secret
       - S3_BUCKET=collabmark-media
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
 
 volumes:
   mongo_data:

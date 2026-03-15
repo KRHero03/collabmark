@@ -1,5 +1,6 @@
 """CollabMark FastAPI application: lifespan, CORS, routes, static frontend."""
 
+import asyncio
 import contextlib
 import logging
 from contextlib import asynccontextmanager
@@ -12,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
+from redis.asyncio import Redis
 from starlette.middleware.sessions import SessionMiddleware
 
 logging.basicConfig(
@@ -27,13 +29,22 @@ from app.models.document_version import DocumentVersion
 from app.models.document_view import DocumentView
 from app.models.folder import Folder, FolderAccess, FolderView
 from app.models.group import DocumentGroupAccess, FolderGroupAccess, Group, GroupMembership
+from app.models.notification import Notification, NotificationPreference
 from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization, OrgMembership
 from app.models.share_link import DocumentAccess, ShareLink
 from app.models.user import User
-from app.routes import auth, comments, documents, folders, keys, orgs, scim, sharing, users, versions, ws
+from app.routes import auth, comments, documents, folders, keys, notifications, orgs, scim, sharing, users, versions, ws
 from app.services.blob_storage import MIME_TYPES, _get_s3_client
+from app.services.channels.email import EmailChannel
 from app.services.crdt_store import MongoYStore
+from app.services.notification_dispatcher import (
+    NotificationChannel,
+    NotificationDispatcher,
+    set_dispatcher,
+)
+from app.services.notification_retry import retry_loop
+from app.services.notification_scheduler import scheduler_loop
 from app.ws.handler import start_websocket_server, stop_websocket_server
 
 DOCUMENT_MODELS = [
@@ -55,6 +66,8 @@ DOCUMENT_MODELS = [
     GroupMembership,
     DocumentGroupAccess,
     FolderGroupAccess,
+    Notification,
+    NotificationPreference,
 ]
 
 STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
@@ -62,7 +75,7 @@ STATIC_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Manage application lifecycle: DB connection, CRDT server startup/shutdown."""
+    """Manage application lifecycle: DB, CRDT, Redis, notification workers."""
     client = AsyncIOMotorClient(
         settings.mongodb_url,
         serverSelectionTimeoutMS=10_000,
@@ -71,13 +84,41 @@ async def lifespan(app: FastAPI):
     db = client[settings.mongodb_db_name]
     await init_beanie(database=db, document_models=DOCUMENT_MODELS, skip_indexes=True)
 
-    # Drop stale unique index on google_id that blocks SCIM users (google_id=null)
     with contextlib.suppress(Exception):
         await db["users"].drop_index("google_id_1")
 
     MongoYStore.set_database(db)
     await start_websocket_server()
+
+    _bg_tasks: list[asyncio.Task] = []
+    redis_client = None
+    if settings.notifications_enabled:
+        try:
+            redis_client = Redis.from_url(settings.redis_url, decode_responses=True)
+            await redis_client.ping()
+
+            dispatcher = NotificationDispatcher(redis_client=redis_client)
+            dispatcher.register_channel(NotificationChannel.EMAIL, EmailChannel())
+            set_dispatcher(dispatcher)
+
+            _bg_tasks.append(asyncio.create_task(scheduler_loop(redis_client, dispatcher)))
+            _bg_tasks.append(asyncio.create_task(retry_loop(redis_client, dispatcher)))
+
+            logging.getLogger(__name__).info(
+                "Notification system initialized (delay=%ds)", settings.notification_delay_seconds
+            )
+        except Exception:
+            logging.getLogger(__name__).warning("Redis unavailable — notifications disabled", exc_info=True)
+
     yield
+
+    for task in _bg_tasks:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    if redis_client:
+        await redis_client.aclose()
+
     await stop_websocket_server()
     client.close()
 
@@ -118,6 +159,7 @@ app.include_router(documents.router)
 app.include_router(folders.router)
 app.include_router(keys.router)
 app.include_router(comments.router)
+app.include_router(notifications.router)
 app.include_router(orgs.router)
 app.include_router(scim.router)
 scim.register_scim_error_handler(app)

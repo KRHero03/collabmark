@@ -52,6 +52,18 @@ class Settings(BaseSettings):
     s3_bucket: str = "collabmark-media"
     s3_region: str = "us-east-1"
 
+    notifications_enabled: bool = True
+    notification_email_provider: str = "smtp"
+    notification_from_email: str = "noreply@collabmark.app"
+    notification_delay_seconds: int = 60
+
+    resend_api_key: str = ""
+
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+
 
 settings = Settings()
 
