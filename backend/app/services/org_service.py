@@ -24,11 +24,10 @@ from app.models.organization import (
 )
 from app.models.user import User
 from app.services import blob_storage
-from app.services.document_service import validate_file_content
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".svg", ".webp"}
 MAX_LOGO_SIZE = 2 * 1024 * 1024  # 2MB
 
 
@@ -43,7 +42,6 @@ async def upload_org_logo(org_id: str, filename: str, contents: bytes) -> Organi
     size_mb = len(contents) / (1024 * 1024)
     if len(contents) > MAX_LOGO_SIZE:
         raise HTTPException(status_code=400, detail=f"File too large ({size_mb:.1f}MB). Maximum logo size is 2MB.")
-    validate_file_content(contents, ext)
 
     org = await get_org(org_id)
 

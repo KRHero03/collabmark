@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://web-production-5e1bc.up.railway.app/sitemap.xml

@@ -28,7 +28,6 @@ from app.services.share_service import get_user_permission
 logger = logging.getLogger(__name__)
 
 _PERM_RECHECK_INTERVAL = 10  # seconds between permission re-checks
-_MAX_WS_MESSAGE_SIZE = 5 * 1024 * 1024  # 5 MB
 
 
 class CollabWebsocketServer(WebsocketServer):
@@ -208,10 +207,6 @@ class FastAPIWebsocketAdapter:
                 raise StopAsyncIteration() from None
             except Exception:
                 raise StopAsyncIteration() from None
-
-            if len(data) > _MAX_WS_MESSAGE_SIZE:
-                logger.warning("Dropped oversized WS message (%d bytes) on room %s", len(data), self.path)
-                continue
 
             if self._is_write_message(data):
                 await self._recheck_permission()

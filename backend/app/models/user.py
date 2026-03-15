@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from typing import Optional
 
 from beanie import Document, Indexed
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class User(Document):
@@ -62,21 +62,8 @@ class UserRead(BaseModel):
         )
 
 
-def _validate_avatar_url(url: str | None) -> str | None:
-    if url is None or url == "":
-        return url
-    if not (url.startswith("https://") or url.startswith("http://localhost")):
-        raise ValueError("avatar_url must use https:// scheme")
-    return url
-
-
 class UserUpdate(BaseModel):
     """Fields a user can update on their profile. All fields optional."""
 
     name: Optional[str] = None
     avatar_url: Optional[str] = None
-
-    @field_validator("avatar_url")
-    @classmethod
-    def validate_avatar_url(cls, v: str | None) -> str | None:
-        return _validate_avatar_url(v)

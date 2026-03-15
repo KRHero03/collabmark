@@ -8,16 +8,13 @@ from pathlib import Path
 
 from beanie import init_beanie
 from botocore.exceptions import ClientError
-from fastapi import Cookie, FastAPI, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 from redis.asyncio import Redis
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from starlette.responses import JSONResponse as StarletteJSONResponse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,7 +22,6 @@ logging.basicConfig(
 )
 
 from app.config import settings
-from app.rate_limit import limiter
 from app.models.api_key import ApiKey
 from app.models.comment import Comment
 from app.models.document import Document_
@@ -127,22 +123,11 @@ async def lifespan(app: FastAPI):
     client.close()
 
 
-def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    return StarletteJSONResponse(
-        status_code=429,
-        content={"detail": "Rate limit exceeded. Please try again later."},
-    )
-
-
 app = FastAPI(
     title=settings.app_name,
     debug=settings.debug,
     lifespan=lifespan,
 )
-
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
-app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     SessionMiddleware,
@@ -153,24 +138,16 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "X-API-Key", "Authorization"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-
-_IMAGE_CONTENT_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
 
 
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
+async def no_cache_api(request: Request, call_next):
     response = await call_next(request)
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
-    if not settings.debug:
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 
@@ -204,20 +181,12 @@ async def health():
 
 
 @app.get("/media/{file_path:path}")
-async def serve_media(
-    file_path: str,
-    access_token: str | None = Cookie(default=None, alias="access_token"),
-):
+async def serve_media(file_path: str):
     """Proxy media files from S3-compatible blob storage.
 
-    Requires a valid JWT cookie. Non-image files are served as attachments
-    to prevent browser execution of uploaded PDFs, Office docs, etc.
+    Streams the object and sets appropriate Content-Type and cache headers.
+    Returns 404 if the object does not exist.
     """
-    from app.auth.jwt import decode_access_token
-
-    if not access_token or decode_access_token(access_token) is None:
-        return Response(status_code=401)
-
     client = _get_s3_client()
     try:
         obj = client.get_object(Bucket=settings.s3_bucket, Key=file_path)
@@ -227,14 +196,10 @@ async def serve_media(
     ext = Path(file_path).suffix.lower()
     content_type = MIME_TYPES.get(ext, obj.get("ContentType", "application/octet-stream"))
     body = obj["Body"].read()
-    headers: dict[str, str] = {"Cache-Control": "public, max-age=86400"}
-    if content_type not in _IMAGE_CONTENT_TYPES:
-        filename = Path(file_path).name
-        headers["Content-Disposition"] = f'attachment; filename="{filename}"'
     return Response(
         content=body,
         media_type=content_type,
-        headers=headers,
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 

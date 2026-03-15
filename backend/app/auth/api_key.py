@@ -1,7 +1,5 @@
 """API key authentication for programmatic access."""
 
-import hmac
-
 from beanie import PydanticObjectId
 from fastapi import HTTPException, Security, status
 from fastapi.security import APIKeyHeader
@@ -35,7 +33,7 @@ async def get_user_from_api_key(
         ApiKey.is_active == True,
     )
 
-    if record is None or not hmac.compare_digest(record.key_hash, key_hash):
+    if record is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",

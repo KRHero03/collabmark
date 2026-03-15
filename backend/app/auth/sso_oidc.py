@@ -4,34 +4,13 @@ Uses authlib to handle OIDC discovery, authorization, and token exchange
 with the organization's Identity Provider.
 """
 
-import ipaddress
-import socket
 from typing import Any
-from urllib.parse import urlparse
 
 import httpx
 from authlib.integrations.httpx_client import AsyncOAuth2Client
 
 from app.auth.sso_common import SSOCallbackResult
 from app.models.org_sso_config import OrgSSOConfig
-
-
-def _validate_url_not_internal(url: str) -> None:
-    """Reject URLs pointing to private/loopback/link-local addresses to prevent SSRF."""
-    parsed = urlparse(url)
-    if parsed.scheme not in ("https", "http"):
-        raise ValueError(f"OIDC URL must use https (got {parsed.scheme})")
-    hostname = parsed.hostname or ""
-    if not hostname:
-        raise ValueError("OIDC URL has no hostname")
-    try:
-        resolved = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
-        for _family, _type, _proto, _canonname, sockaddr in resolved:
-            ip = ipaddress.ip_address(sockaddr[0])
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
-                raise ValueError(f"OIDC discovery URL resolves to non-public address: {ip}")
-    except socket.gaierror as exc:
-        raise ValueError(f"Cannot resolve OIDC discovery URL host: {hostname}") from exc
 
 
 def create_oidc_client(config: OrgSSOConfig) -> AsyncOAuth2Client:
@@ -64,7 +43,6 @@ async def get_oidc_discovery(config: OrgSSOConfig) -> dict[str, Any]:
     """
     if not config.oidc_discovery_url:
         raise ValueError("OIDC discovery URL not configured")
-    _validate_url_not_internal(config.oidc_discovery_url)
     async with httpx.AsyncClient() as client:
         resp = await client.get(config.oidc_discovery_url)
         resp.raise_for_status()

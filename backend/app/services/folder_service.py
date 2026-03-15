@@ -15,7 +15,7 @@ from app.models.folder import Folder, FolderAccess, FolderCreate, FolderUpdate, 
 from app.models.notification import NotificationEvent
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
-from app.services.acl_service import get_base_permission, org_allows_general_access, resolve_effective_permission
+from app.services.acl_service import get_base_permission, resolve_effective_permission
 from app.services.crdt_store import MongoYStore
 from app.services.notification_dispatcher import get_dispatcher
 
@@ -559,12 +559,11 @@ async def _assert_folder_access(folder: Folder, user: User, min_permission: Perm
             except HTTPException:
                 pass
 
-    if org_allows_general_access(getattr(folder, "org_id", None), user.org_id):
-        ga = folder.general_access
-        if ga == GeneralAccess.ANYONE_EDIT:
-            return
-        if ga == GeneralAccess.ANYONE_VIEW and min_permission == Permission.VIEW:
-            return
+    ga = folder.general_access
+    if ga == GeneralAccess.ANYONE_EDIT:
+        return
+    if ga == GeneralAccess.ANYONE_VIEW and min_permission == Permission.VIEW:
+        return
 
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,

@@ -2,7 +2,6 @@
 
 import logging
 import secrets
-import time
 
 from fastapi import APIRouter, Cookie, Query, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,13 +13,9 @@ from app.auth.sso_common import detect_org_by_email_domain, find_or_create_sso_u
 from app.auth.sso_oidc import initiate_oidc_login, process_oidc_callback
 from app.auth.sso_saml import create_saml_auth_request, process_saml_response
 from app.config import AUTH_COOKIE_NAME, settings
-from app.rate_limit import limiter as _limiter
 from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
 from app.models.organization import Organization
 from app.models.user import User
-
-_CLI_AUTH_CODES: dict[str, tuple[str, float]] = {}
-_CLI_CODE_TTL = 60  # seconds
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +41,6 @@ async def _get_enabled_sso_config(org_id: str) -> OrgSSOConfig | None:
 
 
 @router.get("/google/login")
-@_limiter.limit("10/minute")
 async def google_login(request: Request):
     """Redirect the user to Google's OAuth consent screen.
 
@@ -62,7 +56,6 @@ async def google_login(request: Request):
 
 
 @router.get("/google/callback")
-@_limiter.limit("10/minute")
 async def google_callback(request: Request):
     """Handle the OAuth callback from Google, create/update user, set JWT cookie.
 
@@ -102,16 +95,24 @@ async def google_callback(request: Request):
 
 
 @router.get("/cli/complete")
-@_limiter.limit("10/minute")
 async def cli_complete(
-    request: Request,
     port: int = Query(...),
     access_token: str | None = Cookie(default=None, alias=AUTH_COOKIE_NAME),
 ):
-    """Issue a short-lived auth code and redirect the CLI's local server.
+    """Relay the authenticated user's JWT to the CLI's local callback server.
 
-    The CLI exchanges the code for a JWT via POST /api/auth/cli/exchange.
-    This avoids putting the raw JWT in a URL where it could be logged.
+    The frontend redirects here after a successful login during the CLI flow.
+    This endpoint reads the httpOnly JWT cookie (which JS cannot access) and
+    redirects to the CLI's localhost server with the token as a query param.
+    The CLI's local server then redirects the browser back to the frontend
+    ``/cli-login?status=success`` page for the final UI.
+
+    Args:
+        port: The CLI's local HTTP server port.
+        access_token: JWT from the httpOnly cookie.
+
+    Returns:
+        302 redirect to ``http://localhost:{port}/callback?token={jwt}``.
     """
     if not access_token or decode_access_token(access_token) is None:
         return _error_redirect("cli_not_authenticated")
@@ -119,9 +120,7 @@ async def cli_complete(
     if not (1024 <= port <= 65535):
         return _error_redirect("cli_invalid_port")
 
-    code = secrets.token_urlsafe(32)
-    _CLI_AUTH_CODES[code] = (access_token, time.monotonic())
-    redirect_url = f"http://localhost:{port}/callback?code={code}"
+    redirect_url = f"http://localhost:{port}/callback?token={access_token}"
 
     html = f"""<!DOCTYPE html>
 <html><head>
@@ -133,30 +132,8 @@ font-family:-apple-system,system-ui,sans-serif;background:#fff;color:#64748b;fon
     return HTMLResponse(content=html, status_code=200)
 
 
-@router.post("/cli/exchange")
-@_limiter.limit("10/minute")
-async def cli_exchange(request: Request):
-    """Exchange a single-use CLI auth code for a JWT."""
-    body = await request.json()
-    code = body.get("code", "")
-
-    now = time.monotonic()
-    expired = [k for k, (_, ts) in _CLI_AUTH_CODES.items() if now - ts > _CLI_CODE_TTL]
-    for k in expired:
-        _CLI_AUTH_CODES.pop(k, None)
-
-    entry = _CLI_AUTH_CODES.pop(code, None)
-    if entry is None:
-        return Response(status_code=401)
-    token, created_at = entry
-    if now - created_at > _CLI_CODE_TTL:
-        return Response(status_code=401)
-    return {"token": token}
-
-
 @router.post("/logout")
-@_limiter.limit("10/minute")
-async def logout(request: Request, response: Response):
+async def logout(response: Response):
     """Clear the access_token session cookie.
 
     Args:
@@ -175,7 +152,6 @@ async def logout(request: Request, response: Response):
 
 
 @router.post("/sso/detect")
-@_limiter.limit("15/minute")
 async def detect_idp(request: Request):
     """Detect whether an email address belongs to an SSO-enabled organization.
 
@@ -206,7 +182,6 @@ async def detect_idp(request: Request):
 
 
 @router.get("/sso/saml/login/{org_id}")
-@_limiter.limit("10/minute")
 async def saml_login(org_id: str, request: Request):
     """Redirect the user to the SAML Identity Provider for authentication.
 
@@ -227,7 +202,6 @@ async def saml_login(org_id: str, request: Request):
 
 
 @router.post("/sso/saml/callback")
-@_limiter.limit("10/minute")
 async def saml_callback(request: Request):
     """SAML Assertion Consumer Service (ACS) endpoint.
 
@@ -278,7 +252,6 @@ async def saml_callback(request: Request):
 
 
 @router.get("/sso/oidc/login/{org_id}")
-@_limiter.limit("10/minute")
 async def oidc_login(org_id: str, request: Request):
     """Redirect the user to the OIDC Identity Provider for authentication.
 
@@ -308,7 +281,6 @@ async def oidc_login(org_id: str, request: Request):
 
 
 @router.get("/sso/oidc/callback")
-@_limiter.limit("10/minute")
 async def oidc_callback(request: Request, code: str = Query(default=""), state: str = Query(default="")):
     """OIDC callback endpoint. Exchanges code for tokens, creates/finds user.
 

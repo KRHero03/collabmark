@@ -1,6 +1,5 @@
 """Comprehensive tests for SSO authentication: SAML, OIDC, detect, and shared logic."""
 
-import socket
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -757,11 +756,7 @@ class TestGetOidcDiscovery:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        fake_addrinfo = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 0))]
-        with (
-            patch("app.auth.sso_oidc.socket.getaddrinfo", return_value=fake_addrinfo),
-            patch("app.auth.sso_oidc.httpx.AsyncClient", return_value=mock_client),
-        ):
+        with patch("app.auth.sso_oidc.httpx.AsyncClient", return_value=mock_client):
             result = await get_oidc_discovery(config)
             assert result["authorization_endpoint"] == "https://idp.test.com/auth"
             mock_client.get.assert_called_once_with("https://idp.test.com/.well-known/openid-configuration")

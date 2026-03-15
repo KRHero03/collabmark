@@ -1,7 +1,6 @@
 """Application configuration loaded from environment variables."""
 
 import logging
-import secrets
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -69,8 +68,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 if not settings.debug and settings.jwt_secret_key == _DEFAULT_JWT_SECRET:
-    raise RuntimeError("JWT_SECRET_KEY must be changed from the default value in production (set DEBUG=true for development)")
+    logging.getLogger(__name__).critical("JWT secret is unchanged from default — set JWT_SECRET_KEY in production!")
 
 if not settings.session_secret_key:
-    logging.getLogger(__name__).warning("SESSION_SECRET_KEY not set — generating a random ephemeral key")
-    settings.session_secret_key = secrets.token_hex(32)
+    settings.session_secret_key = settings.jwt_secret_key

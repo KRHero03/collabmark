@@ -7,7 +7,6 @@ against ``OrgSSOConfig.scim_bearer_token``.
 """
 
 import hashlib
-import hmac
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
@@ -54,7 +53,7 @@ async def get_scim_org(request: Request) -> tuple[Organization, OrgSSOConfig]:
     token_hash = hash_scim_token(token)
 
     cfg = await OrgSSOConfig.find_one(OrgSSOConfig.scim_bearer_token == token_hash)
-    if cfg is None or not hmac.compare_digest(cfg.scim_bearer_token, token_hash):
+    if cfg is None:
         raise SCIMError(401, "Invalid SCIM bearer token")
 
     if not cfg.scim_enabled:

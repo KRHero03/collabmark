@@ -38,7 +38,7 @@ class TestCLIComplete:
         )
         assert response.status_code == 200
         body = response.text
-        assert "http://localhost:54321/callback?code=" in body
+        assert "http://localhost:54321/callback?token=" in body
 
     @pytest.mark.asyncio
     async def test_rejects_unauthenticated_request(self, async_client):
