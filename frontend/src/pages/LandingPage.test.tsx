@@ -15,8 +15,8 @@ describe("LandingPage", () => {
 
   it("renders the hero headline", () => {
     const { getByText } = render(<LandingPage />);
-    expect(getByText("Write with AI,")).toBeInTheDocument();
-    expect(getByText("share with everyone")).toBeInTheDocument();
+    expect(getByText(/Stop re-teaching your AI agent/)).toBeInTheDocument();
+    expect(getByText("the same rules")).toBeInTheDocument();
   });
 
   it("renders navbar without Sign In link and SSOLoginFlow in hero/footer", () => {
@@ -44,12 +44,12 @@ describe("LandingPage", () => {
   it("renders all 6 feature cards in the feature grid section", () => {
     render(<LandingPage />);
     const featureTitles = [
+      "Team Context Sync",
+      "Works With Any AI Agent",
       "Real-time Collaboration",
       "Full Version History",
-      "Inline Comments",
-      "Folders & Organization",
-      "Beautiful Markdown",
-      "Share in One Click",
+      "CLI-First Workflow",
+      "Enterprise-Ready Auth",
     ];
     featureTitles.forEach((title) => {
       const all = document.querySelectorAll(`*`);
@@ -120,9 +120,9 @@ describe("LandingPage", () => {
   it("renders the stats section with correct labels", () => {
     const { getByText } = render(<LandingPage />);
     expect(getByText("Instant")).toBeInTheDocument();
-    expect(getByText("AI-ready")).toBeInTheDocument();
+    expect(getByText("Team-wide")).toBeInTheDocument();
     expect(getByText("Secure")).toBeInTheDocument();
-    expect(getByText("Global")).toBeInTheDocument();
+    expect(getByText("Open Source")).toBeInTheDocument();
   });
 
   it("does not mention Google Docs anywhere on the page", () => {
@@ -141,7 +141,7 @@ describe("LandingPage", () => {
 
   it("renders the final CTA section", () => {
     const { getByText, getAllByPlaceholderText } = render(<LandingPage />);
-    expect(getByText("Ready to let AI handle your docs?")).toBeInTheDocument();
+    expect(getByText("Your AI agents deserve shared context")).toBeInTheDocument();
     const emailInputs = getAllByPlaceholderText("Enter your work email");
     expect(emailInputs.length).toBeGreaterThanOrEqual(1);
   });
@@ -153,6 +153,21 @@ describe("LandingPage", () => {
     expect(nav).toHaveTextContent("CollabMark");
     const collabMarkTexts = getAllByText("CollabMark");
     expect(collabMarkTexts.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders the pain points / problem section", () => {
+    render(<LandingPage />);
+    const bodyText = document.body.textContent ?? "";
+    expect(bodyText).toContain("Context isn't shared");
+    expect(bodyText).toContain("Manual sync doesn't work");
+    expect(bodyText).toContain("No institutional memory");
+  });
+
+  it("renders the GitHub link in the navbar", () => {
+    render(<LandingPage />);
+    const nav = document.querySelector("nav");
+    const ghLink = nav?.querySelector('a[href="https://github.com/KRHero03/collabmark"]');
+    expect(ghLink).toBeInTheDocument();
   });
 
   describe("carousel touch/drag interaction", () => {

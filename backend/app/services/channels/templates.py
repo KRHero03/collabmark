@@ -4,6 +4,8 @@ Uses inline CSS and table-based layout for maximum email client compatibility.
 Gradient accent (#2563eb -> #7c3aed), Inter font family, clean card layout.
 """
 
+import html as html_mod
+
 from app.config import settings
 
 _FONT_STACK = "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
@@ -79,7 +81,7 @@ def _build_email(
 ) -> tuple[str, str]:
     """Build a complete HTML email from parts. Returns (subject, html_body)."""
     html = _BASE_WRAPPER.format(
-        subject=subject,
+        subject=_esc(subject),
         font_stack=_FONT_STACK,
         body=body_html,
         cta_url=cta_url,
@@ -88,6 +90,11 @@ def _build_email(
         frontend_url=settings.frontend_url,
     )
     return subject, html
+
+
+def _esc(value: str) -> str:
+    """HTML-escape user-supplied values to prevent injection in email templates."""
+    return html_mod.escape(value, quote=True)
 
 
 def render_document_shared(
@@ -99,17 +106,20 @@ def render_document_shared(
     permission: str,
 ) -> tuple[str, str]:
     """Render the 'document shared' email. Returns (subject, html)."""
+    safe_shared_by = _esc(shared_by)
+    safe_title = _esc(document_title)
+    safe_recipient = _esc(recipient_name)
     subject = f'{shared_by} shared "{document_title}" with you'
     perm_label = "edit" if permission == "edit" else "view-only"
     body = (
         f'<p style="margin:0 0 16px;font-size:16px;color:#0f172a;line-height:1.6;">'
-        f"Hi {recipient_name},</p>"
+        f"Hi {safe_recipient},</p>"
         f'<p style="margin:0 0 16px;font-size:16px;color:#0f172a;line-height:1.6;">'
-        f"<strong>{shared_by}</strong> shared a document with you:</p>"
+        f"<strong>{safe_shared_by}</strong> shared a document with you:</p>"
         f'<div style="background:#f1f5f9;border-radius:10px;padding:16px 20px;'
         f'margin:0 0 24px;">'
         f'<p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#0f172a;">'
-        f"{document_title}</p>"
+        f"{safe_title}</p>"
         f'<p style="margin:0;font-size:13px;color:#64748b;">'
         f"You have <strong>{perm_label}</strong> access</p>"
         f"</div>"
@@ -133,17 +143,20 @@ def render_folder_shared(
     permission: str,
 ) -> tuple[str, str]:
     """Render the 'folder shared' email. Returns (subject, html)."""
+    safe_shared_by = _esc(shared_by)
+    safe_folder = _esc(folder_name)
+    safe_recipient = _esc(recipient_name)
     subject = f'{shared_by} shared the folder "{folder_name}" with you'
     perm_label = "edit" if permission == "edit" else "view-only"
     body = (
         f'<p style="margin:0 0 16px;font-size:16px;color:#0f172a;line-height:1.6;">'
-        f"Hi {recipient_name},</p>"
+        f"Hi {safe_recipient},</p>"
         f'<p style="margin:0 0 16px;font-size:16px;color:#0f172a;line-height:1.6;">'
-        f"<strong>{shared_by}</strong> shared a folder with you:</p>"
+        f"<strong>{safe_shared_by}</strong> shared a folder with you:</p>"
         f'<div style="background:#f1f5f9;border-radius:10px;padding:16px 20px;'
         f'margin:0 0 24px;">'
         f'<p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#0f172a;">'
-        f"&#128193; {folder_name}</p>"
+        f"&#128193; {safe_folder}</p>"
         f'<p style="margin:0;font-size:13px;color:#64748b;">'
         f"You have <strong>{perm_label}</strong> access</p>"
         f"</div>"
@@ -167,20 +180,24 @@ def render_comment_added(
     comment_preview: str,
 ) -> tuple[str, str]:
     """Render the 'comment added' email. Returns (subject, html)."""
+    safe_commenter = _esc(commenter)
+    safe_title = _esc(document_title)
+    safe_recipient = _esc(recipient_name)
     subject = f'{commenter} commented on "{document_title}"'
     preview = comment_preview[:150]
     if len(comment_preview) > 150:
         preview += "..."
+    safe_preview = _esc(preview)
     body = (
         f'<p style="margin:0 0 16px;font-size:16px;color:#0f172a;line-height:1.6;">'
-        f"Hi {recipient_name},</p>"
+        f"Hi {safe_recipient},</p>"
         f'<p style="margin:0 0 16px;font-size:16px;color:#0f172a;line-height:1.6;">'
-        f"<strong>{commenter}</strong> left a comment on "
-        f"<strong>{document_title}</strong>:</p>"
+        f"<strong>{safe_commenter}</strong> left a comment on "
+        f"<strong>{safe_title}</strong>:</p>"
         f'<div style="background:#f1f5f9;border-radius:10px;padding:16px 20px;'
         f'margin:0 0 24px;border-left:4px solid #7c3aed;">'
         f'<p style="margin:0;font-size:14px;color:#334155;line-height:1.6;'
-        f'font-style:italic;">&ldquo;{preview}&rdquo;</p>'
+        f'font-style:italic;">&ldquo;{safe_preview}&rdquo;</p>'
         f"</div>"
     )
     doc_url = f"{settings.frontend_url}/?doc={document_id}"
