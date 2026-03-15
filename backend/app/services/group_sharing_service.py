@@ -11,6 +11,7 @@ from beanie import PydanticObjectId
 from fastapi import HTTPException
 
 from app.models.document import Document_
+from app.models.folder import Folder
 from app.models.group import (
     DocumentGroupAccess,
     FolderGroupAccess,
@@ -79,6 +80,8 @@ async def add_group_collaborator(
 
     if entity_type == "document":
         await _schedule_group_share_notification(access, entity_id, user, group, permission)
+    elif entity_type == "folder":
+        await _schedule_group_folder_share_notification(access, entity_id, user, group, permission)
 
     return GroupCollaboratorRead(
         id=str(access.id),
@@ -188,3 +191,52 @@ async def _schedule_group_share_notification(
         )
     except Exception:
         logger.exception("Failed to schedule group share notifications")
+
+
+async def _schedule_group_folder_share_notification(
+    access, entity_id: str, owner: User, group: Group, permission: Permission
+) -> None:
+    """Expand group membership and schedule folder share notifications for each member."""
+    try:
+        dispatcher = get_dispatcher()
+    except RuntimeError:
+        return
+
+    folder = await Folder.get(PydanticObjectId(entity_id))
+    if folder is None:
+        return
+
+    memberships = await GroupMembership.find(GroupMembership.group_id == str(group.id)).to_list()
+    recipients = []
+    for m in memberships:
+        if m.user_id == str(owner.id):
+            continue
+        member = await User.get(PydanticObjectId(m.user_id))
+        if member:
+            recipients.append(
+                {
+                    "user_id": str(member.id),
+                    "email": member.email,
+                    "name": member.name,
+                }
+            )
+
+    if not recipients:
+        return
+
+    try:
+        await dispatcher.schedule(
+            event_type=NotificationEvent.FOLDER_SHARED,
+            recipients=recipients,
+            action_ref_id=str(access.id),
+            document_id=entity_id,
+            payload={
+                "recipient_name": "",
+                "shared_by": owner.name,
+                "folder_name": folder.name,
+                "folder_id": entity_id,
+                "permission": permission.value,
+            },
+        )
+    except Exception:
+        logger.exception("Failed to schedule group folder share notifications")

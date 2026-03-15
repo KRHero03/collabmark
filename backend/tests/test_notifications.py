@@ -7,6 +7,7 @@ import pytest
 from app.auth.jwt import create_access_token
 from app.models.comment import Comment
 from app.models.document import Document_
+from app.models.folder import Folder, FolderAccess
 from app.models.notification import (
     Notification,
     NotificationChannel,
@@ -35,6 +36,12 @@ async def _make_doc(owner: User, title: str = "Test Doc") -> Document_:
     doc = Document_(title=title, content="# Hello", owner_id=str(owner.id))
     await doc.insert()
     return doc
+
+
+async def _make_folder(owner: User, name: str = "Test Folder") -> Folder:
+    folder = Folder(name=name, owner_id=str(owner.id))
+    await folder.insert()
+    return folder
 
 
 class TestNotificationModel:
@@ -1291,3 +1298,149 @@ class TestIntegrationCommentNotification:
             await create_comment(str(doc.id), test_user, payload)
 
         mock_dispatcher.schedule.assert_not_called()
+
+
+class TestFolderSharedTemplate:
+    def test_folder_shared_template(self):
+        from app.services.channels.templates import render_folder_shared
+
+        subject, html = render_folder_shared(
+            recipient_name="Alice",
+            shared_by="Bob",
+            folder_name="Project Files",
+            folder_id="folder-123",
+            permission="edit",
+        )
+        assert subject == 'Bob shared the folder "Project Files" with you'
+        assert "Alice" in html
+        assert "Project Files" in html
+        assert "edit" in html
+        assert "folder=folder-123" in html
+        assert "Open Folder" in html
+
+    def test_folder_shared_view_only(self):
+        from app.services.channels.templates import render_folder_shared
+
+        _, html = render_folder_shared(
+            recipient_name="Alice",
+            shared_by="Bob",
+            folder_name="Docs",
+            folder_id="f-1",
+            permission="view",
+        )
+        assert "view-only" in html
+
+
+class TestValidateFolderAccess:
+    @pytest.mark.asyncio
+    async def test_validate_folder_access_exists(self, test_user: User):
+        from app.services.notification_scheduler import _validate_action_exists
+
+        folder = await _make_folder(test_user)
+        other = await _make_user("fother@example.com", "FolderOther")
+        access = FolderAccess(
+            folder_id=str(folder.id),
+            user_id=str(other.id),
+            permission=Permission.VIEW,
+            granted_by=str(test_user.id),
+        )
+        await access.insert()
+
+        notif = Notification(
+            recipient_id=str(other.id),
+            event_type=NotificationEvent.FOLDER_SHARED,
+            action_ref_id=str(access.id),
+        )
+        assert await _validate_action_exists(notif) is True
+
+    @pytest.mark.asyncio
+    async def test_validate_deleted_folder_access_fails(self, test_user: User):
+        from app.services.notification_scheduler import _validate_action_exists
+
+        folder = await _make_folder(test_user)
+        other = await _make_user("fdel@example.com", "FolderDel")
+        access = FolderAccess(
+            folder_id=str(folder.id),
+            user_id=str(other.id),
+            permission=Permission.VIEW,
+            granted_by=str(test_user.id),
+        )
+        await access.insert()
+        access_id = str(access.id)
+        await access.delete()
+
+        notif = Notification(
+            recipient_id=str(other.id),
+            event_type=NotificationEvent.FOLDER_SHARED,
+            action_ref_id=access_id,
+        )
+        assert await _validate_action_exists(notif) is False
+
+
+class TestIntegrationFolderShareNotification:
+    """Integration: add_folder_collaborator triggers notification scheduling."""
+
+    @pytest.mark.asyncio
+    async def test_add_folder_collaborator_schedules_notification(self, test_user: User):
+        folder = await _make_folder(test_user, "Shared Folder")
+        collab = await _make_user("fcollab@example.com", "FolderCollab")
+
+        mock_dispatcher = AsyncMock(spec=NotificationDispatcher)
+        mock_dispatcher.schedule = AsyncMock(return_value=[])
+
+        with patch(
+            "app.services.folder_service.get_dispatcher",
+            return_value=mock_dispatcher,
+        ):
+            from app.services.folder_service import add_folder_collaborator
+
+            await add_folder_collaborator(str(folder.id), test_user, collab.email, Permission.EDIT)
+
+        mock_dispatcher.schedule.assert_called_once()
+        call_kwargs = mock_dispatcher.schedule.call_args.kwargs
+        assert call_kwargs["event_type"] == NotificationEvent.FOLDER_SHARED
+        assert call_kwargs["payload"]["shared_by"] == test_user.name
+        assert call_kwargs["payload"]["folder_name"] == "Shared Folder"
+
+
+class TestEmailChannelFolderShared:
+    @pytest.mark.asyncio
+    async def test_send_folder_shared_email(self, test_user: User):
+        from app.services.channels.email import EmailChannel
+
+        notif = Notification(
+            recipient_id=str(test_user.id),
+            recipient_email=test_user.email,
+            event_type=NotificationEvent.FOLDER_SHARED,
+            payload={
+                "recipient_name": test_user.name,
+                "shared_by": "Owner",
+                "folder_name": "My Folder",
+                "folder_id": "f-abc",
+                "permission": "view",
+            },
+        )
+        await notif.insert()
+
+        channel = EmailChannel()
+        with (
+            patch("app.services.channels.email.settings") as mock_settings,
+            patch("app.services.channels.email.smtplib.SMTP") as mock_smtp_cls,
+        ):
+            mock_settings.notification_email_provider = "smtp"
+            mock_settings.smtp_host = "smtp.example.com"
+            mock_settings.smtp_port = 587
+            mock_settings.smtp_user = "user"
+            mock_settings.smtp_password = "pass"
+            mock_settings.notification_from_email = "test@test.com"
+
+            mock_smtp = MagicMock()
+            mock_smtp.__enter__ = MagicMock(return_value=mock_smtp)
+            mock_smtp.__exit__ = MagicMock(return_value=False)
+            mock_smtp.has_extn.return_value = True
+            mock_smtp_cls.return_value = mock_smtp
+
+            result = await channel.send(notif)
+
+        assert result is True
+        mock_smtp.sendmail.assert_called_once()

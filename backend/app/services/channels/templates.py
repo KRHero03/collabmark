@@ -124,6 +124,40 @@ def render_document_shared(
     )
 
 
+def render_folder_shared(
+    *,
+    recipient_name: str,
+    shared_by: str,
+    folder_name: str,
+    folder_id: str,
+    permission: str,
+) -> tuple[str, str]:
+    """Render the 'folder shared' email. Returns (subject, html)."""
+    subject = f'{shared_by} shared the folder "{folder_name}" with you'
+    perm_label = "edit" if permission == "edit" else "view-only"
+    body = (
+        f'<p style="margin:0 0 16px;font-size:16px;color:#0f172a;line-height:1.6;">'
+        f"Hi {recipient_name},</p>"
+        f'<p style="margin:0 0 16px;font-size:16px;color:#0f172a;line-height:1.6;">'
+        f"<strong>{shared_by}</strong> shared a folder with you:</p>"
+        f'<div style="background:#f1f5f9;border-radius:10px;padding:16px 20px;'
+        f'margin:0 0 24px;">'
+        f'<p style="margin:0 0 4px;font-size:18px;font-weight:700;color:#0f172a;">'
+        f"&#128193; {folder_name}</p>"
+        f'<p style="margin:0;font-size:13px;color:#64748b;">'
+        f"You have <strong>{perm_label}</strong> access</p>"
+        f"</div>"
+    )
+    folder_url = f"{settings.frontend_url}/?folder={folder_id}"
+    return _build_email(
+        subject=subject,
+        body_html=body,
+        cta_url=folder_url,
+        cta_label="Open Folder",
+        footer_reason="You received this email because someone shared a folder with you on CollabMark.",
+    )
+
+
 def render_comment_added(
     *,
     recipient_name: str,

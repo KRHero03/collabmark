@@ -16,6 +16,7 @@ class NotificationEvent(str, Enum):
     """Types of events that trigger notifications."""
 
     DOCUMENT_SHARED = "document_shared"
+    FOLDER_SHARED = "folder_shared"
     COMMENT_ADDED = "comment_added"
 
 
@@ -71,6 +72,7 @@ class NotificationPreference(Document):
     preferences: dict = Field(
         default_factory=lambda: {
             "document_shared": {"email": True},
+            "folder_shared": {"email": True},
             "comment_added": {"email": True},
         }
     )

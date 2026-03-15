@@ -10,12 +10,13 @@ import httpx
 from app.config import settings
 from app.models.notification import Notification, NotificationEvent
 from app.services.channels.base import BaseChannel
-from app.services.channels.templates import render_comment_added, render_document_shared
+from app.services.channels.templates import render_comment_added, render_document_shared, render_folder_shared
 
 logger = logging.getLogger(__name__)
 
 _TEMPLATE_MAP = {
     NotificationEvent.DOCUMENT_SHARED: render_document_shared,
+    NotificationEvent.FOLDER_SHARED: render_folder_shared,
     NotificationEvent.COMMENT_ADDED: render_comment_added,
 }
 

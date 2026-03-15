@@ -14,6 +14,7 @@ from beanie import PydanticObjectId
 from bson.errors import InvalidId
 
 from app.models.comment import Comment
+from app.models.folder import FolderAccess
 from app.models.notification import (
     Notification,
     NotificationEvent,
@@ -45,6 +46,10 @@ async def _validate_action_exists(notification: Notification) -> bool:
 
     if notification.event_type == NotificationEvent.DOCUMENT_SHARED:
         access = await DocumentAccess.get(oid)
+        return access is not None
+
+    if notification.event_type == NotificationEvent.FOLDER_SHARED:
+        access = await FolderAccess.get(oid)
         return access is not None
 
     return True

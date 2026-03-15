@@ -12,10 +12,12 @@ from app.models.document import Document_, GeneralAccess
 from app.models.document_version import DocumentVersion
 from app.models.document_view import DocumentView as DV
 from app.models.folder import Folder, FolderAccess, FolderCreate, FolderUpdate, FolderView
+from app.models.notification import NotificationEvent
 from app.models.share_link import DocumentAccess, Permission
 from app.models.user import User
 from app.services.acl_service import get_base_permission, resolve_effective_permission
 from app.services.crdt_store import MongoYStore
+from app.services.notification_dispatcher import get_dispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -430,6 +432,9 @@ async def add_folder_collaborator(folder_id: str, owner: User, email: str, permi
         granted_by=str(owner.id),
     )
     await access.insert()
+
+    await _schedule_folder_share_notification(access, folder, owner, target_user)
+
     return access
 
 
@@ -739,3 +744,35 @@ async def list_recently_viewed_folders(user: User) -> list[dict]:
             }
         )
     return results
+
+
+async def _schedule_folder_share_notification(
+    access: FolderAccess, folder: Folder, owner: User, target_user: User
+) -> None:
+    """Schedule a delayed folder_shared notification for the target user."""
+    try:
+        dispatcher = get_dispatcher()
+    except RuntimeError:
+        return
+    try:
+        await dispatcher.schedule(
+            event_type=NotificationEvent.FOLDER_SHARED,
+            recipients=[
+                {
+                    "user_id": str(target_user.id),
+                    "email": target_user.email,
+                    "name": target_user.name,
+                }
+            ],
+            action_ref_id=str(access.id),
+            document_id=str(folder.id),
+            payload={
+                "recipient_name": target_user.name,
+                "shared_by": owner.name,
+                "folder_name": folder.name,
+                "folder_id": str(folder.id),
+                "permission": access.permission.value,
+            },
+        )
+    except Exception:
+        logger.exception("Failed to schedule folder share notification")
