@@ -17,6 +17,7 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 - PDF and Markdown export
 - Toast notifications and confirmation modals for all mutations
 - Dark mode support
+- Email notifications with delayed dispatch and action validation (Resend/SMTP)
 - MongoDB storage, Python (FastAPI) backend, React (Vite) frontend
 
 ## Current State
@@ -273,7 +274,35 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - Trusted publishing via `pypa/gh-action-pypi-publish` (OIDC-based, no API token needed)
   - Build and deploy gates include CLI checks
 
-**Total: 723 backend tests, 878 frontend tests, 313 CLI tests (all passing).**
+- **Phase 21**: CRDT User Attribution
+  - Queue-based approach: `MongoYStore` uses `collections.deque` (FIFO) to associate user IDs with CRDT updates
+  - WebSocket handler enqueues user ID when a Y.Doc-modifying message is received; store pops it when writing to MongoDB
+  - Each CRDT update in MongoDB now carries `metadata.user_id` for audit trail
+  - `apply_incremental_diff` in CLI: uses `difflib.SequenceMatcher` for efficient, minimal CRDT updates (avoids sending full document)
+  - CLI CRDT writes also carry user attribution
+
+- **Phase 22**: Email Notification System
+  - Channel-agnostic notification infrastructure (extensible to in-app, push, campaign notifications)
+  - **Delayed dispatch**: notifications scheduled with configurable delay (default 60s) via Redis sorted set
+  - **Pre-send validation**: scheduler verifies the triggering action still exists before sending (prevents notifications for reverted actions -- e.g., comment added then deleted, or share granted then revoked)
+  - **Event types**: `document_shared`, `folder_shared`, `comment_added`
+  - **Email providers**: Resend API and generic SMTP (auto-detected STARTTLS support)
+  - **Branded HTML templates**: gradient header, Inter font, CTA buttons, direct links matching CollabMark web UI
+  - **Retry mechanism**: Redis-backed queue with exponential backoff (max 3 retries)
+  - **User preferences**: per-event/per-channel opt-in/out via `NotificationPreference` model
+  - **Integration points**: `share_service`, `folder_service`, `group_sharing_service`, `comment_service` all schedule notifications
+  - **Local testing**: Mailpit (docker-compose) for local SMTP email capture
+  - **Production**: Resend API with Railway environment variables
+  - 68 notification tests at 99% coverage
+  - Backend architecture:
+    - `notification_dispatcher.py`: schedules + delivers via registered channels
+    - `notification_scheduler.py`: background loop polling Redis ZSET for due notifications
+    - `notification_retry.py`: background loop for failed sends with exponential backoff
+    - `channels/email.py`: Resend API + SMTP delivery
+    - `channels/templates.py`: branded HTML email templates
+    - `channels/base.py`: abstract channel interface
+
+**Total: 1002 backend tests, 945 frontend tests, 342 CLI tests (all passing).**
 
 ## Tech Stack
 
@@ -289,7 +318,8 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
 | Auth        | Google OAuth2 (authlib), JWT (python-jose), API keys |
 | Diffing     | diff (jsdiff) for version history diff view       |
 | Blob Storage| MinIO (S3-compatible), boto3 client                |
-| Message Bus | Redis (future: pub/sub for WS horizontal scaling) |
+| Notifications| Resend API / SMTP, Redis (delayed scheduling + retry) |
+| Message Bus | Redis (notification scheduling, future: pub/sub for WS) |
 | Testing BE  | pytest, pytest-asyncio, httpx, mongomock-motor    |
 | Testing FE  | Vitest, React Testing Library, jsdom              |
 | CLI         | Python 3.12+, Click, Rich, httpx, pycrdt, watchdog, keyring     |
@@ -306,16 +336,23 @@ collabmark/
       models/        # Beanie document models
         user.py, document.py, api_key.py, share_link.py,
         document_version.py, document_view.py, comment.py,
-        folder.py
+        folder.py, notification.py, organization.py,
+        org_sso_config.py, group.py
       routes/        # REST API endpoints
         auth.py, documents.py, keys.py, sharing.py,
-        versions.py, comments.py, export.py, users.py,
-        folders.py, ws.py
+        versions.py, comments.py, users.py,
+        folders.py, notifications.py, orgs.py, scim.py, ws.py
       services/      # Business logic layer
         document_service.py, share_service.py, version_service.py,
-        comment_service.py, folder_service.py, crdt_store.py
+        comment_service.py, folder_service.py, crdt_store.py,
+        org_service.py, acl_service.py, scim_service.py,
+        group_sharing_service.py, blob_storage.py,
+        notification_dispatcher.py, notification_scheduler.py,
+        notification_retry.py
+        channels/    # Notification channels
+          base.py, email.py, templates.py
       ws/            # WebSocket handler (pycrdt rooms)
-    tests/           # Backend test suite (150+ tests)
+    tests/           # Backend test suite (1002 tests)
   frontend/          # React SPA (Vite + TypeScript)
     src/
       components/    # Reusable UI components
@@ -348,12 +385,21 @@ collabmark/
     tests/           # 313 CLI tests
     pyproject.toml   # hatchling build + CLI entry point
   Dockerfile         # Multi-stage (build frontend + bundle with backend)
-  docker-compose.yml # MongoDB + Redis for local dev
+  docker-compose.yml # MongoDB + Redis + MinIO + Mailpit for local dev
   docker-compose.prod.yml # Production compose
   railway.toml       # Railway deployment config
   Procfile           # Heroku/Railway process file
   agent.md           # THIS FILE -- agent reference
+  .cursor/skills/    # Cursor AI skills (pre-commit checklist, toast-on-action, write-code)
 ```
+
+## Cursor Skills (`.cursor/skills/`)
+
+| Skill | When to Use |
+|-------|-------------|
+| `pre-commit-checklist` | Before every commit -- lint, format, security audit, tests (>90% coverage), build |
+| `toast-on-action` | When writing frontend async actions -- ensure success/error toast for every mutation |
+| `write-code` | When writing/modifying any code -- DRY, YAGNI, single responsibility, naming, readability |
 
 ## API Endpoints
 
@@ -449,6 +495,12 @@ collabmark/
 - `DELETE /api/orgs/{org_id}/members/{user_id}` -- remove member (org admin)
 - `GET /api/orgs/{org_id}/sso` -- get SSO config (org admin)
 - `PUT /api/orgs/{org_id}/sso` -- create/update SSO config (org admin)
+
+### Notifications
+- `GET /api/notifications` -- list current user's notifications (paginated: `limit`, `offset`)
+- `PATCH /api/notifications/{id}/read` -- mark notification as read
+- `GET /api/notifications/preferences` -- get notification preferences
+- `PUT /api/notifications/preferences` -- update notification preferences
 
 ### Frontend Pages
 - `/` -- Home page (Files browser, shared docs, recently viewed, trash)
@@ -591,6 +643,47 @@ same line, a top-down stacking algorithm pushes cards below each other with an 8
 Displaced cards show a dashed connecting line to their ideal position. Orphaned comments
 are shown in a separate "Orphaned" section at the bottom of the panel.
 
+### CRDT User Attribution (Queue-Based)
+`pycrdt-websocket` does not propagate user context to the store layer. Instead, `MongoYStore`
+maintains a FIFO `collections.deque` of user IDs. When the WebSocket handler receives a
+Y.Doc-modifying message (sync step 2 / update), it calls `store.enqueue_user(user_id)`.
+When the store writes an update to MongoDB, it pops from the queue and attaches
+`metadata.user_id`. This avoids ContextVar limitations and works reliably with the
+pycrdt-websocket room lifecycle.
+
+### Email Notifications with Delayed Dispatch
+Notifications are not sent immediately. When a triggering action occurs (document share,
+folder share, comment), a `Notification` document is created with `status=SCHEDULED` and
+`scheduled_for = now + delay` (default 60 seconds). The notification ID is added to a Redis
+sorted set keyed by delivery time.
+
+A background `scheduler_loop` polls the ZSET every 10 seconds for due items. Before sending,
+it calls `_validate_action_exists()` to verify the triggering action hasn't been reverted:
+- `DOCUMENT_SHARED`: checks `DocumentAccess.get(action_ref_id)`
+- `FOLDER_SHARED`: checks `FolderAccess.get(action_ref_id)`
+- `COMMENT_ADDED`: checks `Comment.get(action_ref_id)`
+
+If the action no longer exists, the notification is marked `SKIPPED`. Otherwise, it's
+delivered via the registered channel (currently `EmailChannel` supporting Resend API or SMTP).
+
+Failed sends are pushed to a Redis retry list. A `retry_loop` processes items with exponential
+backoff (base 30s, max 3 retries). The system is extensible: new channels (in-app, push)
+can be added by implementing `BaseChannel` and registering with the dispatcher.
+
+### Notification Environment Configuration
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `NOTIFICATIONS_ENABLED` | Enable/disable system | `true` |
+| `NOTIFICATION_EMAIL_PROVIDER` | `resend` or `smtp` | `resend` |
+| `NOTIFICATION_FROM_EMAIL` | Sender address | `onboarding@resend.dev` |
+| `NOTIFICATION_DELAY_SECONDS` | Delay before sending | `60` |
+| `RESEND_API_KEY` | Resend API key | `re_...` |
+| `SMTP_HOST` | SMTP server host | `smtp.gmail.com` |
+| `SMTP_PORT` | SMTP server port | `587` |
+| `SMTP_USER` | SMTP auth username | (optional) |
+| `SMTP_PASSWORD` | SMTP auth password | (optional) |
+
 ## Common Pitfalls & Technical Challenges
 
 ### Frontend Testing
@@ -609,6 +702,12 @@ are shown in a separate "Orphaned" section at the bottom of the panel.
 
 ### CRDT & Real-time
 - **Content persistence on deploy**: `pycrdt-websocket`'s `YRoom` must explicitly load existing data from `MongoYStore` when a room is opened. Without this, deployments cause content loss until the room is re-opened by a client with local state.
+
+### Notifications
+- **Redis `stop-writes-on-bgsave-error`**: Local Redis may refuse writes if it can't persist RDB snapshots. Fix with `CONFIG SET stop-writes-on-bgsave-error no`.
+- **STARTTLS detection**: SMTP code uses `server.has_extn("starttls")` instead of port-based detection. Mailpit (port 1025) is plain SMTP; production SMTP (port 587) typically supports STARTTLS.
+- **Resend test sender**: `onboarding@resend.dev` works without domain verification but emails may land in spam. Verify a custom domain in Resend for production use.
+- **Mocking scope**: When testing dispatcher in services, patch `get_dispatcher` in the *consuming* module (e.g., `app.services.share_service.get_dispatcher`), not the defining module.
 
 ### Blob Storage (S3/MinIO)
 - **Local dev**: MinIO container in `docker-compose.yml` (API: port 9002, Console: port 9003). Default credentials: `collabmark` / `collabmark-secret`.
@@ -654,7 +753,7 @@ Published via GitHub Actions on tagged releases:
 
 1. `ruff check` + `ruff format --check` on all Python code (backend + CLI)
 2. `yarn run check` on frontend (tsc + eslint + prettier)
-3. All tests passing: backend (641), frontend (860), CLI (313)
+3. All tests passing: backend (1002), frontend (945), CLI (342)
 4. Security audit: no hardcoded secrets, all routes have auth, typed Pydantic schemas
 5. Frontend production build succeeds (`yarn build`)
 6. Dead code scan: no unused imports, functions, or test cases
