@@ -25,7 +25,6 @@ logging.basicConfig(
 )
 
 from app.config import settings
-from app.rate_limit import limiter
 from app.models.api_key import ApiKey
 from app.models.comment import Comment
 from app.models.document import Document_
@@ -38,6 +37,7 @@ from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization, OrgMembership
 from app.models.share_link import DocumentAccess, ShareLink
 from app.models.user import User
+from app.rate_limit import limiter
 from app.routes import auth, comments, documents, folders, keys, notifications, orgs, scim, sharing, users, versions, ws
 from app.services.blob_storage import MIME_TYPES, _get_s3_client
 from app.services.channels.email import EmailChannel

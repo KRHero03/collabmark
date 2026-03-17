@@ -14,10 +14,10 @@ from app.auth.sso_common import detect_org_by_email_domain, find_or_create_sso_u
 from app.auth.sso_oidc import initiate_oidc_login, process_oidc_callback
 from app.auth.sso_saml import create_saml_auth_request, process_saml_response
 from app.config import AUTH_COOKIE_NAME, settings
-from app.rate_limit import limiter as _limiter
 from app.models.org_sso_config import OrgSSOConfig, SSOProtocol
 from app.models.organization import Organization
 from app.models.user import User
+from app.rate_limit import limiter as _limiter
 
 _CLI_AUTH_CODES: dict[str, tuple[str, float]] = {}
 _CLI_CODE_TTL = 60  # seconds

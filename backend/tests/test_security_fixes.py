@@ -9,11 +9,11 @@ L5 (Content-Disposition).
 
 import html as html_mod
 import time
-from unittest.mock import AsyncMock, MagicMock, patch
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from app.auth.jwt import create_access_token
-from app.models.document import Document_
 from app.models.folder import Folder
 from app.models.organization import Organization
 from app.models.user import User, UserUpdate
@@ -269,11 +269,11 @@ class TestAvatarUrlValidation:
         assert update.avatar_url == "https://example.com/avatar.png"
 
     def test_javascript_url_rejected(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             UserUpdate(avatar_url="javascript:alert(1)")
 
     def test_data_url_rejected(self):
-        with pytest.raises(Exception):
+        with pytest.raises(ValueError):
             UserUpdate(avatar_url="data:text/html,<script>alert(1)</script>")
 
     def test_none_accepted(self):
@@ -375,13 +375,13 @@ class TestTimingSafeComparison:
     def test_api_key_module_uses_hmac(self):
         import app.auth.api_key as mod
 
-        source = open(mod.__file__).read()
+        source = Path(mod.__file__).read_text()
         assert "hmac.compare_digest" in source
 
     def test_scim_auth_module_uses_hmac(self):
         import app.auth.scim_auth as mod
 
-        source = open(mod.__file__).read()
+        source = Path(mod.__file__).read_text()
         assert "hmac.compare_digest" in source
 
 
@@ -435,6 +435,6 @@ class TestSessionSecretSeparation:
 
 class TestDefaultCredsEnforcement:
     def test_config_module_raises_on_default_secret_in_prod(self):
-        source = open("/Users/krank/Desktop/vanity-identifier-impl/collabmark/backend/app/config.py").read()
+        source = Path(__file__).resolve().parent.parent.joinpath("app", "config.py").read_text()
         assert "RuntimeError" in source
         assert "JWT_SECRET_KEY must be changed" in source

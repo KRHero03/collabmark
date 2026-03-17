@@ -69,7 +69,9 @@ class Settings(BaseSettings):
 settings = Settings()
 
 if not settings.debug and settings.jwt_secret_key == _DEFAULT_JWT_SECRET:
-    raise RuntimeError("JWT_SECRET_KEY must be changed from the default value in production (set DEBUG=true for development)")
+    raise RuntimeError(
+        "JWT_SECRET_KEY must be changed from the default value in production (set DEBUG=true for development)"
+    )
 
 if not settings.session_secret_key:
     logging.getLogger(__name__).warning("SESSION_SECRET_KEY not set — generating a random ephemeral key")

@@ -65,7 +65,7 @@ class UserRead(BaseModel):
 def _validate_avatar_url(url: str | None) -> str | None:
     if url is None or url == "":
         return url
-    if not (url.startswith("https://") or url.startswith("http://localhost")):
+    if not url.startswith(("https://", "http://localhost")):
         raise ValueError("avatar_url must use https:// scheme")
     return url
 

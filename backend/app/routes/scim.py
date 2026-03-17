@@ -17,10 +17,10 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from app.auth.scim_auth import get_scim_org
-from app.rate_limit import limiter
 from app.models.group import GroupMembership
 from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization
+from app.rate_limit import limiter
 from app.services import scim_service
 from app.services.scim_service import SCIMError
 
