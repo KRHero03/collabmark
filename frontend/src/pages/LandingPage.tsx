@@ -4,93 +4,115 @@ import {
   Users,
   GitBranch,
   MessageSquare,
-  FolderTree,
-  Code,
-  Share2,
   ChevronLeft,
   ChevronRight,
-  Zap,
   Shield,
-  Globe,
   Moon,
   Sun,
   Terminal,
   Bot,
-  RefreshCw,
   ArrowRight,
+  RefreshCw,
+  AlertTriangle,
+  Copy,
+  CheckCircle2,
+  Workflow,
+  Github,
 } from "lucide-react";
 import { SSOLoginFlow } from "../components/Auth/SSOLoginFlow";
+
+const PAIN_POINTS = [
+  {
+    icon: Copy,
+    title: "Context isn't shared",
+    description:
+      "Developer A teaches Cursor your conventions. Developer B's agent has no idea. Every session starts from scratch.",
+    color: "from-red-500 to-orange-400",
+  },
+  {
+    icon: RefreshCw,
+    title: "Manual sync doesn't work",
+    description: "You update CLAUDE.md. Your teammate's copy is already stale. Copy-paste isn't a strategy.",
+    color: "from-amber-500 to-yellow-400",
+  },
+  {
+    icon: AlertTriangle,
+    title: "No institutional memory",
+    description: "A new team member joins. Their AI makes every mistake your team already solved months ago.",
+    color: "from-rose-500 to-pink-400",
+  },
+];
 
 const FEATURES = [
   {
     icon: Users,
+    title: "Team Context Sync",
+    description:
+      "Write your conventions once. Every team member's AI agent reads the latest version automatically — no manual copying, no stale files.",
+    color: "from-blue-500 to-cyan-400",
+  },
+  {
+    icon: Bot,
+    title: "Works With Any AI Agent",
+    description:
+      "Cursor, Claude Code, Copilot, Windsurf — CollabMark syncs to .cursor/rules/, AGENTS.md, and CLAUDE.md. Your agents read context natively.",
+    color: "from-violet-500 to-purple-400",
+  },
+  {
+    icon: MessageSquare,
     title: "Real-time Collaboration",
     description:
-      "Your whole team edits the same doc at the same time. Changes appear instantly -- no waiting, no version conflicts, no lost work.",
-    color: "from-blue-500 to-cyan-400",
+      "Your whole team edits conventions at the same time. Changes appear instantly — no version conflicts, no lost decisions.",
+    color: "from-emerald-500 to-green-400",
   },
   {
     icon: GitBranch,
     title: "Full Version History",
     description:
-      "Every edit is saved automatically. Go back in time, compare versions side by side, and restore anything with one click.",
-    color: "from-violet-500 to-purple-400",
-  },
-  {
-    icon: MessageSquare,
-    title: "Inline Comments",
-    description:
-      "Leave feedback right on the text that matters. Threaded replies keep discussions organized and easy to resolve.",
+      "Every convention change is tracked. See who added what rule, compare versions, and roll back if something breaks.",
     color: "from-amber-500 to-orange-400",
   },
   {
-    icon: FolderTree,
-    title: "Folders & Organization",
+    icon: Terminal,
+    title: "CLI-First Workflow",
     description:
-      "Group docs into folders, nest them however you like, and share entire folders with your team -- with fine-grained permissions.",
-    color: "from-emerald-500 to-green-400",
-  },
-  {
-    icon: Code,
-    title: "Beautiful Markdown",
-    description:
-      "Write in Markdown with live preview. Add diagrams, code blocks, tables, and math -- it all renders beautifully.",
+      "A background daemon that syncs silently. Install, login, start — your agent context stays fresh without lifting a finger.",
     color: "from-rose-500 to-pink-400",
   },
   {
-    icon: Share2,
-    title: "Share in One Click",
+    icon: Shield,
+    title: "Enterprise-Ready Auth",
     description:
-      "Share by email or link. Set view-only or edit access. Control exactly who sees what -- it's that simple.",
+      "Google SSO, SAML 2.0, API keys — your team's conventions stay behind the authentication you already trust.",
     color: "from-sky-500 to-indigo-400",
   },
 ];
 
 const STATS = [
-  { value: "Instant", label: "Sync across devices", icon: RefreshCw },
-  { value: "AI-ready", label: "Works with any agent", icon: Bot },
+  { value: "Instant", label: "Sync across agents", icon: RefreshCw },
+  { value: "Team-wide", label: "Shared conventions", icon: Users },
   { value: "Secure", label: "Enterprise-grade auth", icon: Shield },
-  { value: "Global", label: "Share with anyone", icon: Globe },
+  { value: "Open Source", label: "Free forever", icon: Github },
 ];
 
 const CLI_LINES: { text: string; color: string; delay: number }[] = [
-  { text: "$ collabmark login", color: "text-green-400", delay: 0 },
-  { text: "  ✓ Logged in as alex@acme.dev", color: "text-gray-400", delay: 800 },
+  { text: "$ pip install collabmark", color: "text-green-400", delay: 0 },
+  { text: "  ✓ Installed collabmark v1.2.0", color: "text-gray-400", delay: 800 },
   { text: "", color: "", delay: 1200 },
-  { text: "$ collabmark start", color: "text-green-400", delay: 1500 },
-  { text: "  Connecting to CollabMark cloud...", color: "text-gray-500", delay: 2200 },
+  { text: "$ collabmark login", color: "text-green-400", delay: 1500 },
+  { text: "  ✓ Logged in as alex@acme.dev", color: "text-gray-400", delay: 2200 },
   { text: "", color: "", delay: 2600 },
-  { text: "  ↑ Uploaded    product-roadmap.md", color: "text-blue-400", delay: 3000 },
-  { text: "  ↑ Uploaded    sprint-planning.md", color: "text-blue-400", delay: 3500 },
-  { text: "  ↓ Downloaded  onboarding-guide.md", color: "text-cyan-400", delay: 4200 },
-  { text: "  ✓ 3 docs synced", color: "text-emerald-400", delay: 4800 },
-  { text: "", color: "", delay: 5200 },
-  { text: "  Watching for changes...", color: "text-gray-600", delay: 5500 },
-  { text: "", color: "", delay: 6200 },
-  { text: "  ↓ Updated     product-roadmap.md", color: "text-cyan-400", delay: 6800 },
-  { text: "    Sarah edited on the web just now", color: "text-amber-400", delay: 7200 },
-  { text: "  ↑ Uploaded    meeting-notes.md", color: "text-blue-400", delay: 8000 },
-  { text: "    AI agent created a new doc", color: "text-purple-400", delay: 8400 },
+  { text: "$ collabmark start", color: "text-green-400", delay: 3000 },
+  { text: "  Syncing team conventions...", color: "text-gray-500", delay: 3600 },
+  { text: "", color: "", delay: 4000 },
+  { text: "  ↓ Synced    coding-standards.md  →  .cursor/rules/", color: "text-cyan-400", delay: 4400 },
+  { text: "  ↓ Synced    api-conventions.md   →  CLAUDE.md", color: "text-cyan-400", delay: 5000 },
+  { text: "  ↓ Synced    arch-decisions.md    →  AGENTS.md", color: "text-cyan-400", delay: 5600 },
+  { text: "  ✓ 3 convention docs synced to local agent context", color: "text-emerald-400", delay: 6200 },
+  { text: "", color: "", delay: 6600 },
+  { text: "  Watching for team updates...", color: "text-gray-600", delay: 7000 },
+  { text: "  ↓ Updated   coding-standards.md", color: "text-cyan-400", delay: 7800 },
+  { text: "    Sarah added: 'Use Pydantic v2 validators'", color: "text-amber-400", delay: 8200 },
 ];
 
 function CliTerminalAnimation() {
@@ -127,7 +149,7 @@ function CliTerminalAnimation() {
   }, [visibleLines]);
 
   return (
-    <div className="h-[320px] overflow-hidden px-3 py-3 font-mono text-[11px] leading-relaxed sm:h-[360px] sm:px-4 sm:py-4 sm:text-[13px]">
+    <div className="h-[360px] overflow-hidden px-3 py-3 font-mono text-[11px] leading-relaxed sm:h-[400px] sm:px-4 sm:py-4 sm:text-[13px]">
       {CLI_LINES.slice(0, visibleLines).map((line, i) => (
         <div
           key={i}
@@ -170,7 +192,7 @@ export function LandingPage() {
   }, []);
 
   useEffect(() => {
-    document.title = "CollabMark -- Collaborative Markdown Editor";
+    document.title = "CollabMark — Stop Re-Teaching Your AI Agent the Same Rules";
     return () => {
       document.title = "CollabMark";
     };
@@ -221,14 +243,25 @@ export function LandingPage() {
           <FileText className="h-6 w-6 text-[var(--color-primary)]" />
           <span>CollabMark</span>
         </div>
-        <button
-          onClick={toggleDark}
-          className="rounded-lg p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] hover:text-[var(--color-text)]"
-          title={dark ? "Light mode" : "Dark mode"}
-          aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-3">
+          <a
+            href="https://github.com/KRHero03/collabmark"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] hover:text-[var(--color-text)] sm:inline-flex"
+          >
+            <Github className="h-4 w-4" />
+            GitHub
+          </a>
+          <button
+            onClick={toggleDark}
+            className="rounded-lg p-2 text-[var(--color-text-muted)] transition hover:bg-[var(--color-hover)] hover:text-[var(--color-text)]"
+            title={dark ? "Light mode" : "Dark mode"}
+            aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+          </button>
+        </div>
       </nav>
 
       {/* --- Hero Section --- */}
@@ -251,23 +284,23 @@ export function LandingPage() {
             style={{ animationDelay: "0.05s" }}
           >
             <Bot className="h-4 w-4 text-[var(--color-primary)]" />
-            <span>AI meets team documentation</span>
+            <span>Open source AI context sync</span>
           </div>
           <h1
             className="animate-fade-in-up mb-6 text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl"
             style={{ animationDelay: "0.1s" }}
           >
-            Write with AI,{" "}
+            Stop re-teaching your AI agent{" "}
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400">
-              share with everyone
+              the same rules
             </span>
           </h1>
           <p
             className="animate-fade-in-up mx-auto mb-10 max-w-2xl text-lg text-[var(--color-text-muted)] sm:text-xl"
             style={{ animationDelay: "0.3s" }}
           >
-            Let AI agents draft your docs locally while your team reviews and edits on the web -- every change syncs
-            instantly, so everyone stays on the same page.
+            CollabMark syncs your team's coding conventions, architecture decisions, and project context so every AI
+            agent session starts informed — not from scratch.
           </p>
           <div
             id="get-started"
@@ -286,48 +319,74 @@ export function LandingPage() {
             </a>
           </div>
 
-          {/* Abstract editor illustration */}
+          {/* Sync flow diagram */}
           <div className="animate-fade-in-up mx-auto mt-16 max-w-3xl" style={{ animationDelay: "0.7s" }}>
             <div className="overflow-hidden rounded-xl border border-[var(--color-border)] bg-white shadow-2xl shadow-black/10 dark:bg-[var(--color-surface)]">
               <div className="flex items-center gap-2 border-b border-[var(--color-border)] px-4 py-3">
                 <div className="h-3 w-3 rounded-full bg-red-400" />
                 <div className="h-3 w-3 rounded-full bg-yellow-400" />
                 <div className="h-3 w-3 rounded-full bg-green-400" />
-                <span className="ml-3 text-xs text-[var(--color-text-muted)]">product-roadmap.md</span>
+                <span className="ml-3 text-xs text-[var(--color-text-muted)]">
+                  coding-standards.md — shared with team
+                </span>
               </div>
               <div className="flex">
                 <div className="flex-1 border-r border-[var(--color-border)] p-3 font-mono text-[11px] leading-6 text-[var(--color-text-muted)] sm:p-4 sm:text-sm">
                   <div>
                     <span className="text-purple-500"># </span>
-                    <span className="font-bold text-[var(--color-text)]">Q2 Product Roadmap</span>
+                    <span className="font-bold text-[var(--color-text)]">Team Coding Standards</span>
                   </div>
-                  <div className="mt-2">Launch goals for the next quarter.</div>
                   <div className="mt-2">
                     <span className="text-purple-500">## </span>
-                    <span className="font-bold text-[var(--color-text)]">Key Initiatives</span>
+                    <span className="font-bold text-[var(--color-text)]">Python Conventions</span>
                   </div>
                   <div>
-                    <span className="text-blue-500">- </span>User onboarding v2
+                    <span className="text-blue-500">- </span>Use Pydantic v2 validators
                   </div>
                   <div>
-                    <span className="text-blue-500">- </span>Analytics dashboard
+                    <span className="text-blue-500">- </span>snake_case for all API responses
                   </div>
                   <div>
-                    <span className="text-blue-500">- </span>Mobile experience
+                    <span className="text-blue-500">- </span>Beanie ODM for MongoDB models
+                  </div>
+                  <div className="mt-2">
+                    <span className="text-purple-500">## </span>
+                    <span className="font-bold text-[var(--color-text)]">Architecture Decisions</span>
+                  </div>
+                  <div>
+                    <span className="text-blue-500">- </span>Redis for message bus, not Kafka
                   </div>
                   <div className="mt-2 inline-block rounded bg-blue-100 px-1.5 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                    <span className="animate-pulse">|</span> Sarah is typing...
+                    <span className="animate-pulse">|</span> Sarah is adding a new convention...
                   </div>
                 </div>
                 <div className="hidden flex-1 p-4 text-xs leading-6 sm:block sm:text-sm">
-                  <h3 className="text-base font-bold">Q2 Product Roadmap</h3>
-                  <p className="mt-2 text-[var(--color-text-muted)]">Launch goals for the next quarter.</p>
-                  <h4 className="mt-3 text-sm font-bold">Key Initiatives</h4>
-                  <ul className="mt-1 list-inside list-disc text-[var(--color-text-muted)]">
-                    <li>User onboarding v2</li>
-                    <li>Analytics dashboard</li>
-                    <li>Mobile experience</li>
-                  </ul>
+                  <div className="mb-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                    <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                    <span className="text-xs font-medium">Synced to all team agents</span>
+                  </div>
+                  <div className="space-y-2 text-[var(--color-text-muted)]">
+                    <div className="flex items-center gap-2">
+                      <Workflow className="h-3.5 w-3.5 flex-shrink-0 text-blue-500" />
+                      <span className="text-xs">.cursor/rules/coding-standards.mdc</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Workflow className="h-3.5 w-3.5 flex-shrink-0 text-purple-500" />
+                      <span className="text-xs">CLAUDE.md</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Workflow className="h-3.5 w-3.5 flex-shrink-0 text-amber-500" />
+                      <span className="text-xs">AGENTS.md</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 rounded-lg border border-[var(--color-border)] p-3">
+                    <p className="mb-1 text-xs font-semibold text-[var(--color-text)]">Every agent knows:</p>
+                    <ul className="list-inside list-disc space-y-1 text-xs text-[var(--color-text-muted)]">
+                      <li>Pydantic v2, not v1</li>
+                      <li>snake_case responses</li>
+                      <li>Redis over Kafka</li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
@@ -335,12 +394,44 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* --- The Problem Section --- */}
+      <section className="border-y border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-16 md:py-28">
+        <div className="mx-auto max-w-6xl px-4 md:px-8">
+          <h2 className="mb-4 text-center text-2xl font-bold sm:text-3xl md:text-4xl">
+            Your team&apos;s AI agents keep{" "}
+            <span className="bg-gradient-to-r from-red-500 to-orange-500 bg-clip-text text-transparent dark:from-red-400 dark:to-orange-400">
+              learning the same lessons
+            </span>
+          </h2>
+          <p className="mx-auto mb-10 max-w-2xl text-center text-sm text-[var(--color-text-muted)] sm:text-base md:mb-14">
+            Every AI agent session starts at zero. Conventions, architecture decisions, and project context all get
+            re-taught, re-explained, and re-discovered by every developer on every session.
+          </p>
+          <div className="grid gap-6 sm:grid-cols-3">
+            {PAIN_POINTS.map((point) => (
+              <div
+                key={point.title}
+                className="group rounded-xl border border-[var(--color-border)] bg-white p-6 transition hover:-translate-y-1 hover:shadow-lg dark:bg-[var(--color-surface)]"
+              >
+                <div
+                  className={`mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br ${point.color}`}
+                >
+                  <point.icon className="h-6 w-6 text-white" />
+                </div>
+                <h3 className="mb-2 text-lg font-semibold">{point.title}</h3>
+                <p className="text-sm text-[var(--color-text-muted)]">{point.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* --- Feature Carousel --- */}
       <section className="py-16 md:py-28">
         <div className="mx-auto max-w-5xl px-4 md:px-8">
-          <h2 className="mb-4 text-center text-2xl font-bold sm:text-3xl md:text-4xl">Everything you need</h2>
+          <h2 className="mb-4 text-center text-2xl font-bold sm:text-3xl md:text-4xl">Built for AI-first teams</h2>
           <p className="mx-auto mb-8 max-w-xl text-center text-sm text-[var(--color-text-muted)] sm:text-base md:mb-12">
-            A complete toolkit for teams that think in Markdown.
+            Everything you need to keep your team's AI agents informed and consistent.
           </p>
 
           <div
@@ -406,25 +497,24 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* --- AI Agent + CLI Section --- */}
+      {/* --- CLI Demo + How It Works --- */}
       <section className="border-y border-[var(--color-border)] bg-[var(--color-bg-secondary)] py-16 md:py-28">
         <div className="mx-auto max-w-6xl px-4 md:px-8">
           <div className="mb-4 flex justify-center">
             <div className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500/10 to-purple-500/10 px-4 py-1.5 text-sm font-semibold text-[var(--color-primary)] dark:from-blue-500/20 dark:to-purple-500/20">
-              <Bot className="h-4 w-4" />
-              Supercharge your workflow
+              <Terminal className="h-4 w-4" />
+              Up and running in 60 seconds
             </div>
           </div>
           <h2 className="mb-4 text-center text-2xl font-bold sm:text-3xl md:text-4xl">
-            AI writes your docs.{" "}
+            Three commands.{" "}
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent dark:from-blue-400 dark:to-purple-400">
-              Your team reviews instantly.
+              Every agent stays in sync.
             </span>
           </h2>
           <p className="mx-auto mb-10 max-w-2xl text-center text-sm text-[var(--color-text-muted)] sm:text-base md:mb-14">
-            Keep every context document -- PRDs, meeting notes, sprint plans -- in sync across your local machine and
-            the cloud. AI agents create and update docs on your laptop; your team sees changes on the web the moment
-            they happen.
+            Write your team&apos;s conventions in CollabMark. The CLI syncs them to every developer&apos;s local agent
+            context files — automatically, in the background.
           </p>
 
           <div className="grid items-center gap-8 lg:grid-cols-2 lg:gap-12">
@@ -436,7 +526,7 @@ export function LandingPage() {
                   <div className="h-3 w-3 rounded-full bg-red-400" />
                   <div className="h-3 w-3 rounded-full bg-yellow-400" />
                   <div className="h-3 w-3 rounded-full bg-green-400" />
-                  <span className="ml-3 font-mono text-xs text-gray-500">~/my-docs</span>
+                  <span className="ml-3 font-mono text-xs text-gray-500">~/my-project</span>
                 </div>
                 <CliTerminalAnimation />
               </div>
@@ -444,7 +534,7 @@ export function LandingPage() {
 
             {/* Get Started Steps */}
             <div className="order-1 space-y-5 sm:space-y-6 lg:order-2">
-              <h3 className="text-lg font-bold sm:text-xl">Up and running in 60 seconds</h3>
+              <h3 className="text-lg font-bold sm:text-xl">How it works</h3>
               <div className="flex gap-3 sm:gap-4">
                 <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-sm font-bold text-white shadow-lg shadow-blue-500/20 sm:h-10 sm:w-10">
                   1
@@ -452,8 +542,9 @@ export function LandingPage() {
                 <div className="min-w-0">
                   <h4 className="mb-1 font-semibold">Install & sign in</h4>
                   <p className="text-sm text-[var(--color-text-muted)]">
-                    One command installs CollabMark. Sign in opens your browser -- same Google or SSO login you already
-                    use.
+                    <code className="rounded bg-[var(--color-bg)] px-1.5 py-0.5 text-xs">pip install collabmark</code>{" "}
+                    then <code className="rounded bg-[var(--color-bg)] px-1.5 py-0.5 text-xs">collabmark login</code>.
+                    Uses the same Google or SSO login your team already has.
                   </p>
                 </div>
               </div>
@@ -462,10 +553,10 @@ export function LandingPage() {
                   2
                 </div>
                 <div className="min-w-0">
-                  <h4 className="mb-1 font-semibold">Point it at your docs folder</h4>
+                  <h4 className="mb-1 font-semibold">Write your team&apos;s conventions</h4>
                   <p className="text-sm text-[var(--color-text-muted)]">
-                    Run <code className="rounded bg-[var(--color-bg)] px-1.5 py-0.5 text-xs">collabmark start</code> and
-                    pick a folder. Every Markdown file inside automatically stays in sync with the cloud.
+                    Add coding standards, architecture decisions, and project context on the web. Your team collaborates
+                    on these living documents in real time.
                   </p>
                 </div>
               </div>
@@ -474,37 +565,25 @@ export function LandingPage() {
                   3
                 </div>
                 <div className="min-w-0">
-                  <h4 className="mb-1 font-semibold">Let AI do the heavy lifting</h4>
+                  <h4 className="mb-1 font-semibold">Start syncing</h4>
                   <p className="text-sm text-[var(--color-text-muted)]">
-                    Use Cursor, Copilot, or any AI assistant to draft and update docs. Your team sees every change on
-                    the web in real time -- no manual uploads, no copy-paste.
+                    Run <code className="rounded bg-[var(--color-bg)] px-1.5 py-0.5 text-xs">collabmark start</code>.
+                    The CLI syncs your team&apos;s conventions to local agent context files. When anyone updates a
+                    convention, every agent knows immediately.
                   </p>
                 </div>
               </div>
 
               <div className="rounded-xl border border-[var(--color-border)] bg-gradient-to-r from-blue-50 to-purple-50 p-4 dark:from-blue-950/30 dark:to-purple-950/30 sm:p-5">
                 <div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                  <Zap className="h-4 w-4 text-amber-500" />
-                  Why product teams love this
+                  <ArrowRight className="h-4 w-4 text-[var(--color-primary)]" />
+                  The result
                 </div>
-                <ul className="space-y-1.5 text-sm text-[var(--color-text-muted)]">
-                  <li className="flex items-start gap-2">
-                    <ArrowRight className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--color-primary)]" />
-                    AI and human edits merge automatically -- no conflicts, ever
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ArrowRight className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--color-primary)]" />
-                    Works with any AI tool you already use
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ArrowRight className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--color-primary)]" />
-                    Runs quietly in the background -- set it and forget it
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <ArrowRight className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[var(--color-primary)]" />
-                    Full version history so you can always see who changed what
-                  </li>
-                </ul>
+                <p className="text-sm text-[var(--color-text-muted)]">
+                  Developer A adds &ldquo;Use Pydantic v2 validators&rdquo; to your team&apos;s coding standards.
+                  Developer B&apos;s Cursor, Developer C&apos;s Claude, and the new hire&apos;s Copilot all know about
+                  it within seconds — without anyone copy-pasting a file.
+                </p>
               </div>
             </div>
           </div>
@@ -516,7 +595,7 @@ export function LandingPage() {
         <div className="mx-auto max-w-6xl px-4 md:px-8">
           <h2 className="mb-4 text-center text-2xl font-bold sm:text-3xl md:text-4xl">Everything your team needs</h2>
           <p className="mx-auto mb-8 max-w-xl text-center text-sm text-[var(--color-text-muted)] sm:text-base md:mb-12">
-            Write, share, and collaborate on documents -- with the power of AI or on your own.
+            Sync AI agent context across your entire team with collaborative documents, CLI tools, and enterprise auth.
           </p>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {FEATURES.map((feat) => (
@@ -558,9 +637,10 @@ export function LandingPage() {
       <section className="relative overflow-hidden py-16 md:py-32">
         <div className="animate-gradient absolute inset-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 opacity-[0.06] dark:opacity-[0.12]" />
         <div className="relative z-10 mx-auto max-w-2xl px-4 text-center md:px-8">
-          <h2 className="mb-4 text-2xl font-bold sm:text-3xl md:text-4xl">Ready to let AI handle your docs?</h2>
+          <h2 className="mb-4 text-2xl font-bold sm:text-3xl md:text-4xl">Your AI agents deserve shared context</h2>
           <p className="mb-8 text-sm text-[var(--color-text-muted)] sm:text-base">
-            Free to use. No credit card. Sign in on the web or install the CLI to get started in under a minute.
+            Open source. Free forever for individual use. Get your team&apos;s AI agents on the same page in under a
+            minute.
           </p>
           <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center sm:gap-4">
             <SSOLoginFlow />

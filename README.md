@@ -1,77 +1,56 @@
 # CollabMark
 
-A real-time collaborative Markdown editor with Google OAuth, SSO (SAML 2.0 / OIDC),
-Google Docs-style sharing, inline commenting, version history, org management, and
-programmatic API access. Built with FastAPI, React, and CRDTs.
+**Stop re-teaching your AI agent the same rules.**
 
-## Features
+[![PyPI](https://img.shields.io/pypi/v/collabmark)](https://pypi.org/project/collabmark/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-- **Real-time collaboration** via CRDTs (Yjs + pycrdt) with cursor presence
-- **CLI sync tool** -- bidirectional markdown sync between local files and cloud via CRDTs (`pip install collabmark`)
-- **Authentication**: Google OAuth, SAML 2.0, OIDC, and API keys
-- **Google Docs-style sharing**: general access levels, email-based collaborators, org-scoped ACLs
-- **Organizations**: multi-tenant with SSO, admin dashboard, member management
-- **Split-pane editor**: CodeMirror 6 with live Markdown preview, resizable splitter, presentation mode
-- **Inline & document-level comments** with Yjs-anchored positions and reply threads
-- **Version history** with line-level diffs, restore, and auto-versioning
-- **Spaces (folders)** with hierarchical organization and access inheritance
-- **Google Docs-style trash** -- soft-delete with hierarchy-aware restore and ACL deactivation
-- **Mermaid diagrams**, syntax-highlighted code blocks, dark mode
-- **Interactive API docs** at `/api-docs` with live request execution
-- **PDF and Markdown export**
+Your team's AI agents keep learning the same lessons from scratch. Developer A's Cursor learns that you use Pydantic v2 validators. Developer B's Claude has no idea and makes the same mistakes. A new hire's Copilot starts from zero.
 
-## Prerequisites
+CollabMark fixes this. Write your team's conventions once, and every developer's AI agent reads the latest version automatically.
 
-- Python 3.12+
-- Node.js 20+
-- Docker & Docker Compose (for MongoDB and Redis)
+## The Problem
 
-## Quick Start
+| Without CollabMark | With CollabMark |
+|---|---|
+| Developer A teaches Cursor your conventions | Write conventions once in CollabMark |
+| Developer B's agent has no idea | Every agent reads the latest version |
+| New hire's AI makes solved mistakes | New hire's agent starts fully informed |
+| CLAUDE.md gets stale immediately | Changes sync to all agents in seconds |
+| Copy-paste across machines | Background CLI keeps everything in sync |
 
-The fastest way to get running with a single command:
-
-```bash
-make install       # install backend + frontend dependencies
-docker compose up -d mongodb redis   # start MongoDB and Redis
-```
-
-Then start both servers (in separate terminals):
-
-```bash
-# Terminal 1 — Backend
-cd backend
-source .venv/bin/activate
-uvicorn app.main:app --reload
-```
-
-```bash
-# Terminal 2 — Frontend
-cd frontend
-yarn dev
-```
-
-The app is available at **http://localhost:5173**. The API is at **http://localhost:8000** (Swagger docs at `/docs`).
-
-## CLI Tool
-
-CollabMark ships a Python CLI that bidirectionally syncs local `.md` files with your cloud workspace -- powered by the same CRDTs that drive the web editor.
-
-### Install
+## Get Started in 60 Seconds
 
 ```bash
 pip install collabmark
+collabmark login
+collabmark start
 ```
 
-### Quick start
+That's it. Your team's coding standards, architecture decisions, and project context now sync to `.cursor/rules/`, `CLAUDE.md`, and `AGENTS.md` automatically.
 
-```bash
-collabmark login          # One-click browser login (Google/SSO)
-collabmark start           # Sync the current directory
-```
+## How It Works
 
-That's it. Your markdown files are now live-synced. Edits on the web or locally propagate in seconds.
+1. **Write conventions on the web** — Your team collaborates on living documents: coding standards, architecture decisions, project context. Real-time editing, version history, inline comments.
 
-### Key commands
+2. **CLI syncs to local agent context** — The `collabmark start` daemon watches for changes and syncs your team's documents to local agent context files. Every AI tool reads them natively.
+
+3. **Every agent stays informed** — When anyone updates a convention, every team member's Cursor, Claude, and Copilot know about it within seconds — no copy-pasting files.
+
+## Features
+
+- **Team context sync** — conventions, standards, and decisions synced to every developer's AI agent
+- **Works with any AI agent** — Cursor (.cursor/rules/), Claude (CLAUDE.md), Copilot (AGENTS.md), and more
+- **Real-time collaboration** — live editing with cursor presence, powered by CRDTs (Yjs + pycrdt)
+- **CLI sync tool** — background daemon with bidirectional CRDT sync (`pip install collabmark`)
+- **Full version history** — every convention change tracked, diffed, and restorable
+- **Enterprise auth** — Google OAuth, SAML 2.0, OIDC, and API keys
+- **Folders & sharing** — organize docs into folders, share with fine-grained permissions
+- **Inline comments** — leave feedback on specific text with threaded replies
+- **Beautiful Markdown** — Mermaid diagrams, syntax-highlighted code, dark mode
+- **Interactive API docs** — test all endpoints live at `/api-docs`
+
+## CLI Reference
 
 | Command | Description |
 |---------|-------------|
@@ -86,272 +65,59 @@ That's it. Your markdown files are now live-synced. Edits on the web or locally 
 
 See [`cli/README.md`](cli/README.md) for the full reference.
 
-## Step-by-Step Setup
+## Self-Host / Development Setup
 
-### 1. Start infrastructure
+### Prerequisites
+
+- Python 3.12+
+- Node.js 20+
+- Docker & Docker Compose (for MongoDB and Redis)
+
+### Quick Start
 
 ```bash
-docker compose up -d mongodb redis
+make install                         # install backend + frontend deps
+docker compose up -d mongodb redis   # start MongoDB and Redis
 ```
 
-This starts MongoDB 7 on port 27017 and Redis 7 on port 6379.
+Then start both servers:
 
-### 2. Configure environment
+```bash
+# Terminal 1 — Backend
+cd backend && source .venv/bin/activate && uvicorn app.main:app --reload
+
+# Terminal 2 — Frontend
+cd frontend && yarn dev
+```
+
+App: **http://localhost:5173** | API: **http://localhost:8000** | Swagger: **http://localhost:8000/docs**
+
+### Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your credentials (see [Environment Variables](#environment-variables)).
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MONGODB_URL` | MongoDB connection string | `mongodb://localhost:27017` |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID | *(required)* |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret | *(required)* |
+| `JWT_SECRET_KEY` | JWT signing secret (32+ random chars) | *(required in production)* |
+| `FRONTEND_URL` | Frontend URL for CORS and redirects | `http://localhost:5173` |
 
-### 3. Install dependencies
-
-Using the Makefile (recommended):
-
-```bash
-make install
-```
-
-Or manually:
-
-```bash
-# Backend
-cd backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# Frontend
-cd frontend
-yarn install
-```
-
-### 4. Run the backend
-
-```bash
-cd backend
-source .venv/bin/activate
-uvicorn app.main:app --reload
-```
-
-The API is available at `http://localhost:8000`. Swagger docs at `http://localhost:8000/docs`.
-
-### 5. Run the frontend
-
-```bash
-cd frontend
-yarn dev
-```
-
-The UI is at `http://localhost:5173`. Vite proxies `/api` and `/ws` to the backend automatically.
+See `.env.example` for all variables.
 
 ## Testing
 
-### Run all tests
-
 ```bash
-make test
+make test       # Run all tests (backend + frontend + CLI)
+make test-be    # Backend only
+make test-fe    # Frontend only
+make test-cov   # With coverage reports
+make ci         # Full pipeline: lint + format + test + build
 ```
-
-This runs backend (641 tests), frontend (860 tests), and CLI (313 tests).
-
-### Backend tests only
-
-```bash
-make test-be
-```
-
-Or directly:
-
-```bash
-cd backend
-source .venv/bin/activate
-python -m pytest
-```
-
-Backend tests use an in-memory MongoDB mock (`mongomock-motor`) — no running database needed.
-
-### Frontend tests only
-
-```bash
-make test-fe
-```
-
-Or directly:
-
-```bash
-cd frontend
-yarn test
-```
-
-### CLI tests only
-
-```bash
-cd cli
-pip install -e ".[dev]"
-python -m pytest -v
-```
-
-### Watch mode (frontend)
-
-```bash
-cd frontend
-yarn test:watch
-```
-
-### Test coverage
-
-```bash
-make test-cov
-```
-
-This generates coverage reports for both backend and frontend. Backend uses `pytest-cov`; frontend uses `@vitest/coverage-v8`.
-
-You can also run them separately:
-
-```bash
-# Backend coverage
-cd backend && .venv/bin/python -m pytest --cov=app --cov-report=term-missing
-
-# Frontend coverage
-cd frontend && yarn run test:coverage
-```
-
-## Linting & Formatting
-
-### Check lint (both backend and frontend)
-
-```bash
-make lint
-```
-
-This runs:
-- **Backend**: `ruff check` (pycodestyle, pyflakes, isort, bugbear, bandit security, and more)
-- **Frontend**: `tsc` (TypeScript), `eslint` (React hooks, refresh), `prettier --check`
-
-### Auto-fix lint issues
-
-```bash
-make lint-fix
-```
-
-### Format all code
-
-```bash
-make format
-```
-
-This runs:
-- **Backend**: `ruff format` (Black-compatible, 120 char line width)
-- **Frontend**: `prettier --write` (120 print width, double quotes, trailing commas)
-
-### Check formatting without changes
-
-```bash
-make format-check
-```
-
-### Individual tools
-
-```bash
-# Backend lint
-cd backend && .venv/bin/ruff check app/ tests/
-
-# Backend format
-cd backend && .venv/bin/ruff format app/ tests/
-
-# Frontend lint
-cd frontend && yarn run lint
-
-# Frontend lint auto-fix
-cd frontend && yarn run lint:fix
-
-# Frontend format
-cd frontend && yarn run format
-
-# Frontend full check (tsc + eslint + prettier)
-cd frontend && yarn run check
-```
-
-## Build
-
-### Frontend production build
-
-```bash
-make build
-```
-
-Or directly:
-
-```bash
-cd frontend && yarn build
-```
-
-The output goes to `frontend/dist/`.
-
-### Full CI pipeline
-
-```bash
-make ci
-```
-
-This runs the complete pipeline: lint, format check, all tests, and production build. Use this before committing.
-
-## Docker
-
-### Full stack (development)
-
-```bash
-cp .env.example .env
-# Edit .env with your credentials
-docker compose up --build
-```
-
-The app is available at `http://localhost:8000`.
-
-### Production
-
-```bash
-docker compose -f docker-compose.prod.yml up --build -d
-```
-
-## Makefile Reference
-
-Run `make help` to see all available commands:
-
-| Command            | Description                                      |
-|--------------------|--------------------------------------------------|
-| `make install`     | Install all dependencies (backend + frontend)    |
-| `make lint`        | Run linters (ruff + eslint + prettier check)     |
-| `make lint-fix`    | Auto-fix lint issues                             |
-| `make format`      | Format all code (ruff + prettier)                |
-| `make format-check`| Check formatting without changes                 |
-| `make test`        | Run all tests (backend + frontend)               |
-| `make test-be`     | Run backend tests only                           |
-| `make test-fe`     | Run frontend tests only                          |
-| `make test-cov`    | Run all tests with coverage reports              |
-| `make build`       | Build frontend for production                    |
-| `make ci`          | Full CI pipeline: lint + format + test + build   |
-| `make clean`       | Remove build artifacts and caches                |
-
-## Environment Variables
-
-| Variable               | Description                            | Default / Example                       |
-|------------------------|----------------------------------------|-----------------------------------------|
-| `DEBUG`                | Enable debug mode                      | `true`                                  |
-| `MONGODB_URL`          | MongoDB connection string              | `mongodb://localhost:27017`             |
-| `MONGODB_DB_NAME`      | Database name                          | `collabmark`                            |
-| `REDIS_URL`            | Redis connection string                | `redis://localhost:6379`                |
-| `GOOGLE_CLIENT_ID`     | Google OAuth client ID                 | `123456.apps.googleusercontent.com`     |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret             | `GOCSPX-...`                            |
-| `GOOGLE_REDIRECT_URI`  | OAuth callback URL                     | `http://localhost:8000/api/auth/google/callback` |
-| `JWT_SECRET_KEY`       | JWT signing secret (32+ random chars)  | *(required in production)*              |
-| `JWT_ALGORITHM`        | JWT algorithm                          | `HS256`                                 |
-| `JWT_EXPIRE_MINUTES`   | JWT token lifetime in minutes          | `10080` (7 days)                        |
-| `SESSION_SECRET_KEY`   | Session middleware secret              | Falls back to `JWT_SECRET_KEY`          |
-| `FRONTEND_URL`         | Frontend URL for CORS and redirects    | `http://localhost:5173`                 |
-| `ALLOWED_ORIGINS`      | CORS allowed origins (JSON array)      | `["http://localhost:5173","http://localhost:8000"]` |
-| `SUPER_ADMIN_EMAILS`   | Emails with super admin access (JSON)  | `[]`                                    |
 
 ## Architecture
 
@@ -365,21 +131,16 @@ Browser (React + CodeMirror 6 + Yjs)             CLI (Python + pycrdt)
                                   +-- CLI CRDT sync (bidirectional)
 ```
 
-| Layer        | Technology                                              |
-|--------------|---------------------------------------------------------|
-| Backend      | Python 3.12+, FastAPI, Uvicorn, Gunicorn                |
-| Database     | MongoDB 7 (Beanie ODM, Motor async driver)              |
-| CRDT Server  | pycrdt + pycrdt-websocket with custom MongoDB store     |
-| CRDT Client  | Yjs + y-codemirror.next + y-websocket                   |
-| Frontend     | React 19, Vite 7, TypeScript 5.9, Tailwind CSS v4      |
-| Editor       | CodeMirror 6 (core API + yCollab binding)               |
-| Auth         | Google OAuth2, SAML 2.0, OIDC, JWT, API keys           |
-| Lint (BE)    | ruff (lint + format)                                    |
-| Lint (FE)    | ESLint 9 + Prettier 3                                   |
-| Testing (BE) | pytest, pytest-asyncio, pytest-cov, httpx, mongomock-motor |
-| Testing (FE) | Vitest 4, React Testing Library, jsdom                  |
-| CLI          | Python 3.12+, Click, Rich, httpx, pycrdt, watchdog     |
-| Deployment   | Docker, Railway, Gunicorn                               |
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python 3.12+, FastAPI, Uvicorn, Gunicorn |
+| Database | MongoDB 7 (Beanie ODM, Motor async driver) |
+| CRDT | pycrdt + pycrdt-websocket (server), Yjs + y-websocket (client) |
+| Frontend | React 19, Vite 7, TypeScript 5.9, Tailwind CSS v4 |
+| Editor | CodeMirror 6 with yCollab binding |
+| Auth | Google OAuth2, SAML 2.0, OIDC, JWT, API keys |
+| CLI | Python 3.12+, Click, Rich, httpx, pycrdt, watchdog |
+| Deployment | Docker, Railway, GitHub Actions CI/CD |
 
 ## Project Structure
 
@@ -387,144 +148,35 @@ Browser (React + CodeMirror 6 + Yjs)             CLI (Python + pycrdt)
 collabmark/
   backend/
     app/
-      auth/          # OAuth, JWT, API key, SSO (SAML/OIDC) auth
-      models/        # Beanie document models (User, Document, Comment, Folder, Organization, etc.)
-      routes/        # REST API endpoints (thin -- delegate to services)
-      services/      # Business logic layer (document, share, version, comment, folder, org, acl)
-      utils/         # Shared utilities (owner_resolver)
-      ws/            # WebSocket handler (pycrdt rooms)
-    tests/           # 641 backend tests
-    pyproject.toml   # Ruff lint/format + pytest configuration
-    requirements.txt # Python dependencies
+      auth/       # OAuth, JWT, API key, SSO (SAML/OIDC) auth
+      models/     # Beanie document models
+      routes/     # REST API endpoints
+      services/   # Business logic layer
+      ws/         # WebSocket handler (pycrdt rooms)
+    tests/        # Backend tests
   frontend/
     src/
-      components/    # Reusable UI components (Auth, Editor, Home, Layout)
-      pages/         # Route-level pages (Home, Editor, Login, Settings, Profile, ApiDocs, Admin, OrgSettings)
-      hooks/         # Custom React hooks / Zustand stores
-      lib/           # API client (axios), utilities
-    eslint.config.js # ESLint 9 flat config
-    .prettierrc      # Prettier config
-    vite.config.ts   # Vite + Vitest configuration
+      components/ # Reusable UI components
+      pages/      # Route-level pages
+      hooks/      # Custom hooks / Zustand stores
+      lib/        # API client, utilities
   cli/
     src/collabmark/  # CLI package (commands/, lib/)
-    tests/           # 313 CLI tests
-    pyproject.toml   # hatchling build + CLI entry point
-  Makefile           # Unified lint/format/test/build/ci commands
+    tests/           # CLI tests
+  Makefile           # Unified commands
   Dockerfile         # Multi-stage production build
-  docker-compose.yml # Local dev infrastructure (MongoDB + Redis)
-  docker-compose.prod.yml  # Production compose
-  .env.example       # Environment variable template
-  AGENT.md           # Agent reference (conventions, architecture, progress)
+  docker-compose.yml # Local dev (MongoDB + Redis)
 ```
-
-## API Endpoints
-
-### Auth
-- `GET /api/auth/google/login` -- redirect to Google OAuth
-- `GET /api/auth/google/callback` -- OAuth callback, set JWT cookie
-- `POST /api/auth/logout` -- clear session
-- `POST /api/auth/sso/detect` -- detect SSO org by email domain
-- `GET /api/auth/sso/saml/login/{org_id}` -- redirect to SAML IdP
-- `POST /api/auth/sso/saml/callback` -- SAML assertion consumer service
-- `GET /api/auth/sso/oidc/login/{org_id}` -- redirect to OIDC IdP
-- `GET /api/auth/sso/oidc/callback` -- OIDC authorization code callback
-
-### Documents
-- `POST /api/documents` -- create document
-- `GET /api/documents` -- list own documents
-- `GET /api/documents/{id}` -- get document
-- `PUT /api/documents/{id}` -- update document
-- `DELETE /api/documents/{id}` -- soft-delete
-- `POST /api/documents/{id}/restore` -- restore from trash
-- `DELETE /api/documents/{id}/permanent` -- hard-delete with cleanup
-- `GET /api/documents/trash` -- list trashed documents
-- `GET /api/documents/shared` -- list docs shared with me
-- `GET /api/documents/recent` -- list recently viewed docs
-
-### Folders
-- `POST /api/folders` -- create folder
-- `GET /api/folders/{id}` -- get folder
-- `PUT /api/folders/{id}` -- update folder
-- `DELETE /api/folders/{id}` -- cascade soft-delete
-- `POST /api/folders/{id}/restore` -- cascade restore
-- `DELETE /api/folders/{id}/permanent` -- cascade hard-delete
-- `GET /api/folders/contents` -- list folder contents
-- `GET /api/folders/breadcrumbs` -- get breadcrumb path
-- `POST /api/folders/{id}/collaborators` -- add collaborator
-- `GET /api/folders/{id}/collaborators` -- list collaborators
-- `DELETE /api/folders/{id}/collaborators/{user_id}` -- remove collaborator
-
-### Sharing
-- `PUT /api/documents/{id}/access` -- set general access level
-- `POST /api/documents/{id}/collaborators` -- add collaborator by email
-- `GET /api/documents/{id}/collaborators` -- list collaborators
-- `DELETE /api/documents/{id}/collaborators/{user_id}` -- remove collaborator
-- `POST /api/documents/{id}/view` -- record document view
-
-### Versions
-- `POST /api/documents/{id}/versions` -- create snapshot (deduplicated)
-- `GET /api/documents/{id}/versions` -- list version timeline
-- `GET /api/documents/{id}/versions/{num}` -- get version detail
-
-### Comments
-- `POST /api/documents/{id}/comments` -- create comment
-- `GET /api/documents/{id}/comments` -- list comments with replies
-- `POST /api/comments/{id}/reply` -- reply to comment
-- `POST /api/comments/{id}/resolve` -- resolve comment
-- `PATCH /api/comments/{id}/reanchor` -- update anchor offsets
-- `PATCH /api/comments/{id}/orphan` -- mark as orphaned
-- `DELETE /api/comments/{id}` -- delete comment
-
-### Organizations
-- `GET /api/orgs/my` -- current user's organization
-- `POST /api/orgs` -- create organization (super admin)
-- `GET /api/orgs` -- list all organizations (super admin)
-- `GET /api/orgs/{org_id}` -- get org details
-- `PUT /api/orgs/{org_id}` -- update org
-- `GET /api/orgs/{org_id}/members` -- list members
-- `POST /api/orgs/{org_id}/members` -- add member
-- `POST /api/orgs/{org_id}/members/invite` -- invite by email
-- `PATCH /api/orgs/{org_id}/members/{user_id}/role` -- change role
-- `DELETE /api/orgs/{org_id}/members/{user_id}` -- remove member
-- `GET /api/orgs/{org_id}/sso` -- get SSO config
-- `PUT /api/orgs/{org_id}/sso` -- update SSO config
-
-### CLI Auth
-- `POST /api/auth/cli/token` -- exchange session cookie for a CLI API key
-- `GET /cli-login` -- browser-based CLI login page (OAuth redirect flow)
-- `GET /cli-login/success` -- CLI login success confirmation page
-
-### Other
-- `GET /api/users/me` -- current user profile
-- `PUT /api/users/me` -- update profile
-- `POST /api/keys` -- create API key
-- `GET /api/keys` -- list API keys
-- `DELETE /api/keys/{id}` -- revoke API key
-- `GET /api/folders/tree` -- full folder tree for CLI sync
-- `WS /ws/doc/{document_id}` -- CRDT collaboration WebSocket
 
 ## API Key Access
 
 Generate an API key from **Settings** in the web UI. Use it via the `X-API-Key` header:
 
 ```bash
-# List your documents
 curl -H "X-API-Key: cm_your_key_here" http://localhost:8000/api/documents
-
-# Create a document
-curl -X POST -H "X-API-Key: cm_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "My Doc", "content": "# Hello"}' \
-  http://localhost:8000/api/documents
-
-# Update a document
-curl -X PUT -H "X-API-Key: cm_your_key_here" \
-  -H "Content-Type: application/json" \
-  -d '{"content": "# Updated content"}' \
-  http://localhost:8000/api/documents/{doc_id}
 ```
 
-The interactive API documentation at `/api-docs` lets you test all endpoints in the browser.
+Interactive API documentation at `/api-docs` lets you test all endpoints in the browser.
 
 ## Contributing
 
@@ -533,7 +185,10 @@ The interactive API documentation at `/api-docs` lets you test all endpoints in 
 3. Create a feature branch: `git checkout -b your-name/feature-description`
 4. Write tests for every function/endpoint you add
 5. Ensure the full CI pipeline passes: `make ci`
-6. Commit with concise messages explaining "why" not "what"
-7. Open a pull request
+6. Open a pull request
 
 See `AGENT.md` for detailed coding conventions, architectural decisions, and project progress.
+
+## License
+
+MIT

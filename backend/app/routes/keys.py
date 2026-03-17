@@ -2,17 +2,20 @@
 
 from beanie import PydanticObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.auth.dependencies import get_current_user
 from app.models.api_key import ApiKey, ApiKeyCreate, ApiKeyCreated, ApiKeyRead
 from app.models.user import User
+from app.rate_limit import limiter
 
 router = APIRouter(prefix="/api/keys", tags=["api-keys"])
 
 
 @router.post("", response_model=ApiKeyCreated, status_code=201)
+@limiter.limit("10/minute")
 async def create_api_key(
+    request: Request,
     payload: ApiKeyCreate,
     user: User = Depends(get_current_user),
 ):
@@ -61,7 +64,9 @@ async def list_api_keys(user: User = Depends(get_current_user)):
 
 
 @router.delete("/{key_id}", status_code=204)
+@limiter.limit("10/minute")
 async def revoke_api_key(
+    request: Request,
     key_id: str,
     user: User = Depends(get_current_user),
 ):

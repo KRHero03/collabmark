@@ -1,10 +1,11 @@
 """Document CRUD routes: create, list, get, update, delete, restore, trash, hard-delete, ACL, image upload."""
 
-from fastapi import APIRouter, Depends, File, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
 from app.auth.dependencies import get_current_user
 from app.models.document import DocumentCreate, DocumentRead, DocumentUpdate
 from app.models.user import User
+from app.rate_limit import limiter
 from app.services import document_service
 from app.services.acl_service import get_acl_summary
 from app.utils.owner_resolver import resolve_owner
@@ -80,7 +81,9 @@ async def list_trash(
 
 
 @router.post("/{doc_id}/images")
+@limiter.limit("30/minute")
 async def upload_image(
+    request: Request,
     doc_id: str,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
@@ -95,7 +98,9 @@ async def upload_image(
 
 
 @router.post("/{doc_id}/attachments")
+@limiter.limit("20/minute")
 async def upload_attachment(
+    request: Request,
     doc_id: str,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),

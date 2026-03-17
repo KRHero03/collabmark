@@ -9,7 +9,7 @@ import re
 import secrets
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel, EmailStr
 
 from app.auth.dependencies import get_current_user, get_org_admin_user, get_super_admin_user
@@ -27,6 +27,7 @@ from app.models.organization import (
     OrgRole,
 )
 from app.models.user import User
+from app.rate_limit import limiter
 from app.services import org_service
 
 router = APIRouter(prefix="/api/orgs", tags=["organizations"])
@@ -300,7 +301,9 @@ async def update_sso_config(
 
 
 @router.post("/{org_id}/scim/token", status_code=201)
+@limiter.limit("5/minute")
 async def generate_scim_token(
+    request: Request,
     org_id: str,
     user: User = Depends(get_org_admin_user),
 ):
@@ -360,7 +363,9 @@ async def revoke_scim_token(
 
 
 @router.post("/{org_id}/logo", response_model=OrganizationRead)
+@limiter.limit("10/minute")
 async def upload_logo(
+    request: Request,
     org_id: str,
     file: UploadFile = File(...),
     user: User = Depends(get_org_admin_user),

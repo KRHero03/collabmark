@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from app.auth.scim_auth import get_scim_org
+from app.rate_limit import limiter
 from app.models.group import GroupMembership
 from app.models.org_sso_config import OrgSSOConfig
 from app.models.organization import Organization
@@ -436,6 +437,7 @@ async def scim_schema(schema_id: str) -> JSONResponse:
 
 
 @router.post("/Users")
+@limiter.limit("60/minute")
 async def scim_create_user(
     request: Request,
     org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
@@ -456,6 +458,7 @@ async def scim_create_user(
 
 
 @router.get("/Users")
+@limiter.limit("120/minute")
 async def scim_list_users(
     request: Request,
     org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
@@ -487,6 +490,7 @@ async def scim_list_users(
 
 
 @router.get("/Users/{user_id}")
+@limiter.limit("120/minute")
 async def scim_get_user(
     user_id: str,
     request: Request,
@@ -508,6 +512,7 @@ async def scim_get_user(
 
 
 @router.put("/Users/{user_id}")
+@limiter.limit("60/minute")
 async def scim_replace_user(
     user_id: str,
     request: Request,
@@ -529,6 +534,7 @@ async def scim_replace_user(
 
 
 @router.patch("/Users/{user_id}")
+@limiter.limit("60/minute")
 async def scim_update_user(
     user_id: str,
     request: Request,
@@ -550,7 +556,9 @@ async def scim_update_user(
 
 
 @router.delete("/Users/{user_id}", status_code=204)
+@limiter.limit("30/minute")
 async def scim_delete_user(
+    request: Request,
     user_id: str,
     org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
 ) -> None:
@@ -570,6 +578,7 @@ async def scim_delete_user(
 
 
 @router.post("/Groups")
+@limiter.limit("60/minute")
 async def scim_create_group(
     request: Request,
     org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
@@ -591,6 +600,7 @@ async def scim_create_group(
 
 
 @router.get("/Groups")
+@limiter.limit("120/minute")
 async def scim_list_groups(
     request: Request,
     org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
@@ -617,7 +627,9 @@ async def scim_list_groups(
 
 
 @router.get("/Groups/{group_id}")
+@limiter.limit("120/minute")
 async def scim_get_group(
+    request: Request,
     group_id: str,
     org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
 ) -> JSONResponse:
@@ -633,6 +645,7 @@ async def scim_get_group(
 
 
 @router.put("/Groups/{group_id}")
+@limiter.limit("60/minute")
 async def scim_replace_group(
     group_id: str,
     request: Request,
@@ -655,6 +668,7 @@ async def scim_replace_group(
 
 
 @router.patch("/Groups/{group_id}")
+@limiter.limit("60/minute")
 async def scim_update_group(
     group_id: str,
     request: Request,
@@ -677,7 +691,9 @@ async def scim_update_group(
 
 
 @router.delete("/Groups/{group_id}", status_code=204)
+@limiter.limit("30/minute")
 async def scim_delete_group(
+    request: Request,
     group_id: str,
     org_ctx: tuple[Organization, OrgSSOConfig] = Depends(get_scim_org),
 ) -> None:

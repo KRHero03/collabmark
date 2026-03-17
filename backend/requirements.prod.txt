@@ -16,4 +16,5 @@ pycrdt-websocket>=0.16.0
 python3-saml>=1.16.0
 itsdangerous>=2.2.0
 puremagic>=2.0.0
+slowapi>=0.1.9
 starlette>=0.46.0
