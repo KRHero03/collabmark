@@ -1,7 +1,7 @@
 """Sync engine: reconcile local ``.md`` files with CollabMark cloud.
 
 Handles the three-way comparison between the local filesystem,
-the persisted sync state (``.collabmark/sync.json``), and the remote
+the persisted sync state (``~/.collabmark/projects/{id}/sync.json``), and the remote
 cloud state fetched via the API client.
 
 Content always flows through the CRDT layer (WebSocket).  The REST
@@ -84,10 +84,7 @@ class SyncAction:
 def _list_local_md_files(sync_root: Path) -> dict[str, str]:
     """Return ``{relative_path: content_hash}`` for all ``.md`` files."""
     result: dict[str, str] = {}
-    project_dir_name = ".collabmark"
     for md_file in sync_root.rglob(f"*{_MD_SUFFIX}"):
-        if project_dir_name in md_file.parts:
-            continue
         rel = str(md_file.relative_to(sync_root))
         text = md_file.read_text(encoding="utf-8")
         result[rel] = content_hash(text)
@@ -590,6 +587,87 @@ def _handle_conflict(sync_root: Path, action: SyncAction) -> None:
         action.local_hash,
         action.remote_hash,
     )
+
+
+# ---------------------------------------------------------------------------
+# Single-document sync
+# ---------------------------------------------------------------------------
+
+
+async def run_document_sync_cycle(
+    local_file: Path,
+    doc_id: str,
+    state: SyncState,
+    project_dir: Path,
+    api_key: str,
+) -> bool:
+    """Sync a single local file with a single cloud document.
+
+    Returns True if any sync action was taken, False if already up-to-date.
+    """
+    rel_key = local_file.name
+
+    remote_content = await _crdt_read(doc_id, api_key)
+    remote_hash = content_hash(remote_content) if remote_content else None
+
+    if local_file.is_file():
+        local_text = local_file.read_text(encoding="utf-8")
+        local_h = content_hash(local_text)
+    else:
+        local_text = None
+        local_h = None
+
+    entry = state.files.get(rel_key)
+
+    if local_h and not entry and not remote_content:
+        await _crdt_write(doc_id, local_text, api_key)
+        state.files[rel_key] = SyncFileEntry(doc_id=doc_id, content_hash=local_h, last_synced_at=_now_iso())
+        save_sync_state(state, project_dir)
+        logger.info("↑ doc pushed (new) %s", local_file.name)
+        return True
+
+    if not local_h and remote_content:
+        local_file.parent.mkdir(parents=True, exist_ok=True)
+        local_file.write_text(remote_content, encoding="utf-8")
+        state.files[rel_key] = SyncFileEntry(doc_id=doc_id, content_hash=remote_hash, last_synced_at=_now_iso())
+        save_sync_state(state, project_dir)
+        logger.info("↓ doc pulled (new) %s", local_file.name)
+        return True
+
+    if local_h and entry and remote_hash:
+        local_changed = local_h != entry.content_hash
+        remote_changed = remote_hash != entry.content_hash
+
+        if local_changed and remote_changed:
+            logger.warning("CONFLICT on %s -- resolve manually", local_file.name)
+            return False
+
+        if local_changed:
+            await _crdt_update(doc_id, local_text, api_key)
+            state.files[rel_key] = SyncFileEntry(doc_id=doc_id, content_hash=local_h, last_synced_at=_now_iso())
+            save_sync_state(state, project_dir)
+            logger.info("↑ doc pushed (update) %s", local_file.name)
+            return True
+
+        if remote_changed:
+            local_file.write_text(remote_content, encoding="utf-8")
+            state.files[rel_key] = SyncFileEntry(doc_id=doc_id, content_hash=remote_hash, last_synced_at=_now_iso())
+            save_sync_state(state, project_dir)
+            logger.info("↓ doc pulled (update) %s", local_file.name)
+            return True
+
+    if not entry and local_h and remote_hash:
+        if local_h == remote_hash:
+            state.files[rel_key] = SyncFileEntry(doc_id=doc_id, content_hash=local_h, last_synced_at=_now_iso())
+            save_sync_state(state, project_dir)
+            return False
+        await _crdt_update(doc_id, local_text, api_key)
+        state.files[rel_key] = SyncFileEntry(doc_id=doc_id, content_hash=local_h, last_synced_at=_now_iso())
+        save_sync_state(state, project_dir)
+        logger.info("↑ doc pushed (initial) %s", local_file.name)
+        return True
+
+    return False
 
 
 # Backward-compatible aliases

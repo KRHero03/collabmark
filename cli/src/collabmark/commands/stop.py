@@ -8,8 +8,8 @@ import click
 from rich.console import Console
 from rich.prompt import Prompt
 
-from collabmark.lib.config import find_project_root, load_sync_config
-from collabmark.lib.registry import get_running_syncs, stop_sync_process
+from collabmark.lib.config import get_project_dir, load_sync_config
+from collabmark.lib.registry import find_entry_by_path, get_running_syncs, stop_sync_process
 
 console = Console()
 
@@ -53,9 +53,9 @@ def stop(path: str | None, stop_all: bool) -> None:
         _stop_by_path(Path(path))
         return
 
-    project_root = find_project_root()
-    if project_root:
-        _stop_by_path(project_root)
+    entry = find_entry_by_path(Path.cwd())
+    if entry:
+        _stop_by_path(Path(entry.local_path))
         return
 
     running = get_running_syncs()
@@ -96,9 +96,12 @@ def _stop_by_path(target: Path) -> None:
         _stop_one(match)
         return
 
-    config = load_sync_config(target / ".collabmark") if (target / ".collabmark").is_dir() else None
-    if config:
-        console.print(f"[yellow]Sync for '{config.folder_name}' is not running.[/yellow]")
+    entry = find_entry_by_path(target)
+    if entry:
+        project_dir = get_project_dir(entry.folder_id)
+        config = load_sync_config(project_dir)
+        name = config.folder_name if config else entry.folder_name
+        console.print(f"[yellow]Sync for '{name}' is not running.[/yellow]")
     else:
         console.print("[yellow]No sync found for this directory.[/yellow]")
 

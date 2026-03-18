@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
 
 from collabmark.commands.start import (
+    _doc_title_to_filename,
+    _extract_doc_id,
     _extract_folder_id_from_link,
     _print_sync_summary,
     _resolve_folder,
     start,
 )
 from collabmark.lib.auth import UserInfo
-from collabmark.lib.config import init_project, load_sync_config
+from collabmark.lib.config import get_project_dir, init_project, load_sync_config
+from collabmark.lib.registry import register_sync
 from collabmark.lib.sync_engine import ActionKind, SyncAction
 from collabmark.types import FolderInfo, SyncConfig
 
@@ -38,6 +42,40 @@ class TestExtractFolderIdFromLink:
     def test_url_without_folder_segment(self) -> None:
         url = "https://app.collabmark.io/share/xyz789"
         assert _extract_folder_id_from_link(url) == "xyz789"
+
+
+# ===================================================================
+# Document ID extraction
+# ===================================================================
+
+
+class TestExtractDocId:
+    def test_bare_id(self) -> None:
+        assert _extract_doc_id("abc123") == "abc123"
+
+    def test_url_with_doc_param(self) -> None:
+        url = "https://app.collabmark.io/editor?doc=d123"
+        assert _extract_doc_id(url) == "d123"
+
+    def test_url_with_doc_path(self) -> None:
+        url = "https://app.collabmark.io/doc/d456"
+        assert _extract_doc_id(url) == "d456"
+
+
+# ===================================================================
+# Document title to filename
+# ===================================================================
+
+
+class TestDocTitleToFilename:
+    def test_adds_md_suffix(self) -> None:
+        assert _doc_title_to_filename("Overview") == "Overview.md"
+
+    def test_keeps_existing_suffix(self) -> None:
+        assert _doc_title_to_filename("README.md") == "README.md"
+
+    def test_empty_title(self) -> None:
+        assert _doc_title_to_filename("") == "Untitled.md"
 
 
 # ===================================================================
@@ -87,6 +125,11 @@ class TestStartCommand:
         result = runner.invoke(start, ["--help"])
         assert "--interval" in result.output
 
+    def test_shows_doc_option(self) -> None:
+        runner = CliRunner()
+        result = runner.invoke(start, ["--help"])
+        assert "--doc" in result.output
+
     @patch("collabmark.commands.start._start_async")
     def test_invokes_async_start(self, mock_start: MagicMock) -> None:
         mock_start.return_value = None
@@ -110,7 +153,7 @@ class TestStartCommand:
 
 
 # ===================================================================
-# Resume detection
+# Resume detection (centralized config)
 # ===================================================================
 
 _FAKE_USER = UserInfo(id="u1", email="test@test.com", name="Test User")
@@ -118,18 +161,31 @@ _FAKE_USER = UserInfo(id="u1", email="test@test.com", name="Test User")
 
 class TestResumeDetection:
     @pytest.mark.asyncio
-    async def test_resumes_from_existing_config(self, tmp_path) -> None:
-        config = SyncConfig(
-            server_url="http://localhost:8000",
-            folder_id="f_existing",
-            folder_name="My Folder",
-            user_id="u1",
-            user_email="test@test.com",
-        )
-        init_project(tmp_path, config)
+    async def test_resumes_from_registry_entry(self, tmp_path) -> None:
+        cli_home = tmp_path / "home"
+        sync_root = tmp_path / "notes"
+        sync_root.mkdir()
 
-        mock_client = AsyncMock()
-        folder_id, folder_name = await _resolve_folder(mock_client, tmp_path, None, _FAKE_USER)
+        with patch.dict(os.environ, {"COLLABMARK_HOME": str(cli_home)}):
+            config = SyncConfig(
+                server_url="http://localhost:8000",
+                folder_id="f_existing",
+                folder_name="My Folder",
+                user_id="u1",
+                user_email="test@test.com",
+                local_path=str(sync_root.resolve()),
+            )
+            init_project("f_existing", config)
+            register_sync(
+                str(sync_root),
+                "f_existing",
+                "My Folder",
+                "http://localhost:8000",
+                "test@test.com",
+            )
+
+            mock_client = AsyncMock()
+            folder_id, folder_name = await _resolve_folder(mock_client, sync_root, None, _FAKE_USER)
 
         assert folder_id == "f_existing"
         assert folder_name == "My Folder"
@@ -137,22 +193,27 @@ class TestResumeDetection:
 
     @pytest.mark.asyncio
     async def test_link_overrides_when_no_existing_config(self, tmp_path) -> None:
-        mock_client = AsyncMock()
-        mock_client.get_folder.return_value = FolderInfo(id="f_link", name="Linked Folder", owner_id="u1")
+        with patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path / "home")}):
+            mock_client = AsyncMock()
+            mock_client.get_folder.return_value = FolderInfo(id="f_link", name="Linked Folder", owner_id="u1")
 
-        folder_id, folder_name = await _resolve_folder(mock_client, tmp_path, "f_link", _FAKE_USER)
+            folder_id, folder_name = await _resolve_folder(mock_client, tmp_path, "f_link", _FAKE_USER)
 
         assert folder_id == "f_link"
         assert folder_name == "Linked Folder"
 
     @pytest.mark.asyncio
-    async def test_link_config_stores_user_info(self, tmp_path) -> None:
-        mock_client = AsyncMock()
-        mock_client.get_folder.return_value = FolderInfo(id="f1", name="F1", owner_id="u1")
+    async def test_link_config_stores_in_centralized_dir(self, tmp_path) -> None:
+        cli_home = tmp_path / "home"
+        with patch.dict(os.environ, {"COLLABMARK_HOME": str(cli_home)}):
+            mock_client = AsyncMock()
+            mock_client.get_folder.return_value = FolderInfo(id="f1", name="F1", owner_id="u1")
 
-        await _resolve_folder(mock_client, tmp_path, "f1", _FAKE_USER)
+            await _resolve_folder(mock_client, tmp_path, "f1", _FAKE_USER)
 
-        config = load_sync_config(tmp_path / ".collabmark")
+            config = load_sync_config(get_project_dir("f1"))
+
         assert config is not None
         assert config.user_id == "u1"
         assert config.user_email == "test@test.com"
+        assert not (tmp_path / ".collabmark").exists()

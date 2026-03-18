@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -16,6 +17,7 @@ from collabmark.lib.config import (
     init_project,
     save_sync_state,
 )
+from collabmark.lib.registry import register_sync
 from collabmark.lib.sync_engine import (
     ActionKind,
     _flatten_tree,
@@ -345,19 +347,24 @@ class TestCommandHelp:
 
 class TestInitCommand:
     def test_already_initialized(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
-        project_dir.mkdir()
+        cli_home = tmp_path / "home"
+        target = tmp_path / "project"
+        target.mkdir()
+
         config = SyncConfig(
             server_url="http://localhost:8000",
             folder_id="f1",
             folder_name="Test",
             user_id="u1",
             user_email="test@test.com",
+            local_path=str(target.resolve()),
         )
-        init_project(tmp_path, config)
+        with patch.dict(os.environ, {"COLLABMARK_HOME": str(cli_home)}):
+            init_project("f1", config)
+            register_sync(str(target), "f1", "Test", "http://localhost:8000", "test@test.com")
 
-        runner = CliRunner()
-        result = runner.invoke(cli, ["init", "--path", str(tmp_path)])
+            runner = CliRunner()
+            result = runner.invoke(cli, ["init", "--path", str(target)])
         assert "already set up" in result.output
 
     @pytest.mark.asyncio

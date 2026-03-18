@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from collabmark.lib.api import CollabMarkClient, NotFoundError
-from collabmark.lib.config import PROJECT_DIR_NAME, load_sync_state, save_sync_state
+from collabmark.lib.config import load_sync_state, save_sync_state
 from collabmark.lib.sync_engine import (
     ActionKind,
     SyncAction,
@@ -23,6 +23,7 @@ from collabmark.lib.sync_engine import (
     push_new_file,
     push_update,
     reconcile,
+    run_document_sync_cycle,
 )
 from collabmark.types import DocumentInfo, FolderInfo, SyncFileEntry, SyncFolderEntry, SyncState
 
@@ -105,13 +106,14 @@ class TestListLocalMdFiles:
         rel = str(Path("sub/deep/nested.md"))
         assert rel in result
 
-    def test_ignores_collabmark_directory(self, tmp_path: Path) -> None:
+    def test_no_longer_ignores_collabmark_directory(self, tmp_path: Path) -> None:
+        """Config is now centralized, so .collabmark md files are normal files."""
         (tmp_path / "doc.md").write_text("hello", encoding="utf-8")
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / ".collabmark"
         project_dir.mkdir()
         (project_dir / "internal.md").write_text("skip", encoding="utf-8")
         result = _list_local_md_files(tmp_path)
-        assert len(result) == 1
+        assert len(result) == 2
 
     def test_empty_directory(self, tmp_path: Path) -> None:
         result = _list_local_md_files(tmp_path)
@@ -261,7 +263,6 @@ class TestReconcile:
         assert actions[1].rel_path == "b.md"
 
     def test_untracked_local_and_remote_same_content_no_action(self) -> None:
-        """File exists both locally and remotely (not tracked) with same content."""
         text = "identical"
         local = {"doc.md": content_hash(text)}
         state = SyncState()
@@ -296,7 +297,7 @@ class TestPushNewFile:
         sync_root.mkdir()
         (sync_root / "new.md").write_text("# Hello", encoding="utf-8")
 
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState()
@@ -320,7 +321,7 @@ class TestPushUpdate:
         sync_root.mkdir()
         (sync_root / "doc.md").write_text("updated", encoding="utf-8")
 
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState(files={"doc.md": SyncFileEntry("d1", content_hash("old"), "t1")})
@@ -340,7 +341,7 @@ class TestPullFile:
         sync_root = tmp_path / "root"
         sync_root.mkdir()
 
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState()
@@ -361,7 +362,7 @@ class TestPullFile:
         sync_root = tmp_path / "root"
         sync_root.mkdir()
 
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState()
@@ -382,7 +383,7 @@ class TestDeleteLocal:
         sync_root.mkdir()
         (sync_root / "obsolete.md").write_text("old", encoding="utf-8")
 
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState(files={"obsolete.md": SyncFileEntry("d1", "h1", "t1")})
@@ -401,7 +402,7 @@ class TestDeleteLocal:
         sync_root = tmp_path / "root"
         sync_root.mkdir()
 
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState(files={"gone.md": SyncFileEntry("d1", "h1", "t1")})
@@ -413,7 +414,7 @@ class TestDeleteLocal:
 class TestDeleteRemote:
     @pytest.mark.asyncio
     async def test_soft_deletes_document(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState(files={"doc.md": SyncFileEntry("d1", "h1", "t1")})
@@ -427,7 +428,7 @@ class TestDeleteRemote:
 
     @pytest.mark.asyncio
     async def test_handles_already_deleted_remote(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState(files={"doc.md": SyncFileEntry("d1", "h1", "t1")})
@@ -451,7 +452,7 @@ class TestStatePersistence:
         sync_root.mkdir()
         (sync_root / "file.md").write_text("data", encoding="utf-8")
 
-        project_dir = sync_root / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
         save_sync_state(SyncState(), project_dir)
 
@@ -474,7 +475,7 @@ class TestStatePersistence:
 class TestEnsureCloudFolders:
     @pytest.mark.asyncio
     async def test_creates_single_level_folder(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState()
@@ -490,7 +491,7 @@ class TestEnsureCloudFolders:
 
     @pytest.mark.asyncio
     async def test_creates_nested_folders_depth_first(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState()
@@ -514,7 +515,7 @@ class TestEnsureCloudFolders:
 
     @pytest.mark.asyncio
     async def test_skips_existing_folders(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState(folders={"src": SyncFolderEntry(folder_id="existing_f")})
@@ -527,7 +528,7 @@ class TestEnsureCloudFolders:
 
     @pytest.mark.asyncio
     async def test_ignores_root_level_files(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState()
@@ -540,7 +541,7 @@ class TestEnsureCloudFolders:
 
     @pytest.mark.asyncio
     async def test_ignores_non_push_actions(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState()
@@ -556,7 +557,7 @@ class TestEnsureCloudFolders:
 
     @pytest.mark.asyncio
     async def test_deduplicates_shared_parent(self, tmp_path: Path) -> None:
-        project_dir = tmp_path / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         state = SyncState()
@@ -571,3 +572,119 @@ class TestEnsureCloudFolders:
         await _ensure_cloud_folders(mock_client, actions, state, "root_f", project_dir)
 
         mock_client.create_folder.assert_called_once_with("docs", parent_id="root_f")
+
+
+# ===================================================================
+# Document sync cycle
+# ===================================================================
+
+
+class TestRunDocumentSyncCycle:
+    @pytest.mark.asyncio
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    async def test_pulls_new_document(self, mock_read, tmp_path: Path) -> None:
+        mock_read.return_value = "# Remote Content"
+
+        local_file = tmp_path / "doc.md"
+        project_dir = tmp_path / "project_state"
+        project_dir.mkdir()
+
+        state = SyncState()
+
+        result = await run_document_sync_cycle(local_file, "d1", state, project_dir, _FAKE_API_KEY)
+
+        assert result is True
+        assert local_file.read_text(encoding="utf-8") == "# Remote Content"
+        assert "doc.md" in state.files
+
+    @pytest.mark.asyncio
+    @patch("collabmark.lib.sync_engine.write_content_via_ws", new_callable=AsyncMock)
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    async def test_pushes_new_local_content(self, mock_read, mock_write, tmp_path: Path) -> None:
+        mock_read.return_value = ""
+
+        local_file = tmp_path / "doc.md"
+        local_file.write_text("# Local Content", encoding="utf-8")
+        project_dir = tmp_path / "project_state"
+        project_dir.mkdir()
+
+        state = SyncState()
+
+        result = await run_document_sync_cycle(local_file, "d1", state, project_dir, _FAKE_API_KEY)
+
+        assert result is True
+        mock_write.assert_called_once()
+        assert "doc.md" in state.files
+
+    @pytest.mark.asyncio
+    @patch("collabmark.lib.sync_engine.update_content_via_ws", new_callable=AsyncMock)
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    async def test_pushes_local_update(self, mock_read, mock_update, tmp_path: Path) -> None:
+        old_content = "old content"
+        new_content = "new local content"
+        mock_read.return_value = old_content
+
+        local_file = tmp_path / "doc.md"
+        local_file.write_text(new_content, encoding="utf-8")
+        project_dir = tmp_path / "project_state"
+        project_dir.mkdir()
+
+        state = SyncState(files={"doc.md": SyncFileEntry("d1", content_hash(old_content), "t1")})
+
+        result = await run_document_sync_cycle(local_file, "d1", state, project_dir, _FAKE_API_KEY)
+
+        assert result is True
+        mock_update.assert_called_once()
+        assert state.files["doc.md"].content_hash == content_hash(new_content)
+
+    @pytest.mark.asyncio
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    async def test_pulls_remote_update(self, mock_read, tmp_path: Path) -> None:
+        old_content = "old content"
+        new_remote = "new remote content"
+        mock_read.return_value = new_remote
+
+        local_file = tmp_path / "doc.md"
+        local_file.write_text(old_content, encoding="utf-8")
+        project_dir = tmp_path / "project_state"
+        project_dir.mkdir()
+
+        state = SyncState(files={"doc.md": SyncFileEntry("d1", content_hash(old_content), "t1")})
+
+        result = await run_document_sync_cycle(local_file, "d1", state, project_dir, _FAKE_API_KEY)
+
+        assert result is True
+        assert local_file.read_text(encoding="utf-8") == new_remote
+
+    @pytest.mark.asyncio
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    async def test_no_changes_returns_false(self, mock_read, tmp_path: Path) -> None:
+        content = "same content"
+        mock_read.return_value = content
+
+        local_file = tmp_path / "doc.md"
+        local_file.write_text(content, encoding="utf-8")
+        project_dir = tmp_path / "project_state"
+        project_dir.mkdir()
+
+        state = SyncState(files={"doc.md": SyncFileEntry("d1", content_hash(content), "t1")})
+
+        result = await run_document_sync_cycle(local_file, "d1", state, project_dir, _FAKE_API_KEY)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    @patch("collabmark.lib.sync_engine.read_content_via_ws", new_callable=AsyncMock)
+    async def test_conflict_returns_false(self, mock_read, tmp_path: Path) -> None:
+        mock_read.return_value = "remote edit"
+
+        local_file = tmp_path / "doc.md"
+        local_file.write_text("local edit", encoding="utf-8")
+        project_dir = tmp_path / "project_state"
+        project_dir.mkdir()
+
+        state = SyncState(files={"doc.md": SyncFileEntry("d1", content_hash("original"), "t1")})
+
+        result = await run_document_sync_cycle(local_file, "d1", state, project_dir, _FAKE_API_KEY)
+
+        assert result is False

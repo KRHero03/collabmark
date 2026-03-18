@@ -9,9 +9,9 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from collabmark.lib.config import find_project_root, load_sync_config, load_sync_state
+from collabmark.lib.config import get_project_dir, load_sync_config, load_sync_state
 from collabmark.lib.daemon import is_process_alive, read_pid
-from collabmark.lib.registry import list_syncs, load_registry
+from collabmark.lib.registry import find_entry_by_path, list_syncs
 
 console = Console()
 
@@ -71,9 +71,9 @@ def status(path: str | None) -> None:
     if path:
         _show_project_status(Path(path))
     else:
-        project_root = find_project_root()
-        if project_root:
-            _show_project_status(project_root)
+        entry = find_entry_by_path(Path.cwd())
+        if entry:
+            _show_project_status_from_entry(entry)
         else:
             _show_global_status()
 
@@ -122,30 +122,27 @@ def _show_global_status() -> None:
 
 
 def _show_project_status(start_dir: Path) -> None:
-    """Display detailed status for a single project."""
-    project_root = find_project_root(start_dir)
-
-    if not project_root:
+    """Display detailed status for a project by directory path."""
+    entry = find_entry_by_path(start_dir)
+    if not entry:
         console.print("[yellow]No active sync found.[/yellow] Run [bold]collabmark start[/bold] to begin.")
         return
+    _show_project_status_from_entry(entry)
 
-    project_dir = project_root / ".collabmark"
+
+def _show_project_status_from_entry(entry) -> None:
+    """Display detailed status for a single project from a registry entry."""
+    project_dir = get_project_dir(entry.folder_id)
     config = load_sync_config(project_dir)
     state = load_sync_state(project_dir)
 
-    folder_id = config.folder_id if config else None
-    pid = read_pid(folder_id)
+    pid = read_pid(entry.folder_id)
     is_running = pid is not None and is_process_alive(pid)
 
-    reg_entry = None
-    if not is_running:
-        abs_path = str(project_root.resolve())
-        reg = load_registry()
-        reg_entry = reg.syncs.get(abs_path)
-        if reg_entry and reg_entry.status == "running" and reg_entry.pid:
-            if is_process_alive(reg_entry.pid):
-                is_running = True
-                pid = reg_entry.pid
+    if not is_running and entry.status == "running" and entry.pid:
+        if is_process_alive(entry.pid):
+            is_running = True
+            pid = entry.pid
 
     table = Table(show_header=False, box=None, padding=(0, 2))
     table.add_column(style="bold")
@@ -156,19 +153,19 @@ def _show_project_status(start_dir: Path) -> None:
         table.add_row("User:", config.user_email)
         table.add_row("Server:", config.server_url)
 
-    table.add_row("Local:", str(project_root))
+    table.add_row("Local:", entry.local_path)
     table.add_row("Files:", f"{len(state.files)} synced")
     table.add_row("Folders:", f"{len(state.folders)} tracked")
 
     if is_running:
         table.add_row("Status:", f"[green]Running[/green] (PID {pid})")
-    elif reg_entry and reg_entry.status == "error":
-        table.add_row("Status:", f"[red]Error[/red] [dim]({reg_entry.last_error or ''})[/dim]")
+    elif entry.status == "error":
+        table.add_row("Status:", f"[red]Error[/red] [dim]({entry.last_error or ''})[/dim]")
     else:
         table.add_row("Status:", "[dim]Stopped[/dim]")
 
-    if reg_entry and reg_entry.last_synced_at:
-        table.add_row("Last Sync:", _format_ago(reg_entry.last_synced_at))
+    if entry.last_synced_at:
+        table.add_row("Last Sync:", _format_ago(entry.last_synced_at))
 
     console.print()
     console.print("[bold]CollabMark Sync Status[/bold]")

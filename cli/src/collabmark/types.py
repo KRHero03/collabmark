@@ -15,6 +15,11 @@ class SyncDirection(Enum):
     BOTH = "both"
 
 
+class SyncMode(Enum):
+    FOLDER = "folder"
+    DOCUMENT = "document"
+
+
 @dataclass(frozen=True)
 class CloudDocument:
     """Lightweight reference to a document in CollabMark cloud."""
@@ -95,13 +100,16 @@ class FolderContents:
 
 @dataclass
 class SyncConfig:
-    """Persisted in ``.collabmark/config.json`` inside the synced directory."""
+    """Persisted in ``~/.collabmark/projects/{folder_id}/config.json``."""
 
     server_url: str
     folder_id: str
     folder_name: str
     user_id: str
     user_email: str
+    local_path: str = ""
+    sync_mode: str = "folder"
+    doc_id: Optional[str] = None
 
 
 @dataclass
@@ -122,7 +130,7 @@ class SyncFolderEntry:
 
 @dataclass
 class SyncState:
-    """Full sync state persisted in ``.collabmark/sync.json``."""
+    """Full sync state persisted in ``~/.collabmark/projects/{id}/sync.json``."""
 
     files: dict[str, SyncFileEntry] = field(default_factory=dict)
     folders: dict[str, SyncFolderEntry] = field(default_factory=dict)

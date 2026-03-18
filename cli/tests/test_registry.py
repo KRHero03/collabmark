@@ -12,6 +12,8 @@ import pytest
 from collabmark.lib.registry import (
     SyncRegistry,
     clear_stopped_entries,
+    find_entry_by_folder_id,
+    find_entry_by_path,
     list_syncs,
     load_registry,
     mark_stopped,
@@ -207,6 +209,67 @@ class TestListSyncs:
     def test_returns_empty_when_no_registry(self, registry_home: Path) -> None:
         syncs = list_syncs()
         assert syncs == []
+
+
+class TestFindEntryByPath:
+    def test_finds_exact_match(self, registry_home: Path) -> None:
+        dir_a = registry_home / "proj"
+        dir_a.mkdir()
+        register_sync(str(dir_a), "f1", "Proj", "http://x", "a@a.com")
+        entry = find_entry_by_path(dir_a)
+        assert entry is not None
+        assert entry.folder_id == "f1"
+
+    def test_finds_parent_match(self, registry_home: Path) -> None:
+        dir_a = registry_home / "proj"
+        dir_a.mkdir()
+        register_sync(str(dir_a), "f1", "Proj", "http://x", "a@a.com")
+        sub = dir_a / "sub" / "deep"
+        sub.mkdir(parents=True)
+        entry = find_entry_by_path(sub)
+        assert entry is not None
+        assert entry.folder_id == "f1"
+
+    def test_returns_none_when_no_match(self, registry_home: Path) -> None:
+        entry = find_entry_by_path(Path("/tmp/unknown"))
+        assert entry is None
+
+
+class TestFindEntryByFolderId:
+    def test_finds_by_folder_id(self, registry_home: Path) -> None:
+        register_sync("/tmp/notes", "f_target", "Notes", "http://x", "a@a.com")
+        entry = find_entry_by_folder_id("f_target")
+        assert entry is not None
+        assert entry.folder_name == "Notes"
+
+    def test_returns_none_when_no_match(self, registry_home: Path) -> None:
+        entry = find_entry_by_folder_id("nonexistent")
+        assert entry is None
+
+
+class TestDocSyncFields:
+    def test_register_with_doc_id_and_sync_mode(self, registry_home: Path) -> None:
+        register_sync(
+            "/tmp/doc.md",
+            "f1",
+            "Doc",
+            "http://x",
+            "a@a.com",
+            doc_id="d123",
+            sync_mode="document",
+        )
+        reg = load_registry()
+        resolved = str(Path("/tmp/doc.md").resolve())
+        entry = reg.syncs[resolved]
+        assert entry.doc_id == "d123"
+        assert entry.sync_mode == "document"
+
+    def test_default_sync_mode_is_folder(self, registry_home: Path) -> None:
+        register_sync("/tmp/notes", "f1", "Notes", "http://x", "a@a.com")
+        reg = load_registry()
+        resolved = str(Path("/tmp/notes").resolve())
+        assert reg.syncs[resolved].sync_mode == "folder"
+        assert reg.syncs[resolved].doc_id is None
 
 
 class TestLoadRegistry:

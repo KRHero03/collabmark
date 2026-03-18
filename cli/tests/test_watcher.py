@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 from watchdog.events import DirCreatedEvent, FileCreatedEvent, FileDeletedEvent, FileModifiedEvent, FileMovedEvent
 
-from collabmark.lib.watcher import DebouncedWatcher, _MarkdownHandler
+from collabmark.lib.watcher import DebouncedWatcher, SingleFileWatcher, _MarkdownHandler
 
 # ===================================================================
 # _MarkdownHandler filtering
@@ -32,13 +32,16 @@ class TestMarkdownHandler:
         handler.on_created(event)
         cb.assert_not_called()
 
-    def test_ignores_collabmark_directory(self, tmp_path: Path) -> None:
+    def test_no_longer_ignores_collabmark_directory(self, tmp_path: Path) -> None:
+        """Config is now centralized, so .collabmark dirs are not special."""
         cb = MagicMock()
         handler = _MarkdownHandler(callback=cb, sync_root=tmp_path)
 
-        event = FileModifiedEvent(str(tmp_path / ".collabmark" / "sync.md"))
+        collabmark_dir = tmp_path / ".collabmark"
+        collabmark_dir.mkdir()
+        event = FileModifiedEvent(str(collabmark_dir / "sync.md"))
         handler.on_modified(event)
-        cb.assert_not_called()
+        cb.assert_called_once()
 
     def test_accepts_nested_md_file(self, tmp_path: Path) -> None:
         cb = MagicMock()
@@ -153,5 +156,54 @@ class TestDebouncedWatcher:
             (tmp_path / "crash.md").write_text("x", encoding="utf-8")
             time.sleep(0.3)
             assert watcher.is_running
+        finally:
+            watcher.stop()
+
+
+# ===================================================================
+# SingleFileWatcher
+# ===================================================================
+
+
+class TestSingleFileWatcher:
+    def test_start_and_stop(self, tmp_path: Path) -> None:
+        target = tmp_path / "doc.md"
+        target.write_text("hello", encoding="utf-8")
+        cb = MagicMock()
+        watcher = SingleFileWatcher(target, on_change=cb, debounce_sec=0.05)
+        watcher.start()
+        assert watcher.is_running
+        watcher.stop()
+        assert not watcher.is_running
+
+    def test_detects_target_file_change(self, tmp_path: Path) -> None:
+        target = tmp_path / "doc.md"
+        target.write_text("initial", encoding="utf-8")
+        cb = MagicMock()
+        watcher = SingleFileWatcher(target, on_change=cb, debounce_sec=0.1)
+        watcher.start()
+        try:
+            time.sleep(0.2)
+            target.write_text("modified", encoding="utf-8")
+            time.sleep(0.5)
+            assert cb.call_count >= 1
+        finally:
+            watcher.stop()
+
+    def test_ignores_other_files_in_same_dir(self, tmp_path: Path) -> None:
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        target = sub / "target.md"
+        target.write_text("keep", encoding="utf-8")
+        cb = MagicMock()
+        watcher = SingleFileWatcher(target, on_change=cb, debounce_sec=0.1)
+        watcher.start()
+        try:
+            time.sleep(0.3)
+            cb.reset_mock()
+            (tmp_path / "other.md").write_text("noise", encoding="utf-8")
+            (tmp_path / "another.txt").write_text("noise", encoding="utf-8")
+            time.sleep(0.4)
+            cb.assert_not_called()
         finally:
             watcher.stop()

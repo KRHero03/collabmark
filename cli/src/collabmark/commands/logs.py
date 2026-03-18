@@ -4,14 +4,15 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.prompt import Prompt
 
-from collabmark.lib.config import find_project_root, load_sync_config
+from collabmark.lib.config import get_project_dir, load_sync_config
 from collabmark.lib.logger import get_log_file, list_log_files
-from collabmark.lib.registry import load_registry
+from collabmark.lib.registry import find_entry_by_path, load_registry
 
 console = Console()
 
@@ -58,9 +59,10 @@ def _resolve_log_file(folder: str | None):
         console.print(f"[yellow]No log file for folder '{folder}'.[/yellow]")
         return None
 
-    project_root = find_project_root()
-    if project_root:
-        config = load_sync_config(project_root / ".collabmark")
+    entry = find_entry_by_path(Path.cwd())
+    if entry:
+        project_dir = get_project_dir(entry.folder_id)
+        config = load_sync_config(project_dir)
         if config:
             log_file = get_log_file(config.folder_id)
             if log_file.is_file():

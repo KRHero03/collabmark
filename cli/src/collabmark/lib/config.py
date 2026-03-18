@@ -2,7 +2,7 @@
 
 Global paths:
     ~/.collabmark/              — CLI home (credentials, global config)
-    .collabmark/                — per-project sync state (created in working dir)
+    ~/.collabmark/projects/     — per-project sync state (centralized)
 
 Environment overrides:
     COLLABMARK_API_URL          — base URL for the CollabMark API
@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -60,32 +61,9 @@ def get_credentials_path() -> Path:
     return get_cli_home() / "credentials.json"
 
 
-def get_project_dir(root: Path | None = None) -> Path:
-    """Return the ``.collabmark/`` directory for a given sync root."""
-    base = root or Path.cwd()
-    return base / PROJECT_DIR_NAME
-
-
-# ---------------------------------------------------------------------------
-# Project discovery
-# ---------------------------------------------------------------------------
-
-
-def find_project_root(start: Path | None = None, max_depth: int = 20) -> Path | None:
-    """Walk up from *start* looking for a ``.collabmark/`` directory.
-
-    Returns the **sync root** (parent of ``.collabmark/``), or ``None``.
-    """
-    current = (start or Path.cwd()).resolve()
-    for _ in range(max_depth):
-        candidate = current / PROJECT_DIR_NAME
-        if candidate.is_dir() and (candidate / _CONFIG_FILE).is_file():
-            return current
-        parent = current.parent
-        if parent == current:
-            break
-        current = parent
-    return None
+def get_project_dir(folder_id: str) -> Path:
+    """Return the centralized project directory for a given folder/doc sync."""
+    return get_cli_home() / "projects" / folder_id
 
 
 # ---------------------------------------------------------------------------
@@ -93,12 +71,12 @@ def find_project_root(start: Path | None = None, max_depth: int = 20) -> Path | 
 # ---------------------------------------------------------------------------
 
 
-def init_project(sync_root: Path, config: SyncConfig) -> Path:
-    """Create ``.collabmark/`` with initial ``config.json`` and empty ``sync.json``.
+def init_project(folder_id: str, config: SyncConfig) -> Path:
+    """Create centralized project dir with ``config.json`` and empty ``sync.json``.
 
-    Returns the path to the ``.collabmark/`` directory.
+    Returns the path to the project directory.
     """
-    project_dir = sync_root / PROJECT_DIR_NAME
+    project_dir = get_project_dir(folder_id)
     project_dir.mkdir(parents=True, exist_ok=True)
 
     save_sync_config(config, project_dir)
@@ -106,6 +84,55 @@ def init_project(sync_root: Path, config: SyncConfig) -> Path:
 
     logger.debug("Initialised project at %s", project_dir)
     return project_dir
+
+
+# ---------------------------------------------------------------------------
+# Migration from old local .collabmark/ dirs
+# ---------------------------------------------------------------------------
+
+
+def migrate_local_project(sync_root: Path) -> str | None:
+    """Migrate a legacy ``{sync_root}/.collabmark/`` dir to centralized storage.
+
+    Returns the folder_id if migration succeeded, None otherwise.
+    """
+    old_dir = sync_root / PROJECT_DIR_NAME
+    if not old_dir.is_dir() or not (old_dir / _CONFIG_FILE).is_file():
+        return None
+
+    old_config = load_sync_config(old_dir)
+    if not old_config:
+        return None
+
+    folder_id = old_config.folder_id
+    new_dir = get_project_dir(folder_id)
+
+    if new_dir.exists():
+        logger.debug("Centralized project already exists for %s, removing old local dir", folder_id)
+    else:
+        new_dir.mkdir(parents=True, exist_ok=True)
+        for item in old_dir.iterdir():
+            if item.name.endswith(".tmp"):
+                continue
+            dest = new_dir / item.name
+            if item.is_file():
+                shutil.copy2(item, dest)
+
+    if not old_config.local_path:
+        old_config.local_path = str(sync_root.resolve())
+        save_sync_config(old_config, new_dir)
+
+    shutil.rmtree(old_dir, ignore_errors=True)
+    logger.info("Migrated project config from %s to %s", old_dir, new_dir)
+    return folder_id
+
+
+def detect_and_migrate(sync_root: Path) -> str | None:
+    """Check for a legacy local ``.collabmark/`` and migrate if found."""
+    old_dir = sync_root / PROJECT_DIR_NAME
+    if old_dir.is_dir() and (old_dir / _CONFIG_FILE).is_file():
+        return migrate_local_project(sync_root)
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -146,23 +173,24 @@ def _read_json(path: Path) -> dict | None:
 # ---------------------------------------------------------------------------
 
 
-def save_sync_config(config: SyncConfig, project_dir: Path | None = None) -> None:
-    directory = project_dir or get_project_dir()
+def save_sync_config(config: SyncConfig, project_dir: Path) -> None:
     _atomic_write_json(
-        directory / _CONFIG_FILE,
+        project_dir / _CONFIG_FILE,
         {
             "server_url": config.server_url,
             "folder_id": config.folder_id,
             "folder_name": config.folder_name,
             "user_id": config.user_id,
             "user_email": config.user_email,
+            "local_path": config.local_path,
+            "sync_mode": config.sync_mode,
+            "doc_id": config.doc_id,
         },
     )
 
 
-def load_sync_config(project_dir: Path | None = None) -> SyncConfig | None:
-    directory = project_dir or get_project_dir()
-    data = _read_json(directory / _CONFIG_FILE)
+def load_sync_config(project_dir: Path) -> SyncConfig | None:
+    data = _read_json(project_dir / _CONFIG_FILE)
     if not data:
         return None
     try:
@@ -172,6 +200,9 @@ def load_sync_config(project_dir: Path | None = None) -> SyncConfig | None:
             folder_name=data["folder_name"],
             user_id=data["user_id"],
             user_email=data["user_email"],
+            local_path=data.get("local_path", ""),
+            sync_mode=data.get("sync_mode", "folder"),
+            doc_id=data.get("doc_id"),
         )
     except KeyError as exc:
         logger.warning("Incomplete config.json, missing key: %s", exc)
@@ -183,8 +214,7 @@ def load_sync_config(project_dir: Path | None = None) -> SyncConfig | None:
 # ---------------------------------------------------------------------------
 
 
-def save_sync_state(state: SyncState, project_dir: Path | None = None) -> None:
-    directory = project_dir or get_project_dir()
+def save_sync_state(state: SyncState, project_dir: Path) -> None:
     files = {
         rel: {
             "doc_id": entry.doc_id,
@@ -194,13 +224,12 @@ def save_sync_state(state: SyncState, project_dir: Path | None = None) -> None:
         for rel, entry in state.files.items()
     }
     folders = {rel: {"folder_id": entry.folder_id} for rel, entry in state.folders.items()}
-    _atomic_write_json(directory / _SYNC_FILE, {"files": files, "folders": folders})
+    _atomic_write_json(project_dir / _SYNC_FILE, {"files": files, "folders": folders})
 
 
-def load_sync_state(project_dir: Path | None = None) -> SyncState:
+def load_sync_state(project_dir: Path) -> SyncState:
     """Load sync state; returns an empty ``SyncState`` if missing or corrupt."""
-    directory = project_dir or get_project_dir()
-    data = _read_json(directory / _SYNC_FILE)
+    data = _read_json(project_dir / _SYNC_FILE)
     if not data:
         return SyncState()
 

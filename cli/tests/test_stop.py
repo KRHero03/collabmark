@@ -15,10 +15,7 @@ from collabmark.lib.registry import load_registry, register_sync
 class TestStopNoSyncs:
     def test_shows_no_syncs_message(self, tmp_path: Path) -> None:
         runner = CliRunner()
-        with (
-            patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path)}),
-            patch("collabmark.commands.stop.find_project_root", return_value=None),
-        ):
+        with patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path)}):
             result = runner.invoke(stop)
         assert result.exit_code == 0
         assert "No syncs are currently running" in result.output
@@ -65,7 +62,6 @@ class TestInteractiveStop:
         runner = CliRunner()
         with (
             patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path / "home")}),
-            patch("collabmark.commands.stop.find_project_root", return_value=None),
             patch("collabmark.lib.registry._is_pid_alive", return_value=True),
             patch("os.kill"),
             patch("collabmark.lib.daemon.remove_pid_file"),

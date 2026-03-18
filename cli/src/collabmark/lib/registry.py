@@ -42,6 +42,8 @@ class SyncRegistryEntry:
     last_error: str | None = None
     pid: int | None = None
     status: str = "stopped"
+    doc_id: str | None = None
+    sync_mode: str = "folder"
 
 
 @dataclass
@@ -125,6 +127,28 @@ def load_registry() -> SyncRegistry:
             fcntl.flock(f, fcntl.LOCK_UN)
 
 
+def find_entry_by_path(path: Path) -> SyncRegistryEntry | None:
+    """Find a registry entry whose ``local_path`` contains *path*.
+
+    Checks if *path* equals or is a subdirectory of any registered sync root.
+    """
+    target = str(path.resolve())
+    reg = load_registry()
+    for entry in reg.syncs.values():
+        if target == entry.local_path or target.startswith(entry.local_path + os.sep):
+            return entry
+    return None
+
+
+def find_entry_by_folder_id(folder_id: str) -> SyncRegistryEntry | None:
+    """Find a registry entry by cloud folder ID."""
+    reg = load_registry()
+    for entry in reg.syncs.values():
+        if entry.folder_id == folder_id:
+            return entry
+    return None
+
+
 def register_sync(
     local_path: str,
     folder_id: str,
@@ -132,6 +156,8 @@ def register_sync(
     server_url: str,
     user_email: str,
     pid: int | None = None,
+    doc_id: str | None = None,
+    sync_mode: str = "folder",
 ) -> None:
     """Register or update a sync project in the registry."""
     abs_path = str(Path(local_path).resolve())
@@ -150,6 +176,8 @@ def register_sync(
             last_error=None,
             pid=pid or os.getpid(),
             status="running",
+            doc_id=doc_id,
+            sync_mode=sync_mode,
         )
         return reg
 

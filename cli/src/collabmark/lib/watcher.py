@@ -18,12 +18,11 @@ from watchdog.observers import Observer
 logger = logging.getLogger(__name__)
 
 _MD_SUFFIX = ".md"
-_IGNORE_DIR = ".collabmark"
 _DEFAULT_DEBOUNCE_SEC = 0.5
 
 
 class _MarkdownHandler(FileSystemEventHandler):
-    """Filter filesystem events to only ``.md`` files outside ``.collabmark/``."""
+    """Filter filesystem events to only ``.md`` files."""
 
     def __init__(
         self,
@@ -38,10 +37,10 @@ class _MarkdownHandler(FileSystemEventHandler):
         if not path.endswith(_MD_SUFFIX):
             return False
         try:
-            rel = str(Path(path).relative_to(self._sync_root))
+            Path(path).relative_to(self._sync_root)
         except ValueError:
             return False
-        return _IGNORE_DIR not in Path(rel).parts
+        return True
 
     def on_created(self, event: FileCreatedEvent) -> None:
         if not event.is_directory and self._is_relevant(event.src_path):
@@ -141,6 +140,94 @@ class DebouncedWatcher:
                     loop.run_until_complete(result)
         except Exception:
             logger.exception("Error in sync callback")
+
+    @property
+    def is_running(self) -> bool:
+        return self._observer is not None and self._observer.is_alive()
+
+
+class _SingleFileHandler(FileSystemEventHandler):
+    """Watch for changes to a single specific file."""
+
+    def __init__(self, target: Path, callback: Callable[[str], None]) -> None:
+        super().__init__()
+        self._target = str(target.resolve())
+        self._callback = callback
+
+    def _matches(self, path: str) -> bool:
+        return str(Path(path).resolve()) == self._target
+
+    def on_created(self, event) -> None:
+        if not event.is_directory and self._matches(event.src_path):
+            self._callback(event.src_path)
+
+    def on_modified(self, event) -> None:
+        if not event.is_directory and self._matches(event.src_path):
+            self._callback(event.src_path)
+
+    def on_moved(self, event) -> None:
+        if not event.is_directory and self._matches(getattr(event, "dest_path", "")):
+            self._callback(event.dest_path)
+
+
+class SingleFileWatcher:
+    """Watch a single file for changes with debouncing.
+
+    Watches the parent directory and filters events to the target file only.
+    """
+
+    def __init__(
+        self,
+        target_file: Path,
+        on_change: Callable[[], object],
+        debounce_sec: float = _DEFAULT_DEBOUNCE_SEC,
+    ) -> None:
+        self._target = target_file.resolve()
+        self._on_change = on_change
+        self._debounce_sec = debounce_sec
+        self._observer: Observer | None = None
+        self._timer: threading.Timer | None = None
+        self._lock = threading.Lock()
+
+    def start(self) -> None:
+        handler = _SingleFileHandler(self._target, self._on_event)
+        self._observer = Observer()
+        self._observer.schedule(handler, str(self._target.parent), recursive=False)
+        self._observer.start()
+        logger.info("Watching single file %s", self._target)
+
+    def stop(self) -> None:
+        with self._lock:
+            if self._timer:
+                self._timer.cancel()
+                self._timer = None
+        if self._observer:
+            self._observer.stop()
+            self._observer.join(timeout=5)
+            self._observer = None
+        logger.info("Stopped watching %s", self._target)
+
+    def _on_event(self, path: str) -> None:
+        with self._lock:
+            if self._timer:
+                self._timer.cancel()
+            self._timer = threading.Timer(self._debounce_sec, self._fire_callback)
+            self._timer.daemon = True
+            self._timer.start()
+
+    def _fire_callback(self) -> None:
+        with self._lock:
+            self._timer = None
+        try:
+            result = self._on_change()
+            if asyncio.iscoroutine(result):
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.run_coroutine_threadsafe(result, loop)
+                else:
+                    loop.run_until_complete(result)
+        except Exception:
+            logger.exception("Error in single-file sync callback")
 
     @property
     def is_running(self) -> bool:

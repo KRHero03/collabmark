@@ -21,10 +21,7 @@ def _write_log_entries(log_file: Path, entries: list[dict]) -> None:
 class TestNoLogs:
     def test_shows_no_log_file_message(self, tmp_path: Path) -> None:
         runner = CliRunner()
-        with (
-            patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path)}),
-            patch("collabmark.commands.logs.find_project_root", return_value=None),
-        ):
+        with patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path)}):
             result = runner.invoke(logs)
         assert result.exit_code == 0
         assert "No log file found" in result.output

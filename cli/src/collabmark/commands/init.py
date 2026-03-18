@@ -16,7 +16,8 @@ from collabmark.commands.start import (
 )
 from collabmark.lib.api import CollabMarkClient
 from collabmark.lib.auth import AuthError, ensure_authenticated
-from collabmark.lib.config import find_project_root
+from collabmark.lib.config import detect_and_migrate
+from collabmark.lib.registry import find_entry_by_path
 
 console = Console()
 
@@ -33,7 +34,8 @@ console = Console()
 def init(link: str | None, path: str | None) -> None:
     """Set up the current directory for CollabMark sync.
 
-    This creates a .collabmark/ folder and links it to a cloud folder.
+    This links a local directory to a cloud folder. Configuration is
+    stored centrally in ~/.collabmark/projects/.
     After running init, use `collabmark start` to begin syncing.
 
     \b
@@ -47,8 +49,10 @@ def init(link: str | None, path: str | None) -> None:
 async def _init_async(link: str | None, path_str: str | None) -> None:
     target = Path(path_str) if path_str else Path.cwd()
 
-    existing = find_project_root(target)
-    if existing == target:
+    detect_and_migrate(target)
+
+    existing = find_entry_by_path(target)
+    if existing and Path(existing.local_path) == target.resolve():
         console.print(
             "[yellow]This directory is already set up for sync.[/yellow]\n"
             "Run [bold]collabmark start[/bold] to begin syncing, or "
@@ -70,7 +74,7 @@ async def _init_async(link: str | None, path_str: str | None) -> None:
             folder_id = _extract_folder_id_from_link(link)
             if folder_id:
                 folder = await client.get_folder(folder_id)
-                _init_project_config(target, client, folder.id, folder.name, user_info)
+                _init_project_config(target, folder.id, folder.name, user_info)
                 console.print(f"[green]✓[/green] Linked to cloud folder [bold]{folder.name}[/bold]")
             else:
                 console.print("[red]Could not parse folder link.[/red]")
