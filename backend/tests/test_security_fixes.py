@@ -226,8 +226,7 @@ class TestContentDisposition:
         mock_body = MagicMock()
         mock_body.read.return_value = b"%PDF-1.4 fake content"
         mock_obj = {"Body": mock_body, "ContentType": "application/pdf"}
-        with patch("app.main._get_s3_client") as mock_client:
-            mock_client.return_value.get_object.return_value = mock_obj
+        with patch("app.services.blob_storage.get_object", return_value=mock_obj):
             resp = await async_client.get("/media/documents/abc/report.pdf")
         assert resp.status_code == 200
         assert "attachment" in resp.headers.get("Content-Disposition", "")
@@ -238,8 +237,7 @@ class TestContentDisposition:
         mock_body = MagicMock()
         mock_body.read.return_value = b"\x89PNG\r\n fake"
         mock_obj = {"Body": mock_body, "ContentType": "image/png"}
-        with patch("app.main._get_s3_client") as mock_client:
-            mock_client.return_value.get_object.return_value = mock_obj
+        with patch("app.services.blob_storage.get_object", return_value=mock_obj):
             resp = await async_client.get("/media/documents/abc/image.png")
         assert resp.status_code == 200
         assert "Content-Disposition" not in resp.headers

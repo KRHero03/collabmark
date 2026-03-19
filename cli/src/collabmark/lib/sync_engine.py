@@ -292,9 +292,18 @@ async def pull_file(
     project_dir: Path,
     api_key: str,
 ) -> None:
-    """Download content from CRDT and write it locally."""
+    """Download content from CRDT and write it locally.
+
+    Safety: refuses to overwrite a non-empty local file with empty
+    content (likely a transient server/network issue).
+    """
     content = await _crdt_read(doc_id, api_key)
     file_path = sync_root / rel_path
+
+    if not content and file_path.is_file() and file_path.stat().st_size > 0:
+        logger.warning("Refusing to overwrite %s with empty content (possible offline/error)", rel_path)
+        return
+
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(content, encoding="utf-8")
 
@@ -567,7 +576,7 @@ async def _execute_action(
         delete_local(sync_root, state, action.rel_path, project_dir)
 
     elif action.kind == ActionKind.CONFLICT:
-        _handle_conflict(sync_root, action)
+        await _handle_conflict(sync_root, action, state, project_dir, api_key)
 
 
 def _resolve_folder_id(rel_path: str, state: SyncState, root_folder_id: str) -> str:
@@ -579,13 +588,47 @@ def _resolve_folder_id(rel_path: str, state: SyncState, root_folder_id: str) -> 
     return entry.folder_id if entry else root_folder_id
 
 
-def _handle_conflict(sync_root: Path, action: SyncAction) -> None:
-    """Log a conflict without overwriting either side."""
+async def _handle_conflict(
+    sync_root: Path,
+    action: SyncAction,
+    state: SyncState,
+    project_dir: Path,
+    api_key: str,
+) -> None:
+    """Save the cloud version as a sidecar .conflict file and warn the user.
+
+    The local file is untouched. The remote version is written to
+    ``<name>.conflict.<date>.md`` so the user can compare both and merge.
+    """
+    local_file = sync_root / action.rel_path
+    stem = local_file.stem
+    suffix = local_file.suffix
+    date_tag = datetime.now(UTC).strftime("%Y-%m-%d_%H%M%S")
+    conflict_name = f"{stem}.conflict.{date_tag}{suffix}"
+    conflict_path = local_file.parent / conflict_name
+
+    remote_content = ""
+    if action.doc_id:
+        remote_content = await _crdt_read(action.doc_id, api_key)
+
+    if remote_content:
+        conflict_path.write_text(remote_content, encoding="utf-8")
+    else:
+        conflict_path.write_text(
+            f"# Conflict detected for {action.rel_path}\n\n"
+            "Could not retrieve remote content. Compare manually with the cloud version.\n",
+            encoding="utf-8",
+        )
+
+    entry = state.files.get(action.rel_path)
+    if entry:
+        entry.last_synced_at = _now_iso()
+        save_sync_state(state, project_dir)
+
     logger.warning(
-        "CONFLICT  %s -- modified both locally and on cloud. Resolve manually. Local hash: %s, remote hash: %s",
+        "CONFLICT  %s  →  cloud version saved as %s",
         action.rel_path,
-        action.local_hash,
-        action.remote_hash,
+        conflict_name,
     )
 
 
@@ -627,6 +670,9 @@ async def run_document_sync_cycle(
         return True
 
     if not local_h and remote_content:
+        if not remote_content.strip():
+            logger.warning("Refusing to pull empty content for %s", local_file.name)
+            return False
         local_file.parent.mkdir(parents=True, exist_ok=True)
         local_file.write_text(remote_content, encoding="utf-8")
         state.files[rel_key] = SyncFileEntry(doc_id=doc_id, content_hash=remote_hash, last_synced_at=_now_iso())
@@ -639,7 +685,15 @@ async def run_document_sync_cycle(
         remote_changed = remote_hash != entry.content_hash
 
         if local_changed and remote_changed:
-            logger.warning("CONFLICT on %s -- resolve manually", local_file.name)
+            date_tag = datetime.now(UTC).strftime("%Y-%m-%d_%H%M%S")
+            conflict_name = f"{local_file.stem}.conflict.{date_tag}{local_file.suffix}"
+            conflict_path = local_file.parent / conflict_name
+            conflict_path.write_text(remote_content, encoding="utf-8")
+            logger.warning(
+                "CONFLICT  %s  →  cloud version saved as %s",
+                local_file.name,
+                conflict_name,
+            )
             return False
 
         if local_changed:

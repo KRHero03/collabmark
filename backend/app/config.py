@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     ]
     super_admin_emails: list[str] = []
 
-    s3_endpoint_url: str = "http://localhost:9002"
+    s3_endpoint_url: str = ""
     s3_access_key: str = "collabmark"
     s3_secret_key: str = "collabmark-secret"
     s3_bucket: str = "collabmark-media"

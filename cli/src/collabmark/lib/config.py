@@ -33,8 +33,11 @@ _DEFAULT_FRONTEND_URL = "https://web-production-5e1bc.up.railway.app"
 
 API_KEY_HEADER = "X-API-Key"
 PROJECT_DIR_NAME = ".collabmark"
+_home_override = os.environ.get("COLLABMARK_HOME")
+COLLABMARK_HOME = Path(_home_override) if _home_override else Path.home() / ".collabmark"
 _CONFIG_FILE = "config.json"
 _SYNC_FILE = "sync.json"
+_PENDING_FILE = "pending.json"
 
 
 # ---------------------------------------------------------------------------
@@ -252,3 +255,26 @@ def load_sync_state(project_dir: Path) -> SyncState:
             logger.warning("Skipping corrupt folder entry: %s", rel)
 
     return SyncState(files=files, folders=folders)
+
+
+# ---------------------------------------------------------------------------
+# Pending changes queue (pending.json)
+# ---------------------------------------------------------------------------
+
+
+def save_pending_actions(project_dir: Path, actions: list[dict]) -> None:
+    """Persist failed sync actions to retry on the next successful cycle."""
+    _atomic_write_json(project_dir / _PENDING_FILE, {"actions": actions})
+
+
+def load_pending_actions(project_dir: Path) -> list[dict]:
+    data = _read_json(project_dir / _PENDING_FILE)
+    if not data:
+        return []
+    return data.get("actions", [])
+
+
+def clear_pending_actions(project_dir: Path) -> None:
+    pending = project_dir / _PENDING_FILE
+    if pending.is_file():
+        pending.unlink(missing_ok=True)

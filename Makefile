@@ -1,4 +1,4 @@
-.PHONY: help install lint lint-fix format format-check test test-be test-fe test-cov build ci clean
+.PHONY: help install quickstart lint lint-fix format format-check test test-be test-fe test-cov build ci clean
 
 BACKEND  := backend
 FRONTEND := frontend
@@ -13,6 +13,32 @@ help: ## Show this help
 install: ## Install all dependencies (backend + frontend)
 	cd $(BACKEND) && python3 -m venv .venv && $(VENV)/pip install -r requirements.txt
 	cd $(FRONTEND) && yarn install
+
+# ── Quick Start ──────────────────────────────────────────────────────
+
+quickstart: ## One-command dev setup: env, deps, infra, backend + frontend
+	@echo "==> Copying .env.example → .env (if missing)"
+	@test -f .env || cp .env.example .env
+	@echo "==> Installing dependencies"
+	@$(MAKE) install
+	@echo "==> Starting MongoDB and Redis via Docker"
+	@docker compose up -d mongodb redis 2>/dev/null || echo "Docker unavailable — start MongoDB and Redis manually"
+	@echo "==> Waiting for MongoDB..."
+	@for i in 1 2 3 4 5 6 7 8 9 10; do \
+		mongosh --eval "db.runCommand({ping:1})" --quiet 2>/dev/null && break || sleep 2; \
+	done
+	@echo ""
+	@echo "✓ Ready! Start the servers in two terminals:"
+	@echo "  Terminal 1:  cd backend && source .venv/bin/activate && uvicorn app.main:app --reload"
+	@echo "  Terminal 2:  cd frontend && yarn dev"
+	@echo ""
+	@echo "  App:     http://localhost:5173"
+	@echo "  API:     http://localhost:8000"
+	@echo "  Swagger: http://localhost:8000/docs"
+	@echo ""
+	@echo "Note: S3/MinIO is optional (files stored locally in backend/media/)."
+	@echo "      Redis is optional (notifications disabled if unavailable)."
+	@echo "      Google OAuth credentials are required — see .env for setup instructions."
 
 # ── Lint ─────────────────────────────────────────────────────────────
 

@@ -7,7 +7,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from beanie import init_beanie
-from botocore.exceptions import ClientError
 from fastapi import Cookie, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
@@ -39,7 +38,7 @@ from app.models.share_link import DocumentAccess, ShareLink
 from app.models.user import User
 from app.rate_limit import limiter
 from app.routes import auth, comments, documents, folders, keys, notifications, orgs, scim, sharing, users, versions, ws
-from app.services.blob_storage import MIME_TYPES, _get_s3_client
+from app.services.blob_storage import MIME_TYPES
 from app.services.channels.email import EmailChannel
 from app.services.crdt_store import MongoYStore
 from app.services.notification_dispatcher import (
@@ -208,20 +207,19 @@ async def serve_media(
     file_path: str,
     access_token: str | None = Cookie(default=None, alias="access_token"),
 ):
-    """Proxy media files from S3-compatible blob storage.
+    """Proxy media files from blob storage (S3 or local filesystem).
 
     Requires a valid JWT cookie. Non-image files are served as attachments
     to prevent browser execution of uploaded PDFs, Office docs, etc.
     """
     from app.auth.jwt import decode_access_token
+    from app.services.blob_storage import get_object
 
     if not access_token or decode_access_token(access_token) is None:
         return Response(status_code=401)
 
-    client = _get_s3_client()
-    try:
-        obj = client.get_object(Bucket=settings.s3_bucket, Key=file_path)
-    except ClientError:
+    obj = get_object(file_path)
+    if obj is None:
         return Response(status_code=404)
 
     ext = Path(file_path).suffix.lower()

@@ -6,6 +6,8 @@ from rich.panel import Panel
 
 from collabmark import __version__
 from collabmark.commands.clean import clean
+from collabmark.commands.conflicts import conflicts
+from collabmark.commands.doctor import doctor
 from collabmark.commands.init import init
 from collabmark.commands.list_syncs import list_syncs
 from collabmark.commands.login import login
@@ -69,3 +71,5 @@ cli.add_command(stop)
 cli.add_command(logs)
 cli.add_command(list_syncs, name="list")
 cli.add_command(clean)
+cli.add_command(conflicts)
+cli.add_command(doctor)

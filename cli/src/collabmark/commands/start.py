@@ -25,8 +25,9 @@ from collabmark.lib.config import (
 )
 from collabmark.lib.daemon import daemonize, remove_pid_file, write_pid_file
 from collabmark.lib.logger import setup_logging
+from collabmark.lib.persistent_sync import PersistentDocSync
 from collabmark.lib.registry import find_entry_by_path, mark_stopped, register_sync, update_heartbeat
-from collabmark.lib.sync_engine import ActionKind, run_document_sync_cycle, run_sync_cycle
+from collabmark.lib.sync_engine import ActionKind, content_hash, run_document_sync_cycle, run_sync_cycle
 from collabmark.lib.watcher import DebouncedWatcher, SingleFileWatcher
 from collabmark.types import SyncConfig
 
@@ -56,7 +57,14 @@ logger = logging.getLogger(__name__)
     default=None,
     help="Sync a single document by ID or URL.",
 )
-def start(link: str | None, daemon: bool, path: str | None, interval: float, doc: str | None) -> None:
+@click.option(
+    "-v",
+    "--verbose",
+    is_flag=True,
+    default=False,
+    help="Enable verbose (DEBUG) logging to the console.",
+)
+def start(link: str | None, daemon: bool, path: str | None, interval: float, doc: str | None, verbose: bool) -> None:
     """Start syncing markdown files with CollabMark.
 
     \b
@@ -72,6 +80,9 @@ def start(link: str | None, daemon: bool, path: str | None, interval: float, doc
     them in sync bidirectionally. Press Ctrl+C to stop when running
     in the foreground, or use `collabmark stop` for background mode.
     """
+    if verbose:
+        setup_logging(verbose=True)
+
     if doc:
         try:
             asyncio.run(_start_doc_async(doc, path, interval))
@@ -442,7 +453,15 @@ async def _doc_watch_loop(
     interval: float,
     api_key: str,
 ) -> None:
-    """Run periodic document sync cycles + single-file watching."""
+    """Watch a single document with a persistent WebSocket for real-time sync.
+
+    Local changes (detected by watchdog) are pushed via the persistent
+    connection. Remote changes arrive via SYNC_UPDATE messages and are
+    written to disk immediately.
+    """
+    from collabmark.lib.config import save_sync_state
+    from collabmark.types import SyncFileEntry
+
     stop_event = asyncio.Event()
     loop = asyncio.get_event_loop()
 
@@ -452,27 +471,90 @@ async def _doc_watch_loop(
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
 
+    _writing_from_remote = False
+
+    async def _on_remote_update(remote_doc_id: str, new_content: str) -> None:
+        nonlocal _writing_from_remote
+        if not new_content or not new_content.strip():
+            return
+        if local_file.is_file():
+            current = local_file.read_text(encoding="utf-8")
+            if current == new_content:
+                return
+        _writing_from_remote = True
+        try:
+            local_file.parent.mkdir(parents=True, exist_ok=True)
+            local_file.write_text(new_content, encoding="utf-8")
+            h = content_hash(new_content)
+            from collabmark.lib.sync_engine import _now_iso
+
+            state.files[local_file.name] = SyncFileEntry(
+                doc_id=remote_doc_id, content_hash=h, last_synced_at=_now_iso()
+            )
+            save_sync_state(state, project_dir)
+            update_heartbeat(str(local_file.resolve()), 1)
+            logger.info("↓ real-time pull: %s", local_file.name)
+        finally:
+            _writing_from_remote = False
+
+    psync = PersistentDocSync(
+        doc_id=doc_id,
+        api_key=api_key,
+        on_remote_update=_on_remote_update,
+    )
+    await psync.start()
+
+    if await psync.wait_connected(timeout=15):
+        console.print("[green]✓[/green] Real-time WebSocket connected")
+    else:
+        console.print("[yellow]⚠[/yellow] WebSocket connection pending, falling back to polling")
+
     def on_file_change():
-        asyncio.run_coroutine_threadsafe(
-            _doc_sync_once(local_file, doc_id, state, project_dir, api_key),
-            loop,
-        )
+        if _writing_from_remote:
+            return
+        asyncio.run_coroutine_threadsafe(_push_local(psync, local_file, doc_id, state, project_dir), loop)
 
     watcher = SingleFileWatcher(local_file, on_change=on_file_change)
     watcher.start()
 
     try:
         while not stop_event.is_set():
-            await _doc_sync_once(local_file, doc_id, state, project_dir, api_key)
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=interval)
             except asyncio.TimeoutError:
-                pass
+                if not psync.is_connected:
+                    await _doc_sync_once(local_file, doc_id, state, project_dir, api_key)
     finally:
         watcher.stop()
+        await psync.stop()
         console.print("[dim]Final sync...[/dim]")
         await _doc_sync_once(local_file, doc_id, state, project_dir, api_key)
         console.print("[green]✓[/green] Stopped.")
+
+
+async def _push_local(
+    psync: PersistentDocSync,
+    local_file: Path,
+    doc_id: str,
+    state,
+    project_dir: Path,
+) -> None:
+    """Push local file content through the persistent WebSocket."""
+    from collabmark.lib.config import save_sync_state
+    from collabmark.lib.sync_engine import _now_iso
+    from collabmark.types import SyncFileEntry
+
+    if not local_file.is_file():
+        return
+    text = local_file.read_text(encoding="utf-8")
+    if not text:
+        return
+    if await psync.push_content(text):
+        h = content_hash(text)
+        state.files[local_file.name] = SyncFileEntry(doc_id=doc_id, content_hash=h, last_synced_at=_now_iso())
+        save_sync_state(state, project_dir)
+        update_heartbeat(str(local_file.resolve()), 1)
+        logger.info("↑ real-time push: %s", local_file.name)
 
 
 async def _sync_once(client, sync_root, folder_id, state, project_dir, api_key=None):
