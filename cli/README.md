@@ -51,17 +51,6 @@ Remove stored credentials from the OS keychain.
 collabmark logout
 ```
 
-### `collabmark init`
-
-Set up the current directory for syncing. Links the directory to a cloud
-folder. Configuration is stored centrally in `~/.collabmark/projects/`.
-After init, use `start` to begin syncing.
-
-```bash
-collabmark init                      # Interactive folder picker
-collabmark init <share-link>         # Join a shared folder by link
-```
-
 ### `collabmark start`
 
 Begin syncing markdown files. Performs an initial sync, then watches for
@@ -222,7 +211,6 @@ cli/
     main.py               Root CLI group, welcome banner
     types.py              Shared dataclasses (SyncConfig, DocumentInfo, etc.)
     commands/
-      init.py             collabmark init
       login.py            collabmark login
       logout.py           collabmark logout
       start.py            collabmark start (with registry + heartbeat)

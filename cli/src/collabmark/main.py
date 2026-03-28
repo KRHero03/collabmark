@@ -8,7 +8,6 @@ from collabmark import __version__
 from collabmark.commands.clean import clean
 from collabmark.commands.conflicts import conflicts
 from collabmark.commands.doctor import doctor
-from collabmark.commands.init import init
 from collabmark.commands.list_syncs import list_syncs
 from collabmark.commands.login import login
 from collabmark.commands.logout import logout
@@ -62,7 +61,6 @@ def cli(ctx: click.Context) -> None:
         console.print()
 
 
-cli.add_command(init)
 cli.add_command(login)
 cli.add_command(logout)
 cli.add_command(start)
