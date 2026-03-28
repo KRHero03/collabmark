@@ -16,6 +16,7 @@ from rich.prompt import Prompt
 from collabmark.lib.api import CollabMarkClient
 from collabmark.lib.auth import AuthError, UserInfo, ensure_authenticated
 from collabmark.lib.config import (
+    detect_and_migrate,
     get_api_url,
     get_project_dir,
     init_project,
@@ -116,6 +117,8 @@ async def _start_async(
     is_daemon: bool = False,
 ) -> None:
     sync_root = Path(path_str) if path_str else Path.cwd()
+
+    detect_and_migrate(sync_root)
 
     api_key, user_info = await _authenticate()
     console.print(f"[green]✓[/green] {user_info.name} ({user_info.email})")
