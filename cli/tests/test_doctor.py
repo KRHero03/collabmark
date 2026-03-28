@@ -14,9 +14,6 @@ from collabmark.commands.doctor import (
     _check_keyring,
     doctor,
 )
-from collabmark.lib.auth import LoginMetadata
-
-_FAKE_META = LoginMetadata(email="test@example.com", name="Test User")
 
 
 class TestCheckConfigDir:
@@ -33,7 +30,7 @@ class TestCheckConfigDir:
 class TestCheckCredentials:
     def test_returns_true_when_logged_in(self):
         with (
-            patch("collabmark.commands.doctor.load_metadata", return_value=_FAKE_META),
+            patch("collabmark.commands.doctor.load_metadata", return_value={"email": "test@example.com"}),
             patch("collabmark.commands.doctor.load_api_key", return_value="cm_test_key"),
         ):
             ok, key = _check_credentials()
@@ -51,7 +48,7 @@ class TestCheckCredentials:
 
     def test_returns_false_when_no_api_key(self):
         with (
-            patch("collabmark.commands.doctor.load_metadata", return_value=_FAKE_META),
+            patch("collabmark.commands.doctor.load_metadata", return_value={"email": "test@example.com"}),
             patch("collabmark.commands.doctor.load_api_key", return_value=None),
         ):
             ok, _key = _check_credentials()

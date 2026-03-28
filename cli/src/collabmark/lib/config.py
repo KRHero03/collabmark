@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -31,6 +32,7 @@ _DEFAULT_API_URL = "https://web-production-5e1bc.up.railway.app"
 _DEFAULT_FRONTEND_URL = "https://web-production-5e1bc.up.railway.app"
 
 API_KEY_HEADER = "X-API-Key"
+PROJECT_DIR_NAME = ".collabmark"
 _home_override = os.environ.get("COLLABMARK_HOME")
 COLLABMARK_HOME = Path(_home_override) if _home_override else Path.home() / ".collabmark"
 _CONFIG_FILE = "config.json"
@@ -85,6 +87,55 @@ def init_project(folder_id: str, config: SyncConfig) -> Path:
 
     logger.debug("Initialised project at %s", project_dir)
     return project_dir
+
+
+# ---------------------------------------------------------------------------
+# Migration from old local .collabmark/ dirs
+# ---------------------------------------------------------------------------
+
+
+def migrate_local_project(sync_root: Path) -> str | None:
+    """Migrate a legacy ``{sync_root}/.collabmark/`` dir to centralized storage.
+
+    Returns the folder_id if migration succeeded, None otherwise.
+    """
+    old_dir = sync_root / PROJECT_DIR_NAME
+    if not old_dir.is_dir() or not (old_dir / _CONFIG_FILE).is_file():
+        return None
+
+    old_config = load_sync_config(old_dir)
+    if not old_config:
+        return None
+
+    folder_id = old_config.folder_id
+    new_dir = get_project_dir(folder_id)
+
+    if new_dir.exists():
+        logger.debug("Centralized project already exists for %s, removing old local dir", folder_id)
+    else:
+        new_dir.mkdir(parents=True, exist_ok=True)
+        for item in old_dir.iterdir():
+            if item.name.endswith(".tmp"):
+                continue
+            dest = new_dir / item.name
+            if item.is_file():
+                shutil.copy2(item, dest)
+
+    if not old_config.local_path:
+        old_config.local_path = str(sync_root.resolve())
+        save_sync_config(old_config, new_dir)
+
+    shutil.rmtree(old_dir, ignore_errors=True)
+    logger.info("Migrated project config from %s to %s", old_dir, new_dir)
+    return folder_id
+
+
+def detect_and_migrate(sync_root: Path) -> str | None:
+    """Check for a legacy local ``.collabmark/`` and migrate if found."""
+    old_dir = sync_root / PROJECT_DIR_NAME
+    if old_dir.is_dir() and (old_dir / _CONFIG_FILE).is_file():
+        return migrate_local_project(sync_root)
+    return None
 
 
 # ---------------------------------------------------------------------------
