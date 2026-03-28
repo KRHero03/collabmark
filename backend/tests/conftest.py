@@ -1,6 +1,7 @@
 import asyncio
 from unittest.mock import patch
 
+import mongomock
 import pytest
 import pytest_asyncio
 from app.main import DOCUMENT_MODELS, app
@@ -8,6 +9,20 @@ from app.models.user import User
 from beanie import init_beanie
 from httpx import ASGITransport, AsyncClient
 from mongomock_motor import AsyncMongoMockClient
+
+# ---------------------------------------------------------------------------
+# Patch mongomock to accept extra kwargs (authorizedCollections, nameOnly, …)
+# that newer pymongo/motor versions pass to list_collection_names().
+# mongomock 4.3.0 only accepts (filter, session), causing TypeError.
+# ---------------------------------------------------------------------------
+_orig_list_collection_names = mongomock.Database.list_collection_names
+
+
+def _patched_list_collection_names(self, filter=None, session=None, **_kwargs):
+    return _orig_list_collection_names(self, filter=filter, session=session)
+
+
+mongomock.Database.list_collection_names = _patched_list_collection_names
 
 
 @pytest.fixture(scope="session")
