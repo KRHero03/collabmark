@@ -97,7 +97,7 @@ collabmark --version
 # 3. All commands are registered
 collabmark --help
 # Expected output must list ALL of these commands:
-#   login, start, stop, status, list, logs, clean, conflicts, doctor
+#   login, start, stop, status, list, logs, clean, conflicts, doctor, init
 
 # 4. Doctor runs without crashing (failures are expected pre-login)
 export COLLABMARK_API_URL=http://localhost:8000
@@ -274,7 +274,7 @@ redis-cli shutdown
 | 3 | Backend tests pass | Shell | `pytest tests/` -- 1044+ passed |
 | 4 | CLI tests pass | Shell | `pytest tests/` -- 410+ passed |
 | 5 | CLI installs in venv | Shell | `which collabmark` points to venv, `collabmark --version` matches `__init__.py` |
-| 6 | CLI commands registered | Shell | `collabmark --help` lists login, start, stop, status, list, logs, clean, conflicts, doctor |
+| 6 | CLI commands registered | Shell | `collabmark --help` lists login, start, stop, status, list, logs, clean, conflicts, doctor, init |
 | 7 | Doctor command | Shell | `collabmark doctor` runs, shows keyring + config checks |
 | 8 | Conflicts command | Shell | `collabmark conflicts` finds `.conflict` files, shows table |
 | 9 | Verbose flag | Shell | `collabmark start -v --help` shows `-v/--verbose` |

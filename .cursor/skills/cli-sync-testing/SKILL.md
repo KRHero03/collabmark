@@ -96,9 +96,10 @@ Type new content in the Playwright editor. Wait ~12s. Read the local file.
 1. Create a folder on the web UI via Playwright ("New Folder")
 2. Add 2+ documents inside the folder with content
 3. Note the folder ID from the URL (`?folder=<folder_id>`)
-4. Start sync (pass folder ID as argument — `start` handles linking automatically):
+4. Initialize and start sync:
 ```bash
 mkdir -p /tmp/collabmark-e2e/folder-sync-test
+echo "1" | /tmp/collabmark-e2e/cm init -p /tmp/collabmark-e2e/folder-sync-test
 /tmp/collabmark-e2e/cm start <folder_id> -p /tmp/collabmark-e2e/folder-sync-test &
 ```
 

@@ -122,7 +122,8 @@ package providing the `collabmark` entry point.
 |---------|-------------|
 | `login` | Opens browser for OAuth, receives auth code, exchanges for API key |
 | `logout` | Clears stored credentials from OS keychain |
-| `start` | Links directory to a cloud folder and starts sync (filesystem watcher + periodic sync) |
+| `init` | Links current directory to a cloud folder |
+| `start` | Starts background sync daemon (filesystem watcher + periodic sync) |
 | `stop` | Stops the background sync daemon |
 | `status` | Shows current sync state and daemon health |
 | `logs` | Displays sync log (supports `-f` for follow mode) |

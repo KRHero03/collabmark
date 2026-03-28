@@ -37,6 +37,16 @@ Remove stored credentials from the OS keychain and delete `~/.collabmark/credent
 collabmark logout
 ```
 
+### `collabmark init`
+
+Link a local directory to a cloud folder. Configuration is stored centrally in `~/.collabmark/projects/`. After init, use `start` to begin syncing.
+
+```bash
+collabmark init                      # Interactive folder picker
+collabmark init <share-link>         # Join a shared folder by link
+collabmark init -p ~/notes           # Init a specific directory
+```
+
 ### `collabmark start`
 
 Begin syncing markdown files. Performs an initial sync, then watches for changes on both sides. Content is synced via CRDT WebSocket for real-time bidirectional updates.
