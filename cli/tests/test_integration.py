@@ -13,7 +13,6 @@ from collabmark import __version__
 from collabmark.lib.api import CollabMarkClient
 from collabmark.lib.auth import AuthError
 from collabmark.lib.config import (
-    PROJECT_DIR_NAME,
     init_project,
     save_sync_state,
 )
@@ -173,7 +172,7 @@ class TestRunSyncCycle:
         sync_root.mkdir()
         (sync_root / "notes.md").write_text("# Notes\n", encoding="utf-8")
 
-        project_dir = sync_root / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
         state = SyncState()
         save_sync_state(state, project_dir)
@@ -202,7 +201,7 @@ class TestRunSyncCycle:
         sync_root = tmp_path / "root"
         sync_root.mkdir()
 
-        project_dir = sync_root / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
         state = SyncState()
         save_sync_state(state, project_dir)
@@ -231,7 +230,7 @@ class TestRunSyncCycle:
         sync_root.mkdir()
         (sync_root / "doc.md").write_text("same content", encoding="utf-8")
 
-        project_dir = sync_root / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         h = content_hash("same content")
@@ -259,7 +258,7 @@ class TestRunSyncCycle:
         sync_root.mkdir()
         (sync_root / "doc.md").write_text("local version", encoding="utf-8")
 
-        project_dir = sync_root / PROJECT_DIR_NAME
+        project_dir = tmp_path / "project_state"
         project_dir.mkdir()
 
         h = content_hash("original")

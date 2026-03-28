@@ -64,7 +64,15 @@ All tests must pass. If you added a security-relevant fix, add a matching test.
 
 ## 3. Write & Run Unit Tests
 
-### Coverage target: >90% on changed code
+### Coverage targets
+
+| Component | Minimum overall coverage | Minimum per-file coverage |
+|-----------|-------------------------|--------------------------|
+| Backend (`app/`) | **90%** | 80% (flag any file below) |
+| CLI (`collabmark/`) | **90%** | 80% (flag any file below) |
+| Frontend (`src/`) | **90%** | 80% (flag any file below) |
+
+These are **hard gates** — do not commit if overall coverage drops below the threshold. Per-file coverage below 80% must be flagged and justified (e.g., daemon/WebSocket code that requires live infrastructure).
 
 For every new or modified function/endpoint, write tests covering:
 - Happy path with specific value assertions (`assert data["title"] == "My Doc"`)
@@ -74,17 +82,25 @@ For every new or modified function/endpoint, write tests covering:
 
 ### Backend tests
 ```bash
-cd backend && .venv/bin/python -m pytest --cov=app --cov-report=term-missing -x
+cd backend && source .venv/bin/activate && DEBUG=1 python -m pytest --cov=app --cov-report=term-missing --cov-fail-under=90 -x
 ```
 - Check `term-missing` output — every new function must be covered.
 - Test files: `tests/test_<module>.py`
 - Stack: pytest + pytest-asyncio + httpx ASGI transport + mongomock-motor
 - Do NOT use generic assertions like `assert response.json()`.
 
+### CLI tests
+```bash
+cd cli && source .venv/bin/activate && python -m pytest --cov=collabmark --cov-report=term-missing --cov-fail-under=90 -x
+```
+- Test files: `tests/test_<module>.py`
+- Stack: pytest + unittest.mock + click.testing.CliRunner
+
 ### Frontend tests
 ```bash
-cd frontend && yarn test:coverage
+cd frontend && yarn test --coverage
 ```
+- Verify the summary line shows ≥90% Stmts coverage.
 - Test files: `src/**/<Component>.test.tsx` or `src/**/<hook>.test.ts`
 - Stack: Vitest + React Testing Library + jsdom
 - Destructure from `render()` return — do NOT import `screen` from `@testing-library/react`.
@@ -93,7 +109,7 @@ cd frontend && yarn test:coverage
 ### After writing tests
 ```bash
 make test         # run full suite — all must pass
-make test-cov     # verify coverage numbers
+make test-cov     # verify coverage numbers across all components
 ```
 
 ## 4. Build Verification

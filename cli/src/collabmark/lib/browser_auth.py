@@ -1,8 +1,9 @@
 """Browser-based OAuth login flow for the CollabMark CLI.
 
 Opens the user's default browser to the CollabMark login page, starts a
-temporary local HTTP server to receive the callback, then exchanges the
-JWT for a persistent API key.
+temporary local HTTP server to receive a short-lived auth code, exchanges
+the code for a JWT via the backend, then trades the JWT for a persistent
+API key.
 """
 
 from __future__ import annotations
@@ -26,25 +27,25 @@ _CLI_API_KEY_NAME = "CollabMark CLI (auto-created)"
 
 
 class _CallbackHandler(BaseHTTPRequestHandler):
-    """HTTP handler that captures the OAuth callback token.
+    """HTTP handler that captures the short-lived auth code from the backend.
 
-    After capturing (or failing to capture) the token, the browser is
+    After capturing (or failing to capture) the code, the browser is
     redirected back to the main CollabMark frontend ``/cli-login`` page
     with a ``status`` query parameter so the real site renders the
     success/error UI with full theme and styling support.
     """
 
-    token: str | None = None
+    code: str | None = None
     frontend_url: str = "/"
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
-        token_list = params.get("token", [])
+        code_list = params.get("code", [])
 
         base = _CallbackHandler.frontend_url.rstrip("/")
-        if token_list:
-            _CallbackHandler.token = token_list[0]
+        if code_list:
+            _CallbackHandler.code = code_list[0]
             redirect = f"{base}/cli-login?{urlencode({'status': 'success'})}"
         else:
             redirect = f"{base}/cli-login?{urlencode({'status': 'error'})}"
@@ -64,6 +65,26 @@ def _find_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", 0))
         return s.getsockname()[1]
+
+
+async def _exchange_code_for_jwt(code: str, api_url: str) -> str:
+    """Exchange a single-use CLI auth code for a JWT via the backend.
+
+    The backend issues short-lived codes via ``GET /api/auth/cli/complete``
+    and this function redeems them via ``POST /api/auth/cli/exchange``.
+
+    Returns the JWT string.
+    Raises ``AuthError`` on failure or if the code has expired.
+    """
+    async with httpx.AsyncClient(base_url=api_url, timeout=10.0) as client:
+        try:
+            resp = await client.post("/api/auth/cli/exchange", json={"code": code})
+        except httpx.HTTPError as exc:
+            raise AuthError(f"Cannot reach CollabMark server: {exc}") from exc
+
+    if resp.status_code != 200:
+        raise AuthError(f"Code exchange failed (status {resp.status_code}). Please try logging in again.")
+    return resp.json()["token"]
 
 
 async def _reuse_or_create_api_key(jwt_token: str, api_url: str) -> tuple[str, UserInfo]:
@@ -117,10 +138,11 @@ async def browser_login(
     2. Open the browser to the CollabMark CLI login page.
     3. User authenticates via Google or SSO in the browser.
     4. Frontend detects login, redirects to backend /api/auth/cli/complete.
-    5. Backend relays JWT to the CLI's local server.
-    6. CLI captures the token, redirects browser to /cli-login?status=success.
-    7. CLI exchanges JWT for a persistent API key.
-    8. API key is stored in the OS keychain.
+    5. Backend issues a short-lived auth code and redirects to CLI's local server.
+    6. CLI captures the code, redirects browser to /cli-login?status=success.
+    7. CLI exchanges the code for a JWT via POST /api/auth/cli/exchange.
+    8. CLI exchanges JWT for a persistent API key.
+    9. API key is stored in the OS keychain.
 
     Returns (api_key, user_info).
     Raises AuthError on failure or timeout.
@@ -130,7 +152,7 @@ async def browser_login(
     port = _find_free_port()
     login_url = f"{frontend}/cli-login?port={port}"
 
-    _CallbackHandler.token = None
+    _CallbackHandler.code = None
     _CallbackHandler.frontend_url = frontend
     server = HTTPServer(("127.0.0.1", port), _CallbackHandler)
 
@@ -142,16 +164,17 @@ async def browser_login(
 
         elapsed = 0
         poll_interval = 0.5
-        while _CallbackHandler.token is None and elapsed < timeout_seconds:
+        while _CallbackHandler.code is None and elapsed < timeout_seconds:
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
 
-        if _CallbackHandler.token is None:
+        if _CallbackHandler.code is None:
             raise AuthError(
                 f"Login timed out after {timeout_seconds}s. Please try again or use --api-key for manual login."
             )
 
-        jwt_token = _CallbackHandler.token
+        auth_code = _CallbackHandler.code
+        jwt_token = await _exchange_code_for_jwt(auth_code, base)
 
         raw_api_key, user_info = await _reuse_or_create_api_key(jwt_token, base)
         save_api_key(raw_api_key)

@@ -30,4 +30,12 @@ Thumbs.db
 # Logs
 *.log
 backend/.coverage
+cli/.coverage
 frontend/coverage/
+
+# Playwright MCP
+.playwright-mcp/
+
+# Redis
+dump.rdb
+backend/dump.rdb
