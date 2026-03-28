@@ -53,8 +53,9 @@ collabmark logout
 
 ### `collabmark init`
 
-Set up the current directory for syncing. Creates a `.collabmark/` config folder
-and links to a cloud folder. After init, use `start` to begin syncing.
+Set up the current directory for syncing. Links the directory to a cloud
+folder. Configuration is stored centrally in `~/.collabmark/projects/`.
+After init, use `start` to begin syncing.
 
 ```bash
 collabmark init                      # Interactive folder picker
@@ -129,10 +130,10 @@ collabmark clean --force             # Remove all entries (including running)
 
 ## How Sync Works
 
-1. **Local scan** -- finds all `.md` files recursively (ignoring `.collabmark/`).
+1. **Local scan** -- finds all `.md` files recursively (ignoring hidden directories).
 2. **Cloud scan** -- fetches the full folder tree from CollabMark in one API call.
 3. **Three-way reconciliation** -- compares local files, the last-known sync state
-   (`.collabmark/sync.json`), and cloud documents to determine what changed where.
+   (`~/.collabmark/projects/{id}/sync.json`), and cloud documents to determine what changed where.
 4. **CRDT sync** -- content is pushed/pulled via WebSocket using pycrdt (the same
    CRDT library the server uses), so edits merge correctly with concurrent web users.
 5. **Continuous watch** -- uses OS filesystem events (debounced) plus periodic
@@ -157,8 +158,7 @@ to track all active and stopped syncs. This enables:
 
 ## Configuration
 
-All per-project configuration lives in `.collabmark/` at the root of your
-synced directory:
+All per-project configuration is stored centrally under `~/.collabmark/projects/{folder_id}/`:
 
 | File              | Purpose                                      |
 |-------------------|----------------------------------------------|
@@ -166,7 +166,7 @@ synced directory:
 | `sync.json`       | Per-file sync state (hashes, doc IDs)        |
 | `trash/`          | Files removed by cloud-side deletions        |
 
-Global state is stored under `~/.collabmark/`:
+Global state is also stored under `~/.collabmark/`:
 
 | Path                              | Purpose                                  |
 |-----------------------------------|------------------------------------------|
@@ -235,7 +235,7 @@ cli/
       api.py              Async REST client with retry/backoff
       auth.py             Keychain credential management
       browser_auth.py     Browser-based OAuth flow
-      config.py           .collabmark/ config and state management
+      config.py           Centralized config and state management
       crdt_sync.py        CRDT WebSocket sync (pycrdt)
       daemon.py           Per-project PID file and process management
       logger.py           Per-project structured JSON logging

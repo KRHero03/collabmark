@@ -8,13 +8,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from collabmark.lib.config import (
-    PROJECT_DIR_NAME,
-    detect_and_migrate,
     get_project_dir,
     init_project,
     load_sync_config,
     load_sync_state,
-    migrate_local_project,
     save_sync_config,
     save_sync_state,
 )
@@ -338,93 +335,3 @@ class TestInitProject:
             loaded = load_sync_config(get_project_dir("f1"))
 
         assert loaded is not None
-
-
-# ===================================================================
-# Migration from local .collabmark/
-# ===================================================================
-
-
-class TestMigration:
-    def test_migrates_local_project_to_centralized(self, tmp_path: Path) -> None:
-        cli_home = tmp_path / "home"
-        sync_root = tmp_path / "project"
-        sync_root.mkdir()
-
-        old_dir = sync_root / PROJECT_DIR_NAME
-        old_dir.mkdir()
-        config_data = {
-            "server_url": "http://localhost:8000",
-            "folder_id": "f_migrated",
-            "folder_name": "Test",
-            "user_id": "u1",
-            "user_email": "test@test.com",
-        }
-        (old_dir / "config.json").write_text(json.dumps(config_data), encoding="utf-8")
-        (old_dir / "sync.json").write_text('{"files":{},"folders":{}}', encoding="utf-8")
-
-        with patch.dict(os.environ, {"COLLABMARK_HOME": str(cli_home)}):
-            folder_id = migrate_local_project(sync_root)
-
-        assert folder_id == "f_migrated"
-        assert not old_dir.exists()
-        new_dir = cli_home / "projects" / "f_migrated"
-        assert (new_dir / "config.json").is_file()
-        assert (new_dir / "sync.json").is_file()
-
-    def test_sets_local_path_on_migration(self, tmp_path: Path) -> None:
-        cli_home = tmp_path / "home"
-        sync_root = tmp_path / "project"
-        sync_root.mkdir()
-
-        old_dir = sync_root / PROJECT_DIR_NAME
-        old_dir.mkdir()
-        config_data = {
-            "server_url": "http://x",
-            "folder_id": "f1",
-            "folder_name": "F",
-            "user_id": "u1",
-            "user_email": "e@e.com",
-        }
-        (old_dir / "config.json").write_text(json.dumps(config_data), encoding="utf-8")
-        (old_dir / "sync.json").write_text('{"files":{},"folders":{}}', encoding="utf-8")
-
-        with patch.dict(os.environ, {"COLLABMARK_HOME": str(cli_home)}):
-            migrate_local_project(sync_root)
-            config = load_sync_config(cli_home / "projects" / "f1")
-
-        assert config is not None
-        assert config.local_path == str(sync_root.resolve())
-
-    def test_returns_none_if_no_local_project(self, tmp_path: Path) -> None:
-        with patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path)}):
-            result = migrate_local_project(tmp_path)
-        assert result is None
-
-    def test_detect_and_migrate_triggers_migration(self, tmp_path: Path) -> None:
-        cli_home = tmp_path / "home"
-        sync_root = tmp_path / "project"
-        sync_root.mkdir()
-
-        old_dir = sync_root / PROJECT_DIR_NAME
-        old_dir.mkdir()
-        config_data = {
-            "server_url": "http://x",
-            "folder_id": "f_auto",
-            "folder_name": "Auto",
-            "user_id": "u1",
-            "user_email": "e@e.com",
-        }
-        (old_dir / "config.json").write_text(json.dumps(config_data), encoding="utf-8")
-        (old_dir / "sync.json").write_text('{"files":{},"folders":{}}', encoding="utf-8")
-
-        with patch.dict(os.environ, {"COLLABMARK_HOME": str(cli_home)}):
-            result = detect_and_migrate(sync_root)
-
-        assert result == "f_auto"
-        assert not old_dir.exists()
-
-    def test_detect_and_migrate_noop_if_no_local(self, tmp_path: Path) -> None:
-        with patch.dict(os.environ, {"COLLABMARK_HOME": str(tmp_path)}):
-            result = detect_and_migrate(tmp_path)
-        assert result is None
