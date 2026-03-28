@@ -16,6 +16,7 @@ from collabmark.commands.start import (
 )
 from collabmark.lib.api import CollabMarkClient
 from collabmark.lib.auth import AuthError, ensure_authenticated
+from collabmark.lib.config import detect_and_migrate
 from collabmark.lib.registry import find_entry_by_path
 
 console = Console()
@@ -47,6 +48,8 @@ def init(link: str | None, path: str | None) -> None:
 
 async def _init_async(link: str | None, path_str: str | None) -> None:
     target = Path(path_str) if path_str else Path.cwd()
+
+    detect_and_migrate(target)
 
     existing = find_entry_by_path(target)
     if existing and Path(existing.local_path) == target.resolve():

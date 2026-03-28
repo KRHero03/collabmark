@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from click.testing import CliRunner
 
-from collabmark.lib.auth import LoginMetadata
 from collabmark.commands.doctor import (
     _check_active_syncs,
     _check_config_dir,
@@ -31,7 +30,7 @@ class TestCheckConfigDir:
 class TestCheckCredentials:
     def test_returns_true_when_logged_in(self):
         with (
-            patch("collabmark.commands.doctor.load_metadata", return_value=LoginMetadata(email="test@example.com", name="Test User")),
+            patch("collabmark.commands.doctor.load_metadata", return_value={"email": "test@example.com"}),
             patch("collabmark.commands.doctor.load_api_key", return_value="cm_test_key"),
         ):
             ok, key = _check_credentials()
@@ -49,7 +48,7 @@ class TestCheckCredentials:
 
     def test_returns_false_when_no_api_key(self):
         with (
-            patch("collabmark.commands.doctor.load_metadata", return_value=LoginMetadata(email="test@example.com", name="Test User")),
+            patch("collabmark.commands.doctor.load_metadata", return_value={"email": "test@example.com"}),
             patch("collabmark.commands.doctor.load_api_key", return_value=None),
         ):
             ok, _key = _check_credentials()
