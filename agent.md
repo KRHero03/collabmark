@@ -302,7 +302,17 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
     - `channels/templates.py`: branded HTML email templates
     - `channels/base.py`: abstract channel interface
 
-**Total: 1002 backend tests, 945 frontend tests, 342 CLI tests (all passing).**
+- **Phase 23**: CLI Auth Fix, Migration Cleanup & Technical Documentation
+  - Fixed CLI browser login: updated callback handler to capture `code` param (not `token`) and exchange it via `POST /api/auth/cli/exchange` for the JWT
+  - Added `_exchange_code_for_jwt()` helper in `browser_auth.py`
+  - Removed legacy `detect_and_migrate()`, `migrate_local_project()`, and `PROJECT_DIR_NAME` from CLI config
+  - Removed vestigial migration calls from `init` and `start` commands
+  - Updated CLI README to reference centralized `~/.collabmark/projects/` storage
+  - Added technical documentation: `docs/architecture.md`, `docs/api-reference.md`, `docs/cli-reference.md`, `docs/deployment.md`, `docs/ci-cd.md`
+  - Added Makefile targets: `test-cli`, `lint-cli`, `test-all`, `verify`
+  - Updated `lint` and `test` targets to include CLI
+
+**Total: 1002 backend tests, 945 frontend tests, 408 CLI tests (all passing).**
 
 ## Tech Stack
 
@@ -382,13 +392,21 @@ collabmark/
     src/collabmark/
       commands/      # CLI commands (init, login, start, stop, status, logs, list, clean)
       lib/           # Core libraries (api, auth, config, crdt_sync, daemon, logger, registry, sync_engine, watcher)
-    tests/           # 313 CLI tests
+    tests/           # 408 CLI tests
     pyproject.toml   # hatchling build + CLI entry point
+  docs/              # Technical documentation
+    architecture.md  # System architecture overview
+    api-reference.md # API endpoint reference
+    cli-reference.md # CLI command reference
+    deployment.md    # Deployment guide (local + production)
+    ci-cd.md         # CI/CD pipeline documentation
+    marketing/       # Marketing materials (dev.to, Product Hunt, Reddit)
   Dockerfile         # Multi-stage (build frontend + bundle with backend)
   docker-compose.yml # MongoDB + Redis + MinIO + Mailpit for local dev
   docker-compose.prod.yml # Production compose
   railway.toml       # Railway deployment config
   Procfile           # Heroku/Railway process file
+  Makefile           # Unified build system (install, test, lint, format, build, ci, verify)
   agent.md           # THIS FILE -- agent reference
   .cursor/skills/    # Cursor AI skills (pre-commit checklist, toast-on-action, write-code)
 ```
@@ -475,9 +493,10 @@ collabmark/
 - `DELETE /api/keys/{id}` -- revoke API key
 
 ### CLI Auth
-- `POST /api/auth/cli/token` -- exchange session cookie for a CLI API key (reuses existing key if present)
-- `GET /cli-login` -- browser-based CLI login page (OAuth redirect + token relay)
-- `GET /cli-login/success` -- CLI login success confirmation page
+- `GET /api/auth/cli/complete?port=XXXX` -- issues a short-lived auth code and redirects to CLI's local server
+- `POST /api/auth/cli/exchange` -- exchanges the auth code for a JWT token
+- `POST /api/keys` -- CLI exchanges JWT for a persistent API key (reuses existing key if present)
+- `GET /cli-login` -- browser-based CLI login page (OAuth redirect + code relay)
 
 ### WebSocket
 - `WS /ws/doc/{document_id}` -- CRDT collaboration (VIEW or EDIT access required, used by both web editor and CLI)
@@ -511,8 +530,7 @@ collabmark/
 - `/api-docs` -- Interactive API documentation (public, no auth required)
 - `/admin` -- Super admin dashboard (create/manage organizations, view members)
 - `/org/:orgId/settings` -- Organization settings (General, Members, SSO config)
-- `/cli-login` -- CLI browser-based login (OAuth flow with token relay back to CLI)
-- `/cli-login/success` -- CLI login success confirmation
+- `/cli-login` -- CLI browser-based login (OAuth flow with auth code relay back to CLI)
 
 ## Coding Guidelines
 
@@ -771,8 +789,8 @@ export COLLABMARK_FRONTEND_URL=http://localhost:5173
 
 ### Sync Flow (CRDT-based)
 
-1. **Authentication**: Browser OAuth -> API key stored in OS keychain via `keyring`
-2. **Init**: Create `.collabmark/` directory, link to cloud folder, register in global registry
+1. **Authentication**: Browser OAuth -> auth code exchange -> JWT -> API key stored in OS keychain via `keyring`
+2. **Init**: Link local directory to cloud folder, store config centrally in `~/.collabmark/projects/`, register in global registry
 3. **Sync cycle**:
    - Local scan: recursive `.md` file discovery with SHA-256 content hashing
    - Cloud scan: `GET /api/folders/tree` for full folder+document tree
