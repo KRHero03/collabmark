@@ -306,7 +306,8 @@ CollabMark is a collaborative Markdown editor (Google Docs-style) with:
   - Fixed CLI browser login: updated callback handler to capture `code` param (not `token`) and exchange it via `POST /api/auth/cli/exchange` for the JWT
   - Added `_exchange_code_for_jwt()` helper in `browser_auth.py`
   - Removed legacy `detect_and_migrate()`, `migrate_local_project()`, and `PROJECT_DIR_NAME` from CLI config
-  - Removed vestigial migration calls from `init` and `start` commands
+  - Removed `init` command entirely (redundant — `start` handles folder linking)
+  - Removed vestigial migration calls from `start` command
   - Updated CLI README to reference centralized `~/.collabmark/projects/` storage
   - Added technical documentation: `docs/architecture.md`, `docs/api-reference.md`, `docs/cli-reference.md`, `docs/deployment.md`, `docs/ci-cd.md`
   - Added Makefile targets: `test-cli`, `lint-cli`, `test-all`, `verify`

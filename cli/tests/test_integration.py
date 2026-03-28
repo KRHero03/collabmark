@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -11,12 +10,9 @@ from click.testing import CliRunner
 
 from collabmark import __version__
 from collabmark.lib.api import CollabMarkClient
-from collabmark.lib.auth import AuthError
 from collabmark.lib.config import (
-    init_project,
     save_sync_state,
 )
-from collabmark.lib.registry import register_sync
 from collabmark.lib.sync_engine import (
     ActionKind,
     _flatten_tree,
@@ -28,7 +24,6 @@ from collabmark.main import cli
 from collabmark.types import (
     DocumentInfo,
     FolderContents,
-    SyncConfig,
     SyncFileEntry,
     SyncState,
 )
@@ -319,7 +314,7 @@ class TestCommandHelp:
 
     @pytest.mark.parametrize(
         "cmd",
-        ["init", "login", "logout", "start", "status", "stop", "logs"],
+        ["login", "logout", "start", "status", "stop", "logs"],
     )
     def test_command_has_help(self, runner: CliRunner, cmd: str) -> None:
         result = runner.invoke(cli, [cmd, "--help"])
@@ -334,42 +329,3 @@ class TestCommandHelp:
         result = runner.invoke(cli, ["logs", "--help"])
         assert "Examples:" in result.output
 
-    def test_init_help_shows_examples(self, runner: CliRunner) -> None:
-        result = runner.invoke(cli, ["init", "--help"])
-        assert "Examples:" in result.output
-
-
-# ===================================================================
-# Init command
-# ===================================================================
-
-
-class TestInitCommand:
-    def test_already_initialized(self, tmp_path: Path) -> None:
-        cli_home = tmp_path / "home"
-        target = tmp_path / "project"
-        target.mkdir()
-
-        config = SyncConfig(
-            server_url="http://localhost:8000",
-            folder_id="f1",
-            folder_name="Test",
-            user_id="u1",
-            user_email="test@test.com",
-            local_path=str(target.resolve()),
-        )
-        with patch.dict(os.environ, {"COLLABMARK_HOME": str(cli_home)}):
-            init_project("f1", config)
-            register_sync(str(target), "f1", "Test", "http://localhost:8000", "test@test.com")
-
-            runner = CliRunner()
-            result = runner.invoke(cli, ["init", "--path", str(target)])
-        assert "already set up" in result.output
-
-    @pytest.mark.asyncio
-    async def test_requires_auth(self) -> None:
-        runner = CliRunner()
-        with patch("collabmark.commands.init.ensure_authenticated") as mock_auth:
-            mock_auth.side_effect = AuthError("Not logged in")
-            result = runner.invoke(cli, ["init", "--path", "/tmp"])
-            assert result.exit_code == 1
