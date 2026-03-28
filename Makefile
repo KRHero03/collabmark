@@ -1,4 +1,4 @@
-.PHONY: help install quickstart lint lint-fix lint-cli format format-check test test-all test-be test-fe test-cli test-cov build ci verify clean
+.PHONY: help install quickstart lint lint-fix format format-check test test-be test-fe test-cov build ci clean
 
 BACKEND  := backend
 FRONTEND := frontend
@@ -42,13 +42,9 @@ quickstart: ## One-command dev setup: env, deps, infra, backend + frontend
 
 # ── Lint ─────────────────────────────────────────────────────────────
 
-lint: ## Run all linters (backend + frontend + CLI)
+lint: ## Run linters (ruff + eslint + prettier check)
 	$(VENV)/ruff check $(BACKEND)/app $(BACKEND)/tests
 	cd $(FRONTEND) && yarn run check
-	cd cli && ruff check src/ tests/
-
-lint-cli: ## Run CLI linter
-	cd cli && ruff check src/ tests/ && ruff format --check src/ tests/
 
 lint-fix: ## Auto-fix lint issues
 	$(VENV)/ruff check $(BACKEND)/app $(BACKEND)/tests --fix
@@ -66,18 +62,13 @@ format-check: ## Check formatting without changes
 
 # ── Test ─────────────────────────────────────────────────────────────
 
-test: test-be test-fe test-cli ## Run all tests (backend + frontend + CLI)
-
-test-all: test ## Alias for test (all three suites)
+test: test-be test-fe ## Run all tests
 
 test-be: ## Run backend tests
 	cd $(BACKEND) && $(VENV_REL)/python -m pytest
 
 test-fe: ## Run frontend tests
 	cd $(FRONTEND) && yarn test
-
-test-cli: ## Run CLI tests
-	cd cli && python -m pytest tests/ --tb=short -q
 
 test-cov: ## Run all tests with coverage
 	cd $(BACKEND) && $(VENV_REL)/python -m pytest --cov=app --cov-report=term-missing
@@ -91,29 +82,6 @@ build: ## Build frontend for production
 # ── CI ───────────────────────────────────────────────────────────────
 
 ci: lint format-check test build ## Full CI pipeline: lint + format-check + test + build
-
-# ── Verify ──────────────────────────────────────────────────────────
-
-verify: ## Local E2E verification: infra + tests + build
-	@echo "==> Starting MongoDB and Redis via Docker"
-	@docker compose up -d mongodb redis 2>/dev/null || echo "Docker unavailable — start MongoDB and Redis manually"
-	@echo "==> Waiting for MongoDB..."
-	@for i in 1 2 3 4 5 6 7 8 9 10; do \
-		mongosh --eval "db.runCommand({ping:1})" --quiet 2>/dev/null && break || sleep 2; \
-	done
-	@echo "==> Running backend tests"
-	@$(MAKE) test-be
-	@echo "==> Running frontend tests"
-	@$(MAKE) test-fe
-	@echo "==> Running CLI tests"
-	@$(MAKE) test-cli
-	@echo "==> Building frontend"
-	@$(MAKE) build
-	@echo ""
-	@echo "✓ All checks passed! For full E2E with Playwright MCP, start the servers:"
-	@echo "  Terminal 1:  cd backend && source .venv/bin/activate && uvicorn app.main:app --reload"
-	@echo "  Terminal 2:  cd frontend && yarn dev"
-	@echo "  Then use Playwright MCP to verify landing page, login flow, and Swagger docs."
 
 # ── Clean ────────────────────────────────────────────────────────────
 

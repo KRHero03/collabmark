@@ -1,7 +1,6 @@
 import asyncio
 from unittest.mock import patch
 
-import mongomock
 import pytest
 import pytest_asyncio
 from app.main import DOCUMENT_MODELS, app
@@ -9,21 +8,6 @@ from app.models.user import User
 from beanie import init_beanie
 from httpx import ASGITransport, AsyncClient
 from mongomock_motor import AsyncMongoMockClient
-
-# ---------------------------------------------------------------------------
-# Patch mongomock to accept the `authorizedCollections` keyword that newer
-# pymongo / motor versions pass to list_collection_names(). mongomock 4.3.0
-# doesn't support it, causing TypeError in Beanie init.
-# ---------------------------------------------------------------------------
-_orig_list_collection_names = mongomock.Database.list_collection_names
-
-
-def _patched_list_collection_names(self, *args, **kwargs):
-    kwargs.pop("authorizedCollections", None)
-    return _orig_list_collection_names(self, *args, **kwargs)
-
-
-mongomock.Database.list_collection_names = _patched_list_collection_names
 
 
 @pytest.fixture(scope="session")

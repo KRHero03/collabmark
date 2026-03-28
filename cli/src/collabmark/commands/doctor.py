@@ -32,7 +32,7 @@ def _check_credentials() -> tuple[bool, str | None]:
     if not meta or not api_key:
         console.print(f"  {_check_mark(False)} Credentials (not logged in)")
         return False, None
-    console.print(f"  {_check_mark(True)} Credentials (logged in as {meta.email})")
+    console.print(f"  {_check_mark(True)} Credentials (logged in as {meta.get('email', '?')})")
     return True, api_key
 
 
